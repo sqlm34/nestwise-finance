@@ -16,9 +16,16 @@ Verified locally:
   and financialIngestion=false. There are no ingestion routes or database bindings.
 
 Not yet verified / not complete:
-- Physical Android/iOS app behavior, signed APK/IPA builds.
+- Physical Android/iOS behavior: not tested. EAS staging builds submitted:
+  Android APK: 0d1e1f00-c3ac-4d35-a505-f5b6cfe53741
+  iOS simulator: 38b0629f-9b79-4af7-8892-5d30edc997ae
+  Android is in the free-tier queue (~33 minutes at submission); no completed
+  native artifact is claimed until EAS reports success.
 - Cloudflare automated GitHub deploy activation requires a scoped service token.
-- Expo account and project link verified; EAS CI secret setup is still pending.
+- Expo project linked. A dedicated Developer robot was explicitly approved by
+  the owner; its token is encrypted in GitHub's staging EXPO_TOKEN secret.
+  EAS_ENABLED and EAS_PROJECT_ID are configured. CI access check is pending.
+  Manual EAS workflow becomes available after this PR is merged into main.
 - Full bank-specific contracts, missing statement periods, opening/closing
   balance checks, OFX/QFX/PDF/OCR, durable evidence storage.
 - Server authentication, account authorization and financial journal.
@@ -27,4 +34,5 @@ Not yet verified / not complete:
 
 Production CRM, financial accounts, and production databases were not changed.
 Do not treat phase 1 as complete delivery of the full master specification.
+
 
