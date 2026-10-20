@@ -2,7 +2,7 @@
 
 Expo / React Native / TypeScript application for family, personal and business finances.
 
-**Phase 1 development preview. This is not a live accounting system.**
+**Phase 2A development preview. This is not a live accounting system.**
 All transaction fixtures are synthetic. Alex CRM, banking and OCR are not connected.
 Uploaded CSV files are parsed locally, kept in memory, and never posted to a ledger.
 Workiz is excluded from this project.
@@ -50,8 +50,22 @@ South National currently uses the explicit generic column layout. Real bank
 fixtures are still required before claiming a verified bank-specific adapter.
 
 PDF/OCR/OFX/QFX, bank balances, durable file storage, ledger posting,
-authentication, server workspace authorization, automatic matching, refunds,
-CRM events and accountant report generation are **not yet implemented**.
+mobile login, automatic matching, the CRM sender, cloud database provisioning
+and accountant report generation are **not yet implemented**.
+
+## Server foundation (phase 2A)
+
+The new receiver validates HMAC-signed CRM events and commits a durable inbox
+and balanced immutable journal. Sessions, workspace membership and account
+grants protect the read API. Refunds, supplier credits, fee refunds, corrections,
+out-of-order delivery and idempotency are covered by database tests.
+The deployed receiver remains disabled and production is explicitly refused.
+
+See [CRM API contract and ERD](docs/CRM_CONTRACT.md),
+[OpenAPI](docs/openapi.yaml), and [migration/restore runbook](db/README.md).
+`npm run demo:ledger` opens a synthetic, in-memory PostgreSQL demonstration
+at `http://127.0.0.1:8082`. It is a verification tool, not the user-facing app.
+CI runs PostgreSQL 17 concurrency tests and a dump/restore verification.
 
 ## Version control and CI
 

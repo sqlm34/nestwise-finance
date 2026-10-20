@@ -1,0 +1,43 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nestwise · Проверка финансового журнала</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f7f5;color:#183f33;font:16px system-ui,sans-serif}
+main{max-width:1100px;margin:40px auto;padding:0 24px}h1{font-size:34px;letter-spacing:-1px;margin-bottom:10px}
+.tag{background:#e3eee8;border-radius:20px;padding:7px 12px;display:inline-block;font-size:13px}
+p{color:#526960;line-height:1.6}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px}
+.card,section{background:white;border:1px solid #dce7e0;border-radius:18px;padding:22px;margin:18px 0}.card strong{font-size:29px;display:block;margin-top:12px}
+section{overflow:auto}table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}td,th{padding:13px 8px;border-bottom:1px solid #e7eee9}
+th{color:#637a70;font-weight:500}button{background:#147b5b;color:white;padding:12px 20px;border:0;border-radius:9px;cursor:pointer}
+.ok{color:#147b5b}.note{background:#fff7df;padding:15px;border-radius:10px}code{font-size:12px}footer{padding:20px 0;color:#526960;font-size:13px}
+</style><main><span class="tag">NESTWISE · ЭТАП 2А</span><h1>Событие → журнал → проверка</h1>
+<p>Рабочий приёмник подписанных событий и отдельная тестовая база PostgreSQL. Все операции ниже синтетические. CRM и реальные счета не подключены.</p>
+<div class="note">Сценарий: оплата $350, невозвратная запчасть $95, полный возврат клиенту. Возврат доставлен первым и повторно — журнал должен сохранить расход $95 без двойной записи.</div>
+<div class="cards"><div class="card">Оплаты<strong id="receipts">…</strong></div><div class="card">Возвраты<strong id="refunds">…</strong></div><div class="card">Запчасти<strong id="parts">…</strong></div><div class="card">Результат сценария<strong id="net">…</strong></div></div>
+<section><h2>Доставка событий</h2><p>Показаны фактические ответы обработчика. ACK подтверждает сохранение события, а не обязательно проводку.</p>
+<table><thead><tr><th>Доставка</th><th>Ревизия</th><th>Ответ</th><th>Дубликат</th></tr></thead><tbody id="trace"></tbody></table></section>
+<section><h2>Записанные проводки</h2><p>Положительная сумма — дебет, отрицательная — кредит. Сумма каждой пары должна быть нулевой.</p>
+<table><thead><tr><th>Операция</th><th>Счёт журнала</th><th>Центы</th></tr></thead><tbody id="entries"></tbody></table></section>
+<section><h2>Контроль доступа</h2><p id="access">Проверяем…</p><p id="count"></p><button id="refresh">Обновить из базы</button><p id="error" role="alert"></p></section>
+<footer>Локальная проверка сервера, а не банковский баланс или готовая бухгалтерская отчётность. Данные исчезают при остановке демонстрации.</footer></main>
+<script>
+const format=n=>new Intl.NumberFormat('ru-RU',{style:'currency',currency:'USD'}).format(n/100);
+function row(parent,values){const tr=document.createElement('tr');for(const value of values){const td=document.createElement('td');td.textContent=String(value);tr.append(td);}parent.append(tr);}
+async function refresh(){
+  const error=document.querySelector('#error');error.textContent='';
+  try{
+    const response=await fetch('/report');if(!response.ok)throw new Error('База временно недоступна');
+    const data=await response.json(), sums={};
+    const trace=document.querySelector('#trace'),entries=document.querySelector('#entries');trace.replaceChildren();entries.replaceChildren();
+    data.trace.forEach(e=>row(trace,[e.label,e.revision,e.status,e.duplicate?'Да — без новой записи':'Нет']));
+    data.entries.forEach((tx,i)=>tx.entries.forEach(e=>{sums[e.code]=(sums[e.code]||0)+Number(e.cents);row(entries,[i+1,e.code,e.cents]);}));
+    document.querySelector('#receipts').textContent=format(-sums.receipts);
+    document.querySelector('#refunds').textContent=format(sums.refunds);
+    document.querySelector('#parts').textContent=format(sums.parts_cost);
+    document.querySelector('#net').textContent=format(-sums.receipts-sums.refunds-sums.parts_cost);
+    document.querySelector('#access').textContent=data.accessDenied?'Прямое чтение таблиц запрещено. Журнал получен через API с проверкой сессии, пространства и счёта.':'Проверка доступа не пройдена';
+    document.querySelector('#access').className=data.accessDenied?'ok':'';
+    document.querySelector('#count').textContent=`Операций в журнале: ${data.entries.length}. Доставок: ${data.trace.length}. Движок: ${data.database}.`;
+  }catch(e){error.textContent=e.message;}
+}
+document.querySelector('#refresh').addEventListener('click',refresh);refresh();
+</script></html>

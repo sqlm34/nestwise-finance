@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: Nestwise receiver and journal
+  version: 0.2.0
+  description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
+paths:
+  /health:
+    get:
+      responses:
+        '200':
+          description: Configuration state, not database readiness
+  /v1/crm/events:
+    post:
+      description: Exact-byte HMAC-SHA256 authentication specified in CRM_CONTRACT.md. No browser CORS.
+      parameters:
+        - {in: header, name: X-NW-Connection, required: true, schema: {type: string}}
+        - {in: header, name: X-NW-Key-Id, required: true, schema: {type: string}}
+        - {in: header, name: X-NW-Timestamp, required: true, schema: {type: string, pattern: '^[0-9]{10}$'}}
+        - {in: header, name: X-NW-Nonce, required: true, schema: {type: string, format: uuid}}
+        - {in: header, name: X-NW-Signature, required: true, schema: {type: string, pattern: '^[0-9a-f]{64}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+      responses:
+        '202':
+          description: Durable receipt; status may still be waiting or needs_review
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, duplicate, event_id, status]
+                properties:
+                  accepted: {const: true}
+                  duplicate: {type: boolean}
+                  event_id: {type: string, format: uuid}
+                  status: {enum: [waiting, posted, asserted, needs_review]}
+        '400': {description: Invalid contract}
+        '401': {description: Invalid identity, signature or request time}
+        '404': {description: Disabled or unavailable route}
+        '409': {description: Replay or event/fact/revision conflict}
+        '413': {description: More than 16 KiB}
+        '415': {description: Content type must be application/json}
+        '503': {description: Persistence failed; no ACK; retry with a fresh nonce}
+  /v1/workspaces/{workspace}/accounts/{account}/journal:
+    get:
+      security: [{session: []}]
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Latest 100 transactions; cents represented as decimal strings}
+        '401': {description: Missing, expired or revoked session}
+        '404': {description: Disabled route or account not accessible}
+        '503': {description: Database unavailable}
+components:
+  securitySchemes:
+    session: {type: http, scheme: bearer}
+  schemas:
+    Event:
+      type: object
+      additionalProperties: false
+      required: [schema_version, source_event_id, source_order_id, source_fact_id, order_revision, type, currency, occurred_at, paid_at]
+      description: Type-specific required/prohibited fields are detailed in CRM_CONTRACT.md and enforced by contract.ts.
+      properties:
+        schema_version: {const: 1}
+        source_event_id: {type: string, format: uuid}
+        source_order_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        source_fact_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        order_revision: {type: integer, minimum: 1, maximum: 2147483646}
+        type:
+          enum: [job.payment_recorded, job.part_cost_recorded, job.customer_refund_issued, job.supplier_credit_received, job.cost_corrected, job.processor_fee_recorded, job.processor_fee_refunded, job.financials_finalized, job.reopened, job.voided]
+        currency: {const: USD}
+        occurred_at: {type: string, format: date-time}
+        paid_at: {type: [string, 'null'], format: date-time}
+        amount_cents: {type: integer, minimum: 0, maximum: 9007199254740991}
+        reference_event_id: {type: string, format: uuid}
+        settlement: {enum: [paid, accrued]}
+        totals:
+          type: object
+          additionalProperties: false
+          required: [payments_cents, refunds_cents, parts_net_cents, fees_net_cents]
+          properties:
+            payments_cents: {type: integer, minimum: 0, maximum: 9007199254740991}
+            refunds_cents: {type: integer, minimum: 0, maximum: 9007199254740991}
+            parts_net_cents: {type: integer, minimum: 0, maximum: 9007199254740991}
+            fees_net_cents: {type: integer, minimum: 0, maximum: 9007199254740991}
