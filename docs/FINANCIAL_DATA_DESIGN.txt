@@ -100,3 +100,20 @@ Subsequent local checkpoint — 2026-10-20
   acceptance, remaining CRM event producers, bank PDF/partial workflows and all
   Part 2 acceptance items remain outstanding. Local preview approval remains
   blocked; do not bypass. No new PR yet under the two-delivery agreement.
+
+GitHub verification checkpoint — 2026-10-20
+- Nestwise feature branch pushed through d65501391806ffdd1f21f4956c3d443af53395fe.
+  CI https://github.com/sqlm34/nestwise-finance/actions/runs/39510623588 succeeded,
+  including real PostgreSQL concurrent operations, bank-origin recovery proof,
+  pg_dump/pg_restore, TypeScript, lint, web/mobile exports and Worker dry-run.
+- Feature pushes now run checks without deploying unapplied migrations.
+  Staging/EAS access jobs require STAGING_DEPLOY_BRANCH (default main).
+  Both were skipped for this feature branch. No staging schema or app changes.
+- CRM source branch pushed through 9253ea07c836b25a7d7ae64aebeedaec4303d2a0.
+  CI https://github.com/sqlm34/Alex-CRM/actions/runs/39511396229 succeeded,
+  including concurrent converters/senders on PostgreSQL 17, source outbox dump/
+  restore, immutable audit verification and two-database signed delivery.
+- Fixed historical baseline bypass for a new offline payment on a pre-existing
+  financial order. Reassigning an offline source fact to another job is blocked.
+- No new PR yet: Part 1 product scope is still incomplete. Existing frontend
+  browser acceptance restriction and remaining delivery checklist still apply.
