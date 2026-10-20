@@ -26,7 +26,8 @@ Not yet verified / not complete:
   First automated deployment is pending verification.
 - Expo project linked. A dedicated Developer robot was explicitly approved by
   the owner; its token is encrypted in GitHub's staging EXPO_TOKEN secret.
-  EAS_ENABLED and EAS_PROJECT_ID are configured. CI access check is pending.
+  EAS_ENABLED and EAS_PROJECT_ID are configured. GitHub CI successfully
+  authenticated as the robot and resolved the linked Expo project.
   Manual EAS workflow becomes available after this PR is merged into main.
 - Full bank-specific contracts, missing statement periods, opening/closing
   balance checks, OFX/QFX/PDF/OCR, durable evidence storage.
