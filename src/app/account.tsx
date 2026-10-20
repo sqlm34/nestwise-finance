@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -6,14 +6,14 @@ import { apiURL, authClient, authenticatedFetch } from '../auth/client';
 import { Button, Card, Notice, styles, colors } from '../components/ui';
 import { useApp } from '../state';
 import {AccountJournal} from '../components/AccountJournal';
-import {parseJournal,type JournalPage} from '../domain/journal';
 type Access={user:{name:string;email:string};workspaces:{id:string;name:string;role:string;accounts:{id:string;name:string;currency:string}[]}[]};
 export default function Account() {
   const {t,locale,setLocale}=useApp();
   const [email,setEmail]=useState(''),[password,setPassword]=useState('');
   const [access,setAccess]=useState<Access|null>(null),[busy,setBusy]=useState(!!apiURL),[error,setError]=useState('');
-  const [journal,setJournal]=useState<JournalPage|null>(null);
   const [selected,setSelected]=useState<{workspace:string;account:string;name:string;currency:string}|null>(null);
+  const [expired,setExpired]=useState(false);
+  const sessionExpired=useCallback(()=>{setAccess(null);setSelected(null);setExpired(true);},[]);
   useEffect(()=>{
     const controller=new AbortController();
     let active=true;
@@ -29,7 +29,7 @@ export default function Account() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
   async function signIn() {
-    setBusy(true);setError('');setJournal(null);setSelected(null);
+    setBusy(true);setError('');setExpired(false);setSelected(null);
     try {
       const result=await authClient.signIn.email({email:email.trim(),password});
       setPassword('');
@@ -44,19 +44,8 @@ export default function Account() {
     try {
       const result=await authClient.signOut();
       if(result.error) throw new Error();
-      setAccess(null);setJournal(null);setSelected(null);setPassword('');
+      setAccess(null);setSelected(null);setPassword('');
     } catch {setError(t('authLogoutFailed'));} finally {setBusy(false);}
-  }
-  async function readJournal(workspace:string,account:string,name:string,currency:string) {
-    setBusy(true);setError('');setJournal(null);
-    setSelected({workspace,account,name,currency});
-    try {
-      const result=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/journal`);
-      if(result.status===401) {setAccess(null);setSelected(null);setError(t('authExpired'));return;}
-      if(result.status===404) {setError(t('journalAccessLost'));return;}
-      if(!result.ok) throw new Error();
-      setJournal(parseJournal(await result.json()));
-    } catch {setError(t('journalUnavailable'));} finally {setBusy(false);}
   }
   return <SafeAreaView style={{flex:1,backgroundColor:colors.bg}}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:24,gap:20,maxWidth:650,width:'100%',alignSelf:'center'}}>
@@ -65,6 +54,7 @@ export default function Account() {
         <Text style={styles.muted}>{t('authHint')}</Text>
         {!apiURL&&<Notice text={t('authNotConfigured')}/>}
         {!!error&&<Notice error text={error}/>}
+        {expired&&<Notice error text={t('authExpired')}/>}
         {busy&&<ActivityIndicator accessibilityLabel={t('authLoading')} color={colors.green}/>}
         {access ? <>
           <Text style={styles.h2}>{access.user.name}</Text><Text style={styles.muted}>{access.user.email}</Text>
@@ -83,11 +73,11 @@ export default function Account() {
         {access.workspaces.map(space=><View key={space.id} style={{gap:10}}>
           <Text style={styles.h2}>{space.name}</Text>
           {space.accounts.length===0&&<Notice text={t('journalNoAccounts')}/>}
-          {space.accounts.map(account=><Button key={account.id} label={`${account.name} · ${account.currency}`} selected={selected?.workspace===space.id&&selected.account===account.id} disabled={busy} onPress={()=>void readJournal(space.id,account.id,account.name,account.currency)}/>)}
+          {space.accounts.map(account=><Button key={account.id} label={`${account.name} · ${account.currency}`} selected={selected?.workspace===space.id&&selected.account===account.id} disabled={busy} onPress={()=>setSelected({workspace:space.id,account:account.id,name:account.name,currency:account.currency})}/>)}
         </View>)}
       </Card>}
-      {access&&selected&&<AccountJournal key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency} page={journal} busy={busy}
-        onRefresh={()=>void readJournal(selected.workspace,selected.account,selected.name,selected.currency)}/>}
+      {access&&selected&&<AccountJournal key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
+        workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>}
       <Button label={t('authDemoBack')} onPress={()=>router.replace('/')}/>
     </ScrollView>
   </SafeAreaView>;

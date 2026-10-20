@@ -45,11 +45,12 @@ before(async () => {
   if (db.exec) {
     await db.exec(migration);
     await db.exec(readFileSync('db/migrations/0003_user_access.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0005_journal_history.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,4);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,5);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -59,6 +60,47 @@ before(async () => {
   await sql(`INSERT INTO nestwise.sessions VALUES ($1,$2,now()+interval '1 hour',NULL),($3,$4,now()+interval '1 hour',NULL)`, [tokenHash,user,accountantHash,accountant]);
 });
 after(async () => { if (db?.close) await db.close(); else if (db) await db.end(); });
+
+test('full history paginates tied timestamps, searches beyond page one and rechecks grants',async()=>{
+  const {parseHistoryPage}=require('../.test-build/src/domain/journal-history.js');
+  for(let index=0;index<205;index++)await accept(money(`history-proof-${index}`,1,'job.payment_recorded',100,{
+    occurred_at:index===0?'2026-10-19T01:30:00Z':'2026-10-19T12:00:00.123Z',
+  }));
+  const page=async({query='history-proof-',from=null,to=null,code='all',order='newest',cursor=null,subject='test-owner',target=account}={})=>
+    parseHistoryPage((await sql('SELECT nestwise.user_journal_page($1,$2,$3,$4,$5,$6,$7,$8,$9) result',
+      [subject,workspace,target,query,from,to,code,order,cursor]))[0].result);
+  const first=await page();assert.equal(first.entries.length,100);assert.ok(first.next_cursor);
+  const second=await page({cursor:first.next_cursor});assert.equal(second.entries.length,100);
+  const third=await page({cursor:second.next_cursor});assert.equal(third.entries.length,5);assert.equal(third.next_cursor,null);
+  const all=[...first.entries,...second.entries,...third.entries];
+  assert.equal(new Set(all.map(row=>row.id)).size,205);
+  const asc1=await page({order:'oldest'}),asc2=await page({order:'oldest',cursor:asc1.next_cursor}),
+    asc3=await page({order:'oldest',cursor:asc2.next_cursor});
+  assert.deepEqual([...asc1.entries,...asc2.entries,...asc3.entries].map(row=>row.id),all.map(row=>row.id).reverse());
+  const old=third.entries.at(-1);
+  assert.deepEqual((await page({query:old.source_order_id})).entries.map(row=>row.id),[old.id]);
+  assert.equal((await page({query:'HISTORY-PROOF-',from:'2026-10-19',to:'2026-10-19',code:'receipts'})).entries.length,100);
+  assert.equal((await page({from:'2026-10-18',to:'2026-10-18'})).entries.length,0);
+  assert.equal((await page({code:'refunds'})).entries.length,0);
+  assert.equal((await page({query:'%'})).entries.length,0,'Search is literal, not a wildcard');
+  await accept(money('history-proof-new',1,'job.payment_recorded',100,{occurred_at:'2026-10-21T00:00:00Z'}));
+  assert.deepEqual((await page({cursor:first.next_cursor})).entries,second.entries,'New rows must not shift the continuation');
+  assert.equal((await page()).entries[0].source_order_id,'history-proof-new');
+  await assert.rejects(page({cursor:randomUUID()}),/invalid_cursor/);
+  await assert.rejects(page({subject:'nonexistent'}),/forbidden/);
+  await assert.rejects(page({target:otherAccount}),/forbidden/);
+  await sql('BEGIN');
+  try {
+    await sql('UPDATE nestwise.memberships SET all_accounts=false WHERE workspace_id=$1 AND user_id=$2',[workspace,user]);
+    await sql('SET LOCAL ROLE nestwise_api');
+    await assert.rejects(page({cursor:first.next_cursor}),/forbidden/);
+  } finally {await sql('ROLLBACK');}
+  await sql('BEGIN');
+  try {
+    await sql('SET LOCAL ROLE nestwise_api');
+    assert.equal((await page()).entries.length,100);
+  } finally {await sql('ROLLBACK');}
+});
 
 test('full payment and matching finalized snapshot do not post revenue twice', async () => {
   const order = randomUUID();

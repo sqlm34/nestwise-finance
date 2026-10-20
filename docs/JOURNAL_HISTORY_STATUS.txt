@@ -1,0 +1,36 @@
+Full account history — 2026-10-20
+
+The signed-in journal searches the full authorized account history on the server.
+Filters: case-insensitive literal order/event/journal ID (128 characters max),
+inclusive UTC event dates, and accounting code. Each result preserves every line
+of the balanced transaction. No financial totals or tax classifications inferred.
+Sort: event timestamp and UUID, both ascending or descending. Page size 100.
+Cursor is the last transaction UUID; the database resolves its timestamp without
+losing microseconds. It cannot refer to a transaction in a different account.
+Authorization is rechecked on every request, including continuation pages.
+
+UI: Apply filters / Reset; Previous / Next; first-page refresh; explicit empty,
+loading, invalid-filter, access-loss and network-error states. Changed filters
+are labeled as unapplied until submitted. Account switch aborts the old request.
+Stale responses cannot populate the newly selected account. Only one page stays
+rendered, avoiding an ever-growing mobile transaction list. EN/RU parity checked.
+
+This is live keyset navigation, not a database snapshot. New or late-arriving
+events can appear between requests. Refresh restarts the view. It is not a
+finalized report or bank balance. A future frozen report requires a separate
+versioned reporting boundary.
+
+Deployment: snapshot the isolated Neon staging branch, apply versioned migration
+0005 with the owner via scripts/migrate.cjs, then deploy Worker + matching client.
+Migration adds one index and one SECURITY DEFINER read function with a locked
+search path and explicit runtime-only execute grant. Existing functions remain.
+Rollback: redeploy the previous Worker/client. Leave the additive function/index
+in place; never delete journal records to roll back application behavior.
+For disaster recovery use a separate restored branch and existing recovery
+runbook, including revoking restored sessions/invitations before enabling access.
+
+Verification: 205 rows across 100/100/5 pages, ties, reverse order, literal search
+beyond page one, date/code intersections, no offset shifts after insertion,
+revoked grants, restricted-role execution, invalid parameters and auth failures.
+PostgreSQL CI also verifies migrations and backup/restore. No CRM or production
+changes, no live financial ingestion.

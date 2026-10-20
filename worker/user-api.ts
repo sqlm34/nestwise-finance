@@ -2,6 +2,7 @@ import { connectAuth, type AuthService, type AuthConfig } from './auth';
 import { database } from './database';
 import { limitedText } from './security';
 import { acceptInvitation, invitations } from './invitations';
+import {parseHistoryParams} from '../src/domain/journal-history';
 
 export type UserEnv = {
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
@@ -56,7 +57,7 @@ export async function userApi(request: Request, env: UserEnv,
   const authPaths = new Map([['/api/auth/sign-in/email','POST'],['/api/auth/sign-out','POST'],['/api/auth/get-session','GET']]);
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
-  if (url.search || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
+  if ((url.search&&!journalMatch) || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch))) return finish(response({error:'not_found'},404));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
@@ -82,11 +83,17 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
-    if(journalMatch) return finish(response({entries:await db.userJournal(subject,journalMatch[1],journalMatch[2]),limit:100}));
+    if(journalMatch) {
+      let query;
+      try {query=parseHistoryParams(url.searchParams);}
+      catch {return finish(response({error:'invalid_filters'},400));}
+      return finish(response(await db.userJournalPage(subject,journalMatch[1],journalMatch[2],query.filters,query.cursor)));
+    }
     return finish(response({user:{id:session.user.id,name:session.user.name,email:session.user.email},
       workspaces:await db.userAccess(subject)}));
   } catch(error) {
     if(error instanceof Error && error.message==='forbidden') return finish(response({error:'not_found'},404));
+    if(error instanceof Error && ['invalid_cursor','invalid_filters'].includes(error.message))return finish(response({error:error.message},400));
     return finish(response({error:'temporarily_unavailable'},503));
   } finally { if(service) await service.close().catch(() => {}); }
 }

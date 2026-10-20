@@ -40,7 +40,10 @@ export function parseJournal(value:unknown):JournalPage {
     if(lines.reduce((sum,line)=>sum+BigInt(line.cents),0n)!==0n)throw new Error('invalid_journal');
     return {id,occurred_at:timestamp(row.occurred_at),paid_at:row.paid_at===null?null:timestamp(row.paid_at),
       posted_at:timestamp(row.posted_at),source_event_id:identifier(row.source_event_id),
-      source_order_id:identifier(row.source_order_id),entries:lines};
+      source_order_id:(()=>{
+        if(typeof row.source_order_id!=='string'||!/^[A-Za-z0-9_.:-]{1,128}$/.test(row.source_order_id))throw new Error('invalid_journal');
+        return row.source_order_id;
+      })(),entries:lines};
   });
   return {entries,limit:100};
 }

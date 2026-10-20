@@ -1,23 +1,54 @@
-import React,{useState} from 'react';
+import React,{useEffect,useState} from 'react';
 import {ActivityIndicator,Text,TextInput,View} from 'react-native';
 import {Card,Button,Notice,SearchField,styles,colors} from './ui';
 import {useApp} from '../state';
-import {journalCodes,journalDate,journalMoney,type JournalPage,type JournalCode} from '../domain/journal';
-import {defaultJournalFilters,filterJournal} from '../domain/journal-filters';
+import {journalCodes,journalDate,journalMoney,type JournalCode} from '../domain/journal';
+import {defaultJournalFilters,type JournalFilters} from '../domain/journal-filters';
+import {historyParams,parseHistoryPage,validateHistoryFilters,type HistoryPage} from '../domain/journal-history';
+import {authenticatedFetch} from '../auth/client';
 import type {MessageKey} from '../i18n';
 const labels:Record<JournalCode,MessageKey>={
   clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',
   parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',
 };
-export function AccountJournal({name,currency,page,busy,onRefresh}:{
-  name:string;currency:string;page:JournalPage|null;busy:boolean;onRefresh:()=>void;
+type HistoryRequest={filters:JournalFilters;cursors:(string|null)[];revision:number};
+export function AccountJournal({name,currency,workspace,account,onSessionExpired}:{
+  name:string;currency:string;workspace:string;account:string;onSessionExpired:()=>void;
 }) {
   const {t,locale}=useApp();
   const [filters,setFilters]=useState(defaultJournalFilters);
-  const filtered=filterJournal(page?.entries??[],filters);
+  const [request,setRequest]=useState<HistoryRequest>({filters:defaultJournalFilters,cursors:[null],revision:0});
+  const [result,setResult]=useState<{request:HistoryRequest;page:HistoryPage|null;error:MessageKey|null}|null>(null);
+  const busy=result?.request!==request;
+  const page=busy?null:result?.page;
+  const error=busy?null:result?.error;
+  const filterError=validateHistoryFilters(filters);
+  const dirty=JSON.stringify(filters)!==JSON.stringify(request.filters);
+  useEffect(()=>{
+    const controller=new AbortController();let active=true;
+    (async()=>{
+      try {
+        const response=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/journal${
+          historyParams(request.filters,request.cursors.at(-1)!)}`,controller.signal);
+        if(!active)return;
+        if(response.status===401){onSessionExpired();return;}
+        if(!response.ok){
+          setResult({request,page:null,error:response.status===404?'journalAccessLost':response.status===400?'journalRestart':'journalUnavailable'});
+          return;
+        }
+        const loaded=parseHistoryPage(await response.json());
+        if(active)setResult({request,page:loaded,error:null});
+      } catch {
+        if(active)setResult({request,page:null,error:'journalUnavailable'});
+      }
+    })();
+    return ()=>{active=false;controller.abort();};
+  },[workspace,account,request,onSessionExpired]);
+  const restart=(next:JournalFilters)=>setRequest(current=>({filters:next,cursors:[null],revision:current.revision+1}));
+  const emptyFiltered=!!(request.filters.query||request.filters.from||request.filters.to||request.filters.code!=='all');
   return <Card>
     <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{t('journalTitle')}</Text>
-      <Button label={t('journalRefresh')} disabled={busy} onPress={onRefresh}/></View>
+      <Button label={t('journalRefresh')} disabled={busy} onPress={()=>restart(request.filters)}/></View>
     <Text style={styles.text}>{name} · {currency}</Text>
     <Text style={styles.muted}>{t('journalScope')}</Text>
     <Text style={styles.muted}>{t('journalFilterScope')}</Text>
@@ -40,15 +71,17 @@ export function AccountJournal({name,currency,page,busy,onRefresh}:{
     <View style={styles.row}>
       {(['newest','oldest'] as const).map(order=><Button key={order} label={t(order)} selected={filters.order===order}
         onPress={()=>setFilters(current=>({...current,order}))}/>)}
-      <Button label={t('journalReset')} onPress={()=>setFilters(defaultJournalFilters)}/>
+      <Button label={t('journalReset')} disabled={busy} onPress={()=>{setFilters(defaultJournalFilters);restart(defaultJournalFilters);}}/>
+      <Button label={t('journalApply')} primary disabled={busy||!!filterError} onPress={()=>restart(filters)}/>
     </View>
-    {filtered.error&&<Notice error text={t(filtered.error==='invalidDate'?'journalInvalidDate':'journalReversedRange')}/>}
+    {filterError&&<Notice error text={t(filterError==='invalidDate'?'journalInvalidDate':filterError==='reversedRange'?'journalReversedRange':'journalInvalidQuery')}/>}
+    {dirty&&<Notice text={t('journalUnapplied')}/>}
+    {error&&<Notice error text={t(error)}/>}
     {busy&&<ActivityIndicator accessibilityLabel={t('authLoading')} color={colors.green}/>}
-    {!busy&&page&&page.entries.length===0&&<Notice text={t('journalEmpty')}/>}
-    {!busy&&page&&page.entries.length>0&&!filtered.error&&<>
-      <Text style={styles.muted}>{t('journalShown')} {filtered.entries.length} / {page.entries.length} · {t('journalLimit')}</Text>
-      {filtered.entries.length===0&&<Notice text={t('journalNoMatches')}/>}
-      {filtered.entries.map(transaction=><View key={transaction.id} style={{gap:10,paddingTop:14,borderTopWidth:1,borderColor:colors.line}}>
+    {page&&<>
+      <Text style={styles.muted}>{t('page')} {request.cursors.length} · {t('journalShown')} {page.entries.length} · {t('journalLimit')}</Text>
+      {page.entries.length===0&&<Notice text={t(emptyFiltered?'journalNoMatches':'journalEmpty')}/>}
+      {page.entries.map(transaction=><View key={transaction.id} style={{gap:10,paddingTop:14,borderTopWidth:1,borderColor:colors.line}}>
         <Text style={styles.h2}>{journalDate(transaction.occurred_at,locale)}</Text>
         <Text style={styles.muted}>{t('journalPaidAt')}: {transaction.paid_at?journalDate(transaction.paid_at,locale):t('journalNotPaid')}</Text>
         {transaction.entries.map((line,index)=>{
@@ -64,6 +97,14 @@ export function AccountJournal({name,currency,page,busy,onRefresh}:{
         <Text selectable style={styles.muted}>{t('journalEvent')}: {transaction.source_event_id}</Text>
         <Text style={styles.muted}>{t('journalPostedAt')}: {journalDate(transaction.posted_at,locale)}</Text>
       </View>)}
+      <Text style={styles.muted}>{t(page.next_cursor?'journalMore':'journalEnd')}</Text>
     </>}
+    <View style={styles.row}>
+      <Button label={t('previous')} disabled={busy||request.cursors.length===1}
+        onPress={()=>setRequest(current=>({...current,cursors:current.cursors.slice(0,-1)}))}/>
+      <Button label={t('next')} disabled={busy||!page?.next_cursor}
+        onPress={()=>{if(page?.next_cursor)setRequest(current=>({...current,cursors:[...current.cursors,page.next_cursor]}));}}/>
+    </View>
+    <Text style={styles.muted}>{t('journalLiveHistory')}</Text>
   </Card>;
 }

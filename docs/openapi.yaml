@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Nestwise receiver and journal
-  version: 0.2.0
+  version: 0.3.0
   description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
 paths:
   /health:
@@ -55,6 +55,57 @@ paths:
         '401': {description: Missing, expired or revoked session}
         '404': {description: Disabled route or account not accessible}
         '503': {description: Database unavailable}
+  /v1/user/workspaces/{workspace}/accounts/{account}/journal:
+    get:
+      description: >
+        Live Better Auth session required. Searches the entire authorized account history.
+        Inclusive UTC event dates; literal case-insensitive ID search; code filters retain
+        every line of each balanced transaction. Keyset pagination sorts by occurred_at
+        then UUID. Refresh to include late arrivals; this is not a frozen report.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: q, schema: {type: string, maxLength: 128}, description: Literal substring of order, event or journal ID}
+        - {in: query, name: from, schema: {type: string, format: date}}
+        - {in: query, name: to, schema: {type: string, format: date}}
+        - {in: query, name: code, schema: {enum: [all, clearing, receipts, refunds, parts_cost, parts_payable, fees], default: all}}
+        - {in: query, name: order, schema: {enum: [newest, oldest], default: newest}}
+        - {in: query, name: cursor, schema: {type: string, format: uuid}, description: next_cursor from previous response; keep the same filters}
+      responses:
+        '200':
+          description: Up to 100 complete balanced transactions; no-store. Authorizations rechecked on every page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, limit, next_cursor]
+                properties:
+                  limit: {const: 100}
+                  next_cursor: {type: [string, 'null'], format: uuid}
+                  entries:
+                    type: array
+                    maxItems: 100
+                    items:
+                      type: object
+                      required: [id, occurred_at, paid_at, posted_at, source_event_id, source_order_id, entries]
+                      properties:
+                        id: {type: string, format: uuid}
+                        occurred_at: {type: string, format: date-time}
+                        paid_at: {type: [string, 'null'], format: date-time}
+                        posted_at: {type: string, format: date-time}
+                        source_event_id: {type: string, format: uuid}
+                        source_order_id: {type: string, maxLength: 128}
+                        entries:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              code: {type: string}
+                              cents: {type: string, pattern: '^-?[0-9]+$'}
+        '400': {description: Invalid or duplicate filters, invalid cursor; restart from first page}
+        '401': {description: Missing, expired or revoked Better Auth session}
+        '404': {description: Account not accessible; no cross-account disclosure}
+        '503': {description: Database unavailable; retry without assuming history is empty}
 components:
   securitySchemes:
     session: {type: http, scheme: bearer}
