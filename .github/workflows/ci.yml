@@ -100,3 +100,26 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
           APP_ENV: staging
+  android-internal-build:
+    needs: checks
+    # One selected commit only. No deployment, update or store submission.
+    if: github.event_name == 'push' && vars.EAS_ENABLED == 'true' && github.sha == vars.EAS_INTERNAL_BUILD_SHA
+    environment: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    concurrency:
+      group: nestwise-android-internal
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Build signed staging APK for device acceptance
+        run: npx --no-install eas build --profile staging --platform android --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+          APP_ENV: staging
