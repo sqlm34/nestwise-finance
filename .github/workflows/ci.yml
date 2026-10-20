@@ -56,7 +56,9 @@ jobs:
           retention-days: 7
   staging:
     needs: checks
-    if: github.event_name == 'push' && vars.STAGING_ENABLED == 'true'
+    # Feature pushes always run checks. Deploy only the explicitly selected branch
+    # after its database migrations have been reviewed/applied; default is main.
+    if: github.event_name == 'push' && vars.STAGING_ENABLED == 'true' && github.ref_name == (vars.STAGING_DEPLOY_BRANCH || 'main')
     environment: staging
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -81,7 +83,7 @@ jobs:
         run: node scripts/verify-staging-web.cjs
   eas-access:
     needs: checks
-    if: github.event_name == 'push' && vars.EAS_ENABLED == 'true'
+    if: github.event_name == 'push' && vars.EAS_ENABLED == 'true' && github.ref_name == (vars.STAGING_DEPLOY_BRANCH || 'main')
     environment: staging
     runs-on: ubuntu-latest
     timeout-minutes: 10
