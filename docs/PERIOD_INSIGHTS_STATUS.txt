@@ -1,0 +1,36 @@
+Account period insights — 2026-10-20
+
+Integrated block: authenticated account overview; month/quarter/calendar-year
+presets and custom inclusive UTC event-date periods (up to 366 days); comparison
+with the preceding equal-length period; zero-filled monthly breakdown; full-ledger
+aggregation; drill-down to source journal lines and transaction provenance;
+unresolved-event and missing-payment-date visibility; EN/RU; access regression.
+
+The database computes current, previous, months and attention in one SQL statement.
+Summaries use all authorized postings, not a client page. PostgreSQL numeric sums
+and decimal strings retain precision; client BigInt computes display metrics.
+Client validates balances, period identity, complete month coverage and exact
+monthly reconciliation to period amounts/counts before rendering anything.
+
+Metrics: recorded receipts, customer refunds, net receipts, parts cost net of
+supplier credits/corrections, fees net of fee refunds, their recorded difference,
+clearing movement and payable movement. Accrued parts remain visible separately
+through payables and missing payment dates. Neither movement is a closing balance.
+These are event-date operational facts, not tax recognition or cash-basis reports.
+Unrecorded operating expenses and owner transfers are not invented. Bank/receipt
+reconciliation and approved tax mapping are explicitly unavailable. No finalized,
+approved or tax-ready status is exposed, even for an empty account.
+
+Direct code rows drill into the same period/code; balanced transactions retain all
+lines. Derived figures are explained by formula and can be traced via all-period
+transactions. Month and prior-period drill-downs have explicit date scopes. Return
+refreshes the same overview period. Account changes reset state and abort requests.
+
+Migration 0009 adds only a scoped SECURITY DEFINER read function. Staging snapshot
+retained at 2026-10-20 19:56:20 UTC before application. Rollback redeploys prior app and preserves the additive
+function and all financial history. Existing CRM and production are unchanged.
+
+Tests cover 213 postings, refunds/credits/corrections, paid/accrued parts, fee refund,
+previous/event/payment-date distinction, zero months, 13-month partial ranges,
+leap years, exact large aggregates, malformed responses, invalid filters, unknown
+accounts, revoked grants, restricted SQL role and live authenticated API requests.

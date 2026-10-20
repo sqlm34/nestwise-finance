@@ -13,13 +13,14 @@ const labels:Record<JournalCode,MessageKey>={
   parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',
 };
 type HistoryRequest={filters:JournalFilters;cursors:(string|null)[];revision:number};
-export function AccountJournal({name,currency,workspace,account,onSessionExpired}:{
+export function AccountJournal({name,currency,workspace,account,onSessionExpired,initialFilters=defaultJournalFilters}:{
   name:string;currency:string;workspace:string;account:string;onSessionExpired:()=>void;
+  initialFilters?:JournalFilters;
 }) {
   const {t,locale}=useApp();
-  const [filters,setFilters]=useState(defaultJournalFilters);
+  const [filters,setFilters]=useState(initialFilters);
   const [selectedTransaction,setSelectedTransaction]=useState<string|null>(null);
-  const [request,setRequest]=useState<HistoryRequest>({filters:defaultJournalFilters,cursors:[null],revision:0});
+  const [request,setRequest]=useState<HistoryRequest>({filters:initialFilters,cursors:[null],revision:0});
   const [result,setResult]=useState<{request:HistoryRequest;page:HistoryPage|null;error:MessageKey|null}|null>(null);
   const busy=result?.request!==request;
   const page=busy?null:result?.page;

@@ -25,6 +25,12 @@ test('real Better Auth login, workspace authorization, logout and stale cookie r
   assert.equal(result.workspaces[0].accounts[0].id,fixture.account);
   const path=`/v1/user/workspaces/${fixture.workspace}/accounts/${fixture.account}/journal`;
   const eventsPath=path.replace(/journal$/,'events');
+  const insightsPath=path.replace(/journal$/,'insights'),periodQuery='?from=2026-10-01&to=2026-10-31';
+  assert.equal((await fixture.fetch(request(insightsPath+periodQuery))).status,401);
+  const emptyInsights=await fixture.fetch(request(insightsPath+periodQuery,{cookie}));assert.equal(emptyInsights.status,200);
+  assert.equal(emptyInsights.headers.get('cache-control'),'no-store');assert.equal((await emptyInsights.json()).current.transaction_count,'0');
+  for(const query of ['','?from=2026-02-30&to=2026-03-01','?from=2025-01-01&to=2026-12-31'])
+    assert.equal((await fixture.fetch(request(insightsPath+query,{cookie}))).status,400);
   assert.equal((await fixture.fetch(request(eventsPath))).status,401);
   const emptyEvents=await fixture.fetch(request(eventsPath,{cookie}));assert.equal(emptyEvents.status,200);
   assert.equal(emptyEvents.headers.get('cache-control'),'no-store');
@@ -46,6 +52,8 @@ test('real Better Auth login, workspace authorization, logout and stale cookie r
       ['auth-history',randomUUID(),Math.floor(Date.now()/1000),JSON.stringify(event)]);
   }
   const first=await (await fixture.fetch(request(path,{cookie}))).json();
+  const insights=await (await fixture.fetch(request(insightsPath+periodQuery,{cookie}))).json();
+  assert.equal(insights.current.transaction_count,'101');assert.equal(insights.current.totals.receipts,'-10100');
   const events=await (await fixture.fetch(request(eventsPath+'?status=all',{cookie}))).json();
   assert.equal(events.events.length,100);assert.equal(events.counts.posted,'101');
   const eventDetailPath=eventsPath+'/'+events.events[0].cursor;
@@ -68,6 +76,7 @@ test('real Better Auth login, workspace authorization, logout and stale cookie r
   const match=await (await fixture.fetch(request(path+'?q=auth-order-0&from=2026-10-01&to=2026-10-01&code=receipts',{cookie}))).json();
   assert.deepEqual(match.entries,second.entries);
   await fixture.db.query('UPDATE nestwise.memberships SET all_accounts=false WHERE workspace_id=$1',[fixture.workspace]);
+  assert.equal((await fixture.fetch(request(insightsPath+periodQuery,{cookie}))).status,404);
   assert.equal((await fixture.fetch(request(eventsPath+'?status=all&cursor='+events.next_cursor,{cookie}))).status,404);
   assert.equal((await fixture.fetch(request(eventDetailPath,{cookie}))).status,404);
   assert.equal((await fixture.fetch(request(path+`?cursor=${first.next_cursor}`,{cookie}))).status,404);

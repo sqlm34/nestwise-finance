@@ -5,6 +5,7 @@ const { readFileSync } = require('node:fs');
 const { validateEvent } = require('../.test-build/worker/contract.js');
 let db;
 const workspace = randomUUID(), otherWorkspace = randomUUID(), account = randomUUID(), otherAccount = randomUUID();
+const periodAccount=randomUUID();
 const user = randomUUID(), accountant = randomUUID();
 const tokenHash = createHash('sha256').update('synthetic-session').digest('hex');
 const accountantHash = createHash('sha256').update('synthetic-accountant').digest('hex');
@@ -49,11 +50,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0006_journal_provenance.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0007_account_events.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0008_event_details.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0009_account_period_insights.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,8);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,9);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -63,6 +65,51 @@ before(async () => {
   await sql(`INSERT INTO nestwise.sessions VALUES ($1,$2,now()+interval '1 hour',NULL),($3,$4,now()+interval '1 hour',NULL)`, [tokenHash,user,accountantHash,accountant]);
 });
 after(async () => { if (db?.close) await db.close(); else if (db) await db.end(); });
+
+test('period insights aggregate the full ledger, reconcile months, isolate accounts and keep operational meanings',async()=>{
+  const {parsePeriodInsights,periodMetrics}=require('../.test-build/src/domain/period-insights.js');
+  const target=periodAccount;await sql("INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,'Period proof')",[target,workspace]);
+  await sql('INSERT INTO nestwise.source_connections VALUES ($1,$2,$3,true)',['period-proof',workspace,target]);
+  const send=async event=>{validateEvent(event);return sql('SELECT nestwise.accept_event($1,$2,$3,$4)',['period-proof',randomUUID(),Math.floor(Date.now()/1000),JSON.stringify(event)]);};
+  const read=async(from='2026-10-01',to='2026-10-31',subject='test-owner',accountId=target)=>parsePeriodInsights((await sql('SELECT nestwise.user_period_insights($1,$2,$3,$4,$5) result',[subject,workspace,accountId,from,to]))[0].result,{from,to});
+  const payment=money('period-order',1,'job.payment_recorded',35000,{occurred_at:'2026-10-01T00:00:00Z'});
+  const part=money('period-order',2,'job.part_cost_recorded',9500,{settlement:'paid'});
+  const correction=money('period-order',3,'job.cost_corrected',7500,{reference_event_id:part.source_event_id});
+  await send(payment);await send(part);await send(correction);
+  await send(money('period-order',4,'job.supplier_credit_received',2500,{reference_event_id:correction.source_event_id}));
+  await send(money('period-order',5,'job.customer_refund_issued',10000,{reference_event_id:payment.source_event_id}));
+  await send(money('period-accrual',1,'job.part_cost_recorded',3000,{settlement:'accrued',paid_at:null}));
+  const fee=money('period-fee',1,'job.processor_fee_recorded',500);await send(fee);
+  await send(money('period-fee',2,'job.processor_fee_refunded',100,{reference_event_id:fee.source_event_id}));
+  for(let i=0;i<205;i++)await send(money(`period-bulk-${i}`,1,'job.payment_recorded',100));
+  await send(money('period-previous',1,'job.payment_recorded',50000,{occurred_at:'2026-09-30T23:59:59Z'}));
+  await send(money('period-outside',1,'job.payment_recorded',999,{occurred_at:'2026-11-01T00:00:00Z'}));
+  await send(money('period-wait',2,'job.payment_recorded',999999,{occurred_at:'2026-09-01T00:00:00Z'}));
+  await send(money('period-order',6,'job.customer_refund_issued',999999,{reference_event_id:payment.source_event_id}));
+  const overview=await read(),m=periodMetrics(overview.current);
+  assert.equal(overview.current.transaction_count,'213');assert.equal(overview.previous.transaction_count,'1');
+  assert.equal(overview.current.missing_paid_date,'1');assert.deepEqual(overview.attention,{waiting:'1',needs_review:'1'});
+  assert.equal(m.receipts,55500n);assert.equal(m.refunds,10000n);assert.equal(m.parts_cost,8000n);assert.equal(m.fees,400n);
+  assert.equal(m.recorded_difference,37100n);assert.equal(m.parts_payable,3000n);assert.equal(m.clearing,40100n);
+  assert.equal(periodMetrics(overview.previous).receipts,50000n);assert.deepEqual(overview.months[0],overview.current);
+  const quarterly=await read('2026-10-01','2026-12-31');assert.equal(quarterly.months.length,3);
+  assert.equal(quarterly.months[1].transaction_count,'1');assert.equal(quarterly.months[2].transaction_count,'0');
+  const empty=await read('2025-01-01','2025-01-31');assert.equal(empty.current.transaction_count,'0');assert.equal(empty.attention.waiting,'1');
+  const correctionDay=await read('2026-10-19','2026-10-19');
+  assert.equal(periodMetrics(correctionDay.current).receipts,20500n);
+  assert.equal(correctionDay.previous.transaction_count,'0');
+  assert.equal((await read('2026-01-15','2027-01-14')).months.length,13);
+  for(let i=0;i<2;i++)await send(money(`period-large-${i}`,1,'job.payment_recorded',9007199254740991,{occurred_at:'2026-07-01T12:00:00Z'}));
+  assert.equal(periodMetrics((await read('2026-07-01','2026-07-31')).current).receipts,18014398509481982n);
+  await assert.rejects(read('2026-10-01','2026-10-31','test-accountant'),/forbidden/);
+  await assert.rejects(read('2026-10-01','2026-10-31','test-owner',otherAccount),/forbidden/);
+  await assert.rejects(read('2024-01-01','2025-01-01'),/invalid_filters/);
+  await sql('INSERT INTO nestwise.account_grants VALUES ($1,$2,$3)',[workspace,accountant,target]);
+  assert.equal((await read('2026-10-01','2026-10-31','test-accountant')).current.transaction_count,'213');
+  await sql('DELETE FROM nestwise.account_grants WHERE user_id=$1',[accountant]);
+  await assert.rejects(read('2026-10-01','2026-10-31','test-accountant'),/forbidden/);
+  await sql('BEGIN');try{await sql('SET LOCAL ROLE nestwise_api');assert.equal((await read()).current.transaction_count,'213');}finally{await sql('ROLLBACK');}
+});
 
 test('account event center covers unposted orders, keyset pages, safe guidance and revoked grants',async()=>{
   const {parseEventsPage}=require('../.test-build/src/domain/account-events.js');
@@ -321,7 +368,7 @@ test('authenticated subjects receive only assigned workspaces and accounts',asyn
     assert.deepEqual((await sql('SELECT nestwise.user_access($1) result',['unknown']))[0].result,[]);
     const access=(await sql('SELECT nestwise.user_access($1) result',['test-owner']))[0].result;
     assert.equal(access.length,1); assert.equal(access[0].id,workspace);
-    assert.equal(access[0].accounts.length,1); assert.equal(access[0].accounts[0].id,account);
+    assert.deepEqual(access[0].accounts.map(row=>row.id).sort(),[account,periodAccount].sort());
     assert.ok((await sql('SELECT nestwise.user_journal($1,$2,$3) result',['test-owner',workspace,account]))[0].result.length>0);
     await assert.rejects(sql('SELECT nestwise.user_journal($1,$2,$3)',['test-owner',otherWorkspace,otherAccount]),/forbidden/);
     await assert.rejects(sql('SELECT * FROM nestwise_auth.account'),/permission denied|does not exist/);

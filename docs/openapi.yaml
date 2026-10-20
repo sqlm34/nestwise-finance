@@ -4,6 +4,43 @@ info:
   version: 0.3.0
   description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
 paths:
+  /v1/user/workspaces/{workspace}/accounts/{account}/insights:
+    get:
+      description: >
+        Authenticated operational journal summary, not a bank balance or tax report.
+        Aggregates all posted transactions by occurred_at, inclusive UTC days, maximum
+        366 days. Compares the immediately preceding equal-length period. Includes
+        zero-filled partial/calendar months and account-wide unresolved event counts.
+        All amounts and counts are decimal strings. Access rechecked per request.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: from, required: true, schema: {type: string, format: date}}
+        - {in: query, name: to, required: true, schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: Live single-query calculation; Cache-Control no-store; not a frozen snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [currency, generated_at, current, previous, months, attention]
+                properties:
+                  currency: {const: USD}
+                  generated_at: {type: string, format: date-time}
+                  current: {$ref: '#/components/schemas/PeriodSummary'}
+                  previous: {$ref: '#/components/schemas/PeriodSummary'}
+                  months: {type: array, minItems: 1, maxItems: 13, items: {$ref: '#/components/schemas/PeriodSummary'}}
+                  attention:
+                    type: object
+                    required: [waiting, needs_review]
+                    properties:
+                      waiting: {type: string, pattern: '^[0-9]+$'}
+                      needs_review: {type: string, pattern: '^[0-9]+$'}
+        '400': {description: Invalid, missing or duplicate dates; reversed or excessive period}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible account}
+        '503': {description: Temporarily unavailable; do not substitute zero totals}
   /v1/user/workspaces/{workspace}/accounts/{account}/events/{event}:
     get:
       description: >
@@ -212,6 +249,19 @@ components:
   securitySchemes:
     session: {type: http, scheme: bearer}
   schemas:
+    PeriodSummary:
+      type: object
+      required: [from, to, transaction_count, missing_paid_date, totals]
+      properties:
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        transaction_count: {type: string, pattern: '^[0-9]+$'}
+        missing_paid_date: {type: string, pattern: '^[0-9]+$'}
+        totals:
+          type: object
+          required: [clearing, receipts, refunds, parts_cost, parts_payable, fees]
+          description: Signed debit-positive journal sums in cents, sum across codes is zero
+          additionalProperties: {type: string, pattern: '^-?[0-9]+$'}
     SourceEvent:
       type: object
       required: [id, order_id, revision, kind, status, occurred_at, paid_at, received_at, posted_at, journal_id, reference_id]

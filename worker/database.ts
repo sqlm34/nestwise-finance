@@ -10,10 +10,14 @@ export type Database = {
   userJournalDetail(subject:string,workspace:string,account:string,transaction:string,before:number|null):Promise<unknown>;
   userAccountEvents(subject:string,workspace:string,account:string,status:string,query:string,cursor:string|null):Promise<unknown>;
   userEventDetail(subject:string,workspace:string,account:string,event:string,before:number|null):Promise<unknown>;
+  userPeriodInsights(subject:string,workspace:string,account:string,from:string,to:string):Promise<unknown>;
 };
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async userPeriodInsights(subject,workspace,account,from,to) {
+      return (await sql`SELECT nestwise.user_period_insights(${subject},${workspace}::uuid,${account}::uuid,${from}::date,${to}::date) result`)[0].result;
+    },
     async userEventDetail(subject,workspace,account,event,before) {
       return (await sql`SELECT nestwise.user_event_detail(${subject},${workspace}::uuid,${account}::uuid,${event}::uuid,${before}::integer) result`)[0].result;
     },
