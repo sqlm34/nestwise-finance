@@ -3,7 +3,7 @@ import {type JournalTransaction} from './journal';
 import {validatePeriod,type Period} from './period-insights';
 import {type BankRow} from './statement';
 
-export const cashKinds=['job.payment_recorded','job.customer_refund_issued','job.part_cost_recorded','job.supplier_credit_received','job.processor_fee_recorded','job.processor_fee_refunded'] as const;
+export const cashKinds=['job.payment_recorded','job.customer_refund_issued','job.part_cost_recorded','job.supplier_credit_received','job.processor_fee_recorded','job.processor_fee_refunded','manual.income','manual.expense','manual.transfer','manual.refund'] as const;
 export type Candidate=JournalTransaction & {kind:string};
 export type DraftGroup={rows:number[];transactions:string[];cents:string};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -9,6 +9,9 @@ import {AccountJournal} from '../components/AccountJournal';
 import {AccountEvents} from '../components/AccountEvents';
 import {AccountInsights} from '../components/AccountInsights';
 import {AccountReconciliation} from '../components/AccountReconciliation';
+import {ManualOperationForm} from '../components/ManualOperationForm';
+import {WorkspaceAdministration} from '../components/WorkspaceAdministration';
+import {AccountReceipts} from '../components/AccountReceipts';
 type Access={user:{name:string;email:string};workspaces:{id:string;name:string;role:string;accounts:{id:string;name:string;currency:string}[]}[]};
 export default function Account() {
   const {t,locale,setLocale}=useApp();
@@ -16,8 +19,14 @@ export default function Account() {
   const [access,setAccess]=useState<Access|null>(null),[busy,setBusy]=useState(!!apiURL),[error,setError]=useState('');
   const [selected,setSelected]=useState<{workspace:string;account:string;name:string;currency:string}|null>(null);
   const [expired,setExpired]=useState(false);
-  const [section,setSection]=useState<'insights'|'journal'|'events'|'reconciliation'>('insights');
+  const [administration,setAdministration]=useState<string|null|undefined>(undefined);
+  const [section,setSection]=useState<'insights'|'journal'|'events'|'reconciliation'|'operations'|'receipts'>('insights');
   const sessionExpired=useCallback(()=>{setAccess(null);setSelected(null);setExpired(true);},[]);
+  const refreshAccess=useCallback(()=>{
+    setAdministration(undefined);setSelected(null);
+    void authenticatedFetch('/v1/session').then(async r=>{if(r.status===401){sessionExpired();return;}if(!r.ok)throw new Error();setAccess(await r.json());})
+      .catch(()=>setError(t('authUnavailable')));
+  },[sessionExpired,t]);
   useEffect(()=>{
     const controller=new AbortController();
     let active=true;
@@ -73,21 +82,28 @@ export default function Account() {
         </>}
       </Card>
       {access&&<Card><Text style={styles.h2}>{t('authSpaces')}</Text>
+        <Button label={locale==='ru'?'Новое пространство':'New workspace'} onPress={()=>setAdministration(null)}/>
         {access.workspaces.length===0&&<Notice text={t('authNoAccess')}/>}
         {access.workspaces.map(space=><View key={space.id} style={{gap:10}}>
           <Text style={styles.h2}>{space.name}</Text>
+          {space.role==='owner'&&<Button label={locale==='ru'?'Настроить пространство':'Manage workspace'} onPress={()=>setAdministration(space.id)}/>}
           {space.accounts.length===0&&<Notice text={t('journalNoAccounts')}/>}
           {space.accounts.map(account=><Button key={account.id} label={`${account.name} · ${account.currency}`} selected={selected?.workspace===space.id&&selected.account===account.id} disabled={busy} onPress={()=>setSelected({workspace:space.id,account:account.id,name:account.name,currency:account.currency})}/>)}
         </View>)}
       </Card>}
+      {access&&administration!==undefined&&<WorkspaceAdministration key={administration||'new'} workspace={administration} onChanged={refreshAccess} onSessionExpired={sessionExpired}/>}
       {access&&selected&&<>
         <View style={styles.row}>
           <Button label={t('insightsTitle')} selected={section==='insights'} onPress={()=>setSection('insights')}/>
           <Button label={t('journalTitle')} selected={section==='journal'} onPress={()=>setSection('journal')}/>
           <Button label={t('eventsTitle')} selected={section==='events'} onPress={()=>setSection('events')}/>
           <Button label={t('reconciliationTitle')} selected={section==='reconciliation'} onPress={()=>setSection('reconciliation')}/>
+          <Button label={locale==='ru'?'Чеки':'Receipts'} selected={section==='receipts'} onPress={()=>setSection('receipts')}/>
+          {['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')&&<Button label={locale==='ru'?'Новая операция':'New operation'} selected={section==='operations'} onPress={()=>setSection('operations')}/>}
         </View>
-        {section==='reconciliation'?<AccountReconciliation canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} key={`${selected.workspace}:${selected.account}`} name={selected.name} workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
+        {section==='receipts'?<AccountReceipts key={`${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account} canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} onSessionExpired={sessionExpired}/>:
+          section==='operations'?<ManualOperationForm key={`${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account} accounts={access.workspaces.find(space=>space.id===selected.workspace)?.accounts||[]} onSaved={()=>setSection('journal')} onSessionExpired={sessionExpired}/>:
+          section==='reconciliation'?<AccountReconciliation canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} key={`${selected.workspace}:${selected.account}`} name={selected.name} workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
           section==='insights'?<AccountInsights key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
           workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired} onEvents={()=>setSection('events')}/>:
           section==='journal'?<AccountJournal key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}

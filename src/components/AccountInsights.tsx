@@ -8,7 +8,7 @@ import {defaultJournalFilters,type JournalFilters} from '../domain/journal-filte
 import {metricKeys,periodPreset,validatePeriod,parsePeriodInsights,periodMetrics,insightMoney,type Period,type PeriodInsights,type Metric} from '../domain/period-insights';
 import {AccountJournal} from './AccountJournal';
 import type {MessageKey} from '../i18n';
-const labels:Record<Metric,MessageKey>={receipts:'insightsReceipts',refunds:'journalRefunds',net_receipts:'insightsNetReceipts',parts_cost:'insightsParts',fees:'journalFees',recorded_difference:'insightsDifference',clearing:'insightsClearing',parts_payable:'insightsPayable'};
+const labels:Record<Metric,MessageKey>={receipts:'insightsReceipts',refunds:'journalRefunds',net_receipts:'insightsNetReceipts',parts_cost:'insightsParts',fees:'journalFees',recorded_difference:'insightsDifference',clearing:'insightsClearing',parts_payable:'insightsPayable',expenses:'journalExpenses',transfers:'journalTransfers'};
 export function AccountInsights({workspace,account,name,currency,onSessionExpired,onEvents}:{workspace:string;account:string;name:string;currency:string;onSessionExpired:()=>void;onEvents:()=>void}){
   const {t,locale}=useApp();
   const [period,setPeriod]=useState<Period>(()=>periodPreset('month'));

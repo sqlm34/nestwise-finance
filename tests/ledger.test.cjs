@@ -55,11 +55,15 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0011_saved_reconciliation.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0012_statement_archive.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0013_statement_evidence.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0014_manual_operations.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0015_workspace_admin.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0016_receipt_evidence.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0017_bank_booking.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,13);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,17);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -445,5 +449,33 @@ test('PostgreSQL document reservations serialize at quota and survive restore wi
     await clients[0].query('SELECT nestwise.complete_document($1,$2,$3,$4)',['test-owner',workspace,periodAccount,completed]);
     assert.equal((await sql('SELECT count(*)::int n FROM nestwise.statement_archived WHERE account_id=$1',[periodAccount]))[0].n,1);
     assert.deepEqual((await clients[0].query('SELECT nestwise.document_evidence($1,$2,$3,$4,$5) result',['test-owner',workspace,periodAccount,completed,'[]'])).rows[0].result,{groups:[],reserved:[],canceled:0});
+  }finally{await Promise.all(clients.map(c=>c.end()));}
+});
+
+test('manual and workspace evidence is retained for full database recovery verification',async()=>{
+  await sql('SELECT nestwise.workspace_command($1,$2,$3)',['test-owner',workspace,JSON.stringify({id:randomUUID(),action:'rename_account',target:account,name:'Clearing test'})]);
+  const payload={id:randomUUID(),kind:'expense',paid_on:'2026-10-20',amount_cents:'123',note:'Recovery proof',destination_account:null,reference_operation:null,allocations:[{category:'supplies',cents:'123'}]};
+  await sql('SELECT nestwise.post_manual_operation($1,$2,$3,$4)',['test-owner',workspace,account,JSON.stringify(payload)]);
+  assert.equal((await sql('SELECT count(*)::int n FROM nestwise.manual_operations WHERE id=$1',[payload.id]))[0].n,1);
+  const receiptHash='9'.repeat(64),reviewId=randomUUID(),operationId=randomUUID();
+  await sql('SELECT nestwise.prepare_receipt($1,$2,$3,$4,$5,$6)',['test-owner',workspace,account,receiptHash,32,'image/png']);
+  await sql('SELECT nestwise.complete_receipt($1,$2,$3,$4)',['test-owner',workspace,account,receiptHash]);
+  const receipt={supplier:'Synthetic recovery receipt',date:'2026-10-19',currency:'USD',items:[{description:'Test supply',cents:'123'}],tax_cents:'0',tip_cents:'0',shipping_cents:'0',discount_cents:'0',total_cents:'123'};
+  await sql('SELECT nestwise.review_receipt($1,$2,$3,$4,$5,$6,$7)',['test-owner',workspace,account,receiptHash,reviewId,0,JSON.stringify(receipt)]);
+  await sql('SELECT nestwise.post_receipt($1,$2,$3,$4,$5,$6,$7)',['test-owner',workspace,account,receiptHash,reviewId,operationId,'2026-10-20']);
+  assert.equal((await sql('SELECT count(*)::int n FROM nestwise.receipt_postings WHERE operation_id=$1',[operationId]))[0].n,1);
+});
+
+test('PostgreSQL serializes concurrent refunds and opposite transfers under the restricted role',{skip:!process.env.TEST_DATABASE_URL},async()=>{
+  const {Client}=require('pg'),clients=[new Client({connectionString:process.env.TEST_DATABASE_URL}),new Client({connectionString:process.env.TEST_DATABASE_URL})];
+  const original={id:randomUUID(),kind:'income',paid_on:'2026-10-20',amount_cents:'1000',note:'Concurrent proof',destination_account:null,reference_operation:null,allocations:[{category:'other_income',cents:'1000'}]};
+  await sql('SELECT nestwise.post_manual_operation($1,$2,$3,$4)',['test-owner',workspace,account,JSON.stringify(original)]);
+  await Promise.all(clients.map(c=>c.connect()));
+  try{
+    await Promise.all(clients.map(c=>c.query('SET ROLE nestwise_api')));
+    const results=await Promise.allSettled(clients.map(c=>c.query('SELECT nestwise.post_manual_operation($1,$2,$3,$4)',['test-owner',workspace,account,JSON.stringify({...original,id:randomUUID(),kind:'refund',amount_cents:'600',reference_operation:original.id,allocations:[]})])));
+    assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.match(results.find(r=>r.status==='rejected').reason.message,/manual_refund_exceeded/);
+    const transfers=await Promise.all(clients.map((c,i)=>c.query('SELECT nestwise.post_manual_operation($1,$2,$3,$4)',['test-owner',workspace,i?periodAccount:account,JSON.stringify({...original,id:randomUUID(),kind:'transfer',destination_account:i?account:periodAccount,allocations:[]})])));
+    assert.equal(transfers.length,2);
   }finally{await Promise.all(clients.map(c=>c.end()));}
 });

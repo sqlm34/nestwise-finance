@@ -1,0 +1,80 @@
+Part 1 implementation notes — 2026-10-20 — IN PROGRESS
+
+Observed baseline
+- journal_transactions.event_id is NOT NULL with a source_events foreign key.
+  Existing read APIs join CRM events; simply adding manual rows would hide them.
+- journal_entries code constraint contains only six CRM management accounts.
+- Manual operation input contract now validates exact cent strings, calendar
+  dates, allocation totals, linked refunds and transfers. This is NOT a posting
+  API. No manual operation is available to users until the full path is ready.
+
+Next implementation sequence within this same branch/PR
+1. Add immutable manual_operations and posting origins with actor/account
+   idempotency. Preserve CRM event foreign keys; enforce exactly one origin.
+   Extend all journal/history/insights/candidate projections for both origins.
+2. Add restricted SQL write RPC, stable account lock order for transfers,
+   bounded cumulative refunds and live permissions on both transfer accounts.
+   A transfer creates two account postings atomically and never business income.
+   Reclassifications/corrections append evidence; no financial row editing.
+3. Connect authenticated Worker routes and bilingual operation forms, with a
+   review/confirm step and retry of the same idempotency identity after timeout.
+4. Add workspace/account administration and audit controls, then receipts and
+   statement extensions against this unified journal.
+5. Complete isolated CRM producer and end-to-end integration before one PR.
+
+CRM inspection findings (implementation in separate isolated worktree)
+Repository: sqlm34-alex-crm-https-github-com, existing working tree is dirty.
+worker/index.ts contains distinct mutation paths:
+- Stripe webhook route around line822 and payment materialization near2994.
+- Offline payment creation route1435 and SQL near3200/3299.
+- Offline void route1449 and SQL near3397/3439.
+- General job PATCH1474 can update finance_items/payments; must not bypass
+  the outbox or erase financial facts without an explicit corrective event.
+Existing offline_payments has stable IDs, idempotency keys and no-delete trigger.
+Existing partial-payment release preserves Stripe payment attempts and webhook
+reconciliation. Any producer must cover all paths inside their DB transaction.
+
+Planned additive CRM migration/rollback
+- Isolated branch/check-out; do not copy uncommitted unrelated Workiz changes.
+- Add financial revision/outbox/attempt tables, stable facts and transactionally
+  generated events; do not replace jobs/payments or change customer schemas.
+- Run regression and isolated PostgreSQL tests; feature flag defaults OFF.
+- Before any staging migration, verify target identity and retain snapshot.
+- Rollback disables dispatcher/flag and reverts application code; preserve
+  outbox, acknowledgements and posted financial history. No history deletion.
+- Actual production rollout and historical import remain unperformed until
+  explicit owner authorization. Never infer refunds from a missing array item.
+
+Unresolved external acceptance inputs
+- Representative redacted Chase/South National CSV/PDF layouts.
+- OCR provider/runtime choice without silently purchasing a subscription.
+- Accounting policies for Part 2; no tax approval inferred from a category key.
+- Real-device Android/iOS tests and credentials at build/signing time.
+
+Implementation checkpoint — 2026-10-20 (Part 1 remains IN PROGRESS)
+- Migrations 0014–0017 and authenticated bilingual UI cover manual operations,
+  split allocations, cumulative refunds, atomic transfers, owner administration,
+  dual-copy receipt originals/review/explicit payment, OCR draft adapter and
+  explicit verified bank-row booking. Receipt lists now use scoped keyset paging.
+- Manual journal entries are visible through both subject and legacy token
+  readers. Restore verification includes manual, administration, receipt and
+  bank-booking immutable tables; the main ledger fixture seeds receipt history.
+- Local suite: 119 tests, 114 passing and 5 real-PostgreSQL checks skipped.
+  TypeScript and ESLint passed; web export passed before the final receipt
+  pagination UI change. Browser acceptance of these screens remains outstanding.
+- CRM branch codex/nestwise-outbox: atomic job/offline-payment capture,
+  immutable outbox, ordered delivery leases/backoff/DLQ, signed transport and
+  disabled-by-default staging dispatcher. Six integration tests pass and Worker
+  preview dry-run bundles successfully. No live CRM migration or deployment.
+- CRM full regression: 353 cases at the earlier checkpoint, nine failures:
+  six require unavailable local PostgreSQL; three source assertions concern
+  existing job-text/startup UI. Re-running those two test files against copies
+  extracted from unmodified b407ee3 reproduces the same three failures.
+- Still needed: canonical CRM event generation/corrections/parts evidence,
+  review and retry UI, historical dry-run, invitations, receipt PDF/camera UX,
+  bank PDF/balances/gaps/partial workflows, integrated browser/native acceptance.
+- Automatic approval review rejected starting the local Expo preview server,
+  including a localhost-only attempt, with only "blocked by policy" supplied.
+  Do not bypass that restriction. Existing staging still serves the old version.
+- No push or Part 1 PR yet. No new staging migrations, OCR calls, production or
+  store actions. Local checkpoints do not mean the delivery is complete.

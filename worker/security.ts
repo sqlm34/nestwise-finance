@@ -5,7 +5,7 @@ export async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), n => n.toString(16).padStart(2, '0')).join('');
 }
-export async function limitedText(request: Request): Promise<string> {
+export async function limitedText(request: Request,limit=maxBodyBytes): Promise<string> {
   if (!request.body) throw new Error('invalid_body');
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = []; let length = 0;
@@ -14,7 +14,7 @@ export async function limitedText(request: Request): Promise<string> {
       const { done, value } = await reader.read();
       if (done) break;
       length += value.byteLength;
-      if (length > maxBodyBytes) { await reader.cancel(); throw new Error('body_too_large'); }
+      if (length > limit) { await reader.cancel(); throw new Error('body_too_large'); }
       chunks.push(value);
     }
   } finally { reader.releaseLock(); }

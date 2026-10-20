@@ -6,6 +6,7 @@ import {authenticatedFetch} from '../auth/client';
 import {journalDate,journalMoney} from '../domain/journal';
 import {parseJournalDetail,parseEventDetail,type EventDetail,type JournalDetail as Detail,type SourceEvent} from '../domain/journal-detail';
 import type {MessageKey} from '../i18n';
+import {parseManualDetail,type ManualDetail} from '../domain/manual-operation';
 const kinds:Record<SourceEvent['kind'],MessageKey>={
   'job.payment_recorded':'eventPayment','job.part_cost_recorded':'eventPart','job.customer_refund_issued':'eventRefund',
   'job.supplier_credit_received':'eventCredit','job.cost_corrected':'eventCorrection',
@@ -33,7 +34,7 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
 }){
   const {t,locale}=useApp();
   const [request,setRequest]=useState<{cursors:(number|null)[];revision:number}>({cursors:[null],revision:0});
-  const [result,setResult]=useState<{request:typeof request;data:Detail|EventDetail|null;error:MessageKey|null}|null>(null);
+  const [result,setResult]=useState<{request:typeof request;data:Detail|EventDetail|null;manual?:ManualDetail;error:MessageKey|null}|null>(null);
   const busy=result?.request!==request,data=busy?null:result?.data;
   useEffect(()=>{
     const controller=new AbortController();let active=true;
@@ -44,6 +45,7 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
       if(response.status===401){onSessionExpired();return;}
       if(!response.ok){setResult({request,data:null,error:response.status===404?(event?'eventsDetailUnavailable':'provenanceUnavailable'):'journalUnavailable'});return;}
       const payload=await response.json();
+      if(!event&&payload.manual){if(active)setResult({request,data:null,manual:parseManualDetail(payload,transaction!),error:null});return;}
       const detail=event?parseEventDetail(payload,event):parseJournalDetail(payload,transaction!);
       if(active)setResult({request,data:detail,error:null});
     }catch{if(active)setResult({request,data:null,error:'journalUnavailable'});}})();
@@ -57,11 +59,23 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
     <Button label={t(event?'eventsRefresh':'journalRefresh')} disabled={busy} onPress={()=>setRequest(current=>({cursors:[null],revision:current.revision+1}))}/>
     {busy&&<ActivityIndicator color={colors.green} accessibilityLabel={t('authLoading')}/>}
     {!busy&&result?.error&&<Notice error text={t(result.error)}/>}
+    {!busy&&result?.manual&&<>
+      <Text style={styles.h2}>{locale==='ru'?'Ручная операция':'Manual operation'} · {result.manual.manual.kind}</Text>
+      <Text selectable style={styles.text}>{result.manual.manual.id}</Text>
+      <Text style={styles.text}>{journalMoney(result.manual.manual.amount_cents,locale,currency)} · {result.manual.manual.paid_on}</Text>
+      <Text style={styles.text}>{result.manual.manual.note}</Text>
+      <Text style={styles.muted}>{locale==='ru'?'Возвращено':'Refunded'}: {journalMoney(result.manual.refunded_cents,locale,currency)}</Text>
+      <Text selectable style={styles.muted}>{locale==='ru'?'Автор':'Recorded by'}: {result.manual.actor}</Text>
+      <Text style={styles.muted}>{journalDate(result.manual.created_at,locale)}</Text>
+      {result.manual.manual.reference_operation&&<Text selectable style={styles.text}>{locale==='ru'?'Исходная операция':'Original operation'}: {result.manual.manual.reference_operation}</Text>}
+      {result.manual.manual.allocations.map(a=><Text key={a.category} style={styles.text}>{a.category} · {journalMoney(a.cents,locale,currency)}</Text>)}
+      {result.manual.transaction.entries.map((line,index)=><Text key={index} style={styles.text}>{line.code} · {journalMoney(line.cents,locale,currency)}</Text>)}
+    </>}
     {data&&<>
       <Text selectable style={styles.text}>{t('journalOrder')}: {data.source.order_id}</Text>
       {data.transaction?<Text selectable style={styles.muted}>{t('journalEntry')}: {data.transaction.id}</Text>:<Notice text={t('eventsNoPosting')}/>}
       {data.transaction?.entries.map((line,index)=><Text key={index} style={styles.text}>
-        {t(({clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees'} as const)[line.code])}
+        {t(({clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',expenses:'journalExpenses',transfers:'journalTransfers'} as const)[line.code])}
         {' · '}{t(BigInt(line.cents)>0n?'journalDebit':'journalCredit')}{' · '}{journalMoney((BigInt(line.cents)<0n?-BigInt(line.cents):BigInt(line.cents)).toString(),locale,currency)}
       </Text>)}
       <Text accessibilityRole="header" style={styles.h2}>{t('provenanceSource')}</Text>

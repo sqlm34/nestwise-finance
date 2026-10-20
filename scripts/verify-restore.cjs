@@ -30,6 +30,20 @@ async function verifyRestore(source,restored,runtime=restored) {
   await rejected('DELETE FROM nestwise.journal_entries',/immutable_financial_history/);
   await rejected('UPDATE nestwise.journal_transactions SET posted_at=now()',/immutable_financial_history/);
   await rejected('DELETE FROM nestwise.audit_logs',/immutable_financial_history/);
+  if(expected.manual_operations?.count){
+    await rejected('DELETE FROM nestwise.manual_operations',/immutable_financial_history/);
+    await rejected('SELECT * FROM nestwise.manual_operations',/permission denied/,true);
+  }
+  if(expected.workspace_admin_audit?.count){
+    await rejected('DELETE FROM nestwise.workspace_admin_audit',/immutable_financial_history/);
+    await rejected('SELECT * FROM nestwise.workspace_admin_audit',/permission denied/,true);
+  }
+  for(const table of ['receipt_originals','receipt_archived','receipt_reviews','receipt_postings','bank_bookings']){
+    if(expected[table]?.count){
+      await rejected(`DELETE FROM nestwise.${table}`,/immutable_financial_history/);
+      await rejected(`SELECT * FROM nestwise.${table}`,/permission denied/,true);
+    }
+  }
   if(expected.reconciliation_groups?.count){
     await rejected('DELETE FROM nestwise.reconciliation_groups',/immutable_financial_history/);
     await rejected('SELECT * FROM nestwise.reconciliation_groups',/permission denied/,true);

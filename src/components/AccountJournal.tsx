@@ -10,7 +10,7 @@ import type {MessageKey} from '../i18n';
 import {JournalDetail} from './JournalDetail';
 const labels:Record<JournalCode,MessageKey>={
   clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',
-  parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',
+  parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',expenses:'journalExpenses',transfers:'journalTransfers',
 };
 type HistoryRequest={filters:JournalFilters;cursors:(string|null)[];revision:number};
 export function AccountJournal({name,currency,workspace,account,onSessionExpired,initialFilters=defaultJournalFilters}:{
@@ -98,7 +98,7 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
             <Text style={[styles.text,{fontWeight:'600'}]}>{journalMoney((amount<0n?-amount:amount).toString(),locale,currency)}</Text>
           </View>;
         })}
-        <Text selectable style={styles.muted}>{t('journalOrder')}: {transaction.source_order_id}</Text>
+        <Text selectable style={styles.muted}>{transaction.source_order_id.startsWith('manual:')?(locale==='ru'?'Ручная операция':'Manual operation'):t('journalOrder')}: {transaction.source_order_id}</Text>
         <Text selectable style={styles.muted}>{t('journalEntry')}: {transaction.id}</Text>
         <Text selectable style={styles.muted}>{t('journalEvent')}: {transaction.source_event_id}</Text>
         <Text style={styles.muted}>{t('journalPostedAt')}: {journalDate(transaction.posted_at,locale)}</Text>

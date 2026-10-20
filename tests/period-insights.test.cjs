@@ -1,6 +1,6 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');
 const {periodPreset,previousPeriod,parsePeriodParams,parsePeriodInsights,periodMetrics,insightMoney}=require('../.test-build/src/domain/period-insights.js');
-const totals={clearing:'0',receipts:'0',refunds:'0',parts_cost:'0',parts_payable:'0',fees:'0'};
+const totals={clearing:'0',receipts:'0',refunds:'0',parts_cost:'0',parts_payable:'0',fees:'0',expenses:'0',transfers:'0'};
 const summary=(from,to)=>({from,to,transaction_count:'0',missing_paid_date:'0',totals:{...totals}});
 test('period presets and equal-length comparisons use UTC and handle leap years and year changes',()=>{
   assert.deepEqual(periodPreset('month',new Date('2024-02-29T23:30:00Z')),{from:'2024-02-01',to:'2024-02-29'});
@@ -28,7 +28,7 @@ test('summary parser validates balance, period identity and complete monthly rec
     {...page,current:{...page.current,missing_paid_date:'1'}}])assert.throws(()=>parsePeriodInsights(bad,expected));
 });
 test('operational metrics distinguish refunds, supplier credits, accruals and clearing without precision loss',()=>{
-  const p=summary('2026-01-01','2026-01-31');p.totals={clearing:'20500',receipts:'-35000',refunds:'10000',parts_cost:'7500',parts_payable:'-3000',fees:'0'};
+  const p=summary('2026-01-01','2026-01-31');p.totals={clearing:'20500',receipts:'-35000',refunds:'10000',parts_cost:'7500',parts_payable:'-3000',fees:'0',expenses:'0',transfers:'0'};
   const m=periodMetrics(p);assert.equal(m.net_receipts,25000n);assert.equal(m.recorded_difference,17500n);assert.equal(m.parts_payable,3000n);assert.equal(m.clearing,20500n);
   assert.equal(insightMoney(900719925474099123n,'en'),'9,007,199,254,740,991.23 USD');
   assert.equal(insightMoney(-1n,'ru'),'−0,01 USD');

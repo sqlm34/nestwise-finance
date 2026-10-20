@@ -9,8 +9,11 @@ import {parseEventParams} from '../src/domain/account-events';
 import {parsePeriodParams} from '../src/domain/period-insights';
 import {candidateParams} from '../src/domain/reconciliation';
 import {parseSave,parseCancellation,savedCursor} from '../src/domain/saved-reconciliation';
+import {parseManualOperation} from '../src/domain/manual-operation';
+import {parseWorkspaceCommand} from '../src/domain/workspace-admin';
+import {receiptApi,type ReceiptEnv} from './receipts';
 
-export type UserEnv = DocumentEnv & {
+export type UserEnv = DocumentEnv & ReceiptEnv & {
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
   AUTH_SECRET?: string; AUTH_BASE_URL?: string; AUTH_WEB_ORIGIN?: string;
   NESTWISE_DATABASE_URL?: string;
@@ -62,10 +65,20 @@ export async function userApi(request: Request, env: UserEnv,
   }
   const authPaths = new Map([['/api/auth/sign-in/email','POST'],['/api/auth/sign-out','POST'],['/api/auth/get-session','GET']]);
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
+  const receiptMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/receipts(?:\/([0-9a-f]{64})(?:\/(original|review|post|ocr))?)?$/i.exec(url.pathname);
+  const receiptList=!!receiptMatch&&!receiptMatch[3]&&request.method==='GET';
+  const receiptRoute=receiptList||!!receiptMatch&&!url.search&&(request.method==='GET'&&(!receiptMatch[4]||receiptMatch[4]==='original')||request.method==='POST'&&!!receiptMatch[4]);
+  const receiptWrite=receiptRoute&&request.method==='POST';
+  const receiptUpload=receiptWrite&&receiptMatch?.[4]==='original';
+  const adminMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/administration$/i.exec(url.pathname);
+  const adminRoute=!!adminMatch&&!url.search&&['GET','POST'].includes(request.method);
+  const adminWrite=adminRoute&&request.method==='POST';
+  const manualMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/operations$/i.exec(url.pathname);
+  const manualWrite=!!manualMatch&&request.method==='POST'&&!url.search;
   const savedMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations$/i.exec(url.pathname);
   const cancelMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations\/([0-9a-f-]{36})\/cancel$/i.exec(url.pathname);
-  const documentMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/documents(?:\/([0-9a-f]{64})(\/(?:verify|review))?)?$/i.exec(url.pathname);
-  const documentRoute=!!documentMatch&&!url.search&&(request.method==='GET'||request.method==='POST'&&!!documentMatch[3]&&!documentMatch[4]);
+  const documentMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/documents(?:\/([0-9a-f]{64})(\/(?:verify|review|book))?)?$/i.exec(url.pathname);
+  const documentRoute=!!documentMatch&&!url.search&&(request.method==='GET'&&documentMatch[4]!=='/book'||request.method==='POST'&&!!documentMatch[3]&&(!documentMatch[4]||documentMatch[4]==='/book'));
   const documentWrite=documentRoute&&request.method==='POST';
   const reconciliationWrite=request.method==='POST'&&(savedMatch||cancelMatch);
   const reconciliationMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliation-candidates$/i.exec(url.pathname);
@@ -74,15 +87,15 @@ export async function userApi(request: Request, env: UserEnv,
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&(reconciliationWrite||!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
+  if ((url.search&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
-  if((reconciliationWrite||documentWrite)&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
+  if((receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
-  if (request.method==='POST'&&!documentWrite) {
+  if (request.method==='POST'&&!documentWrite&&!receiptUpload) {
     if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') return finish(response({error:'invalid_body'},415));
     let raw: string;
-    try {raw=await limitedText(request); if(new TextEncoder().encode(raw).length>(reconciliationWrite?16384:4096)) throw new Error();}
+    try {const limit=receiptWrite?65536:manualWrite||reconciliationWrite?16384:4096;raw=await limitedText(request,limit);}
     catch {return finish(response({error:'invalid_body'},413));}
     safeRequest=new Request(request.url,{method:request.method,headers:request.headers,body:raw});
   }
@@ -101,6 +114,16 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
+    if(receiptRoute&&receiptMatch)return finish(await receiptApi(receiptUpload?request:safeRequest,env,db,subject,receiptMatch[1],receiptMatch[2],receiptMatch[3]?.toLowerCase(),receiptMatch[4]));
+    if(adminRoute&&adminMatch){
+      if(!adminWrite)return finish(response(await db.workspaceAdministration(subject,adminMatch[1])));
+      let payload;try{payload=parseWorkspaceCommand(await safeRequest.json());}catch{return finish(response({error:'invalid_workspace_command'},400));}
+      return finish(response({id:await db.workspaceCommand(subject,adminMatch[1],payload)}));
+    }
+    if(manualWrite&&manualMatch){
+      let payload;try{payload=parseManualOperation(await safeRequest.json());}catch{return finish(response({error:'invalid_manual_operation'},400));}
+      return finish(response({id:await db.postManualOperation(subject,manualMatch[1],manualMatch[2],payload)}));
+    }
     if(documentRoute&&documentMatch)return finish(await documentApi(request,env,db,subject,documentMatch[1],documentMatch[2],documentMatch[3]?.toLowerCase(),documentMatch[4]?.slice(1)));
     if(cancelMatch){
       let reason;try{reason=parseCancellation(await safeRequest.json());}catch{return finish(response({error:'invalid_reconciliation'},400));}
@@ -143,6 +166,16 @@ export async function userApi(request: Request, env: UserEnv,
     return finish(response({user:{id:session.user.id,name:session.user.name,email:session.user.email},
       workspaces:await db.userAccess(subject)}));
   } catch(error) {
+    if(error instanceof Error&&error.message==='bank_booking_conflict')return finish(response({error:error.message},409));
+    if(error instanceof Error&&error.message==='invalid_bank_booking')return finish(response({error:error.message},400));
+    if(error instanceof Error&&error.message==='ocr_rate_limited')return finish(response({error:error.message},429));
+    if(error instanceof Error&&['ocr_not_configured','ocr_incomplete','ocr_unavailable'].includes(error.message))return finish(response({error:error.message},503));
+    if(error instanceof Error&&['receipt_conflict','receipt_already_posted','receipt_limit'].includes(error.message))return finish(response({error:error.message},409));
+    if(error instanceof Error&&error.message==='invalid_receipt')return finish(response({error:error.message},400));
+    if(error instanceof Error&&['workspace_command_conflict','workspace_limit','last_workspace_owner'].includes(error.message))return finish(response({error:error.message},409));
+    if(error instanceof Error&&error.message==='invalid_workspace_command')return finish(response({error:error.message},400));
+    if(error instanceof Error&&['manual_operation_conflict','manual_refund_exceeded'].includes(error.message))return finish(response({error:error.message},409));
+    if(error instanceof Error&&error.message==='invalid_manual_operation')return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='archive_full')return finish(response({error:'archive_full'},409));
     if(error instanceof Error&&['reconciliation_conflict','reconciliation_mismatch'].includes(error.message))return finish(response({error:error.message},409));
     if(error instanceof Error&&['invalid_reconciliation','invalid_document'].includes(error.message))return finish(response({error:error.message},400));

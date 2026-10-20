@@ -36,8 +36,8 @@ export async function authenticatedPost(path:string,body:unknown,signal?:AbortSi
     headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie,'Expo-Origin':`${typeof scheme==='string'?scheme:'nestwise-development'}://`}:{})},body:JSON.stringify(body)});
 }
 
-export async function authenticatedUpload(path:string,bytes:Uint8Array){
+export async function authenticatedUpload(path:string,bytes:Uint8Array,contentType='text/csv'){
   if(!apiURL)throw new Error('unconfigured');
   const cookie=Platform.OS==='web'?'':await authClient.getCookie();
-  return fetch(apiURL+path,{method:'POST',credentials:'include',headers:{'Content-Type':'text/csv',...(cookie?{Cookie:cookie,'Expo-Origin':`${typeof scheme==='string'?scheme:'nestwise-development'}://`}:{})},body:Uint8Array.from(bytes)});
+  return fetch(apiURL+path,{method:'POST',credentials:'include',headers:{'Content-Type':contentType,...(cookie?{Cookie:cookie,'Expo-Origin':`${typeof scheme==='string'?scheme:'nestwise-development'}://`}:{})},body:Uint8Array.from(bytes)});
 }

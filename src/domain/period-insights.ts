@@ -32,7 +32,7 @@ function summary(value:unknown):PeriodSummary{
   day(row.from);day(row.to);if(row.from>row.to)throw new Error('invalid_insights');
   const rawTotals=object(row.totals),totals={} as PeriodSummary['totals'];
   for(const code of journalCodes)totals[code]=integer(rawTotals[code],true);
-  if(Object.keys(rawTotals).length!==6||journalCodes.reduce((total,code)=>total+BigInt(totals[code]),0n)!==0n)throw new Error('invalid_insights');
+  if(Object.keys(rawTotals).length!==journalCodes.length||journalCodes.reduce((total,code)=>total+BigInt(totals[code]),0n)!==0n)throw new Error('invalid_insights');
   const count=integer(row.transaction_count),missing=integer(row.missing_paid_date);
   if(BigInt(missing)>BigInt(count)||(count==='0'&&journalCodes.some(code=>BigInt(totals[code])!==0n)))throw new Error('invalid_insights');
   return {from:row.from,to:row.to,transaction_count:count,missing_paid_date:missing,totals};
@@ -54,11 +54,11 @@ export function parsePeriodInsights(value:unknown,expected:Period):PeriodInsight
   const attention=object(row.attention);
   return {currency:'USD',generated_at:row.generated_at,current,previous,months,attention:{waiting:integer(attention.waiting),needs_review:integer(attention.needs_review)}};
 }
-export const metricKeys=['receipts','refunds','net_receipts','parts_cost','fees','recorded_difference','clearing','parts_payable'] as const;
+export const metricKeys=['receipts','refunds','net_receipts','parts_cost','fees','recorded_difference','clearing','parts_payable','expenses','transfers'] as const;
 export type Metric=typeof metricKeys[number];
 export function periodMetrics(period:PeriodSummary):Record<Metric,bigint>{
   const t=period.totals,receipts=-BigInt(t.receipts),refunds=BigInt(t.refunds),parts=BigInt(t.parts_cost),fees=BigInt(t.fees);
-  return {receipts,refunds,net_receipts:receipts-refunds,parts_cost:parts,fees,recorded_difference:receipts-refunds-parts-fees,clearing:BigInt(t.clearing),parts_payable:-BigInt(t.parts_payable)};
+  return {receipts,refunds,net_receipts:receipts-refunds,parts_cost:parts,fees,recorded_difference:receipts-refunds-parts-fees-BigInt(t.expenses),expenses:BigInt(t.expenses),transfers:BigInt(t.transfers),clearing:BigInt(t.clearing),parts_payable:-BigInt(t.parts_payable)};
 }
 export function insightMoney(cents:bigint,locale:'en'|'ru'):string{
   const absolute=cents<0n?-cents:cents;

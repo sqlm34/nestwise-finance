@@ -49,6 +49,7 @@ yarn-error.*
 .wrangler/
 .test-build/
 dist-mobile/
+dist-part1/
 artifacts/
 .local/
 *.log

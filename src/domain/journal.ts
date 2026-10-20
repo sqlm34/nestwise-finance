@@ -1,4 +1,4 @@
-export const journalCodes=['clearing','receipts','refunds','parts_cost','parts_payable','fees'] as const;
+export const journalCodes=['clearing','receipts','refunds','parts_cost','parts_payable','fees','expenses','transfers'] as const;
 export type JournalCode=typeof journalCodes[number];
 export type JournalTransaction={
   id:string;occurred_at:string;paid_at:string|null;posted_at:string;

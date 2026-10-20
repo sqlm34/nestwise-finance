@@ -1,6 +1,16 @@
 import { neon } from '@neondatabase/serverless';
 import type {JournalFilters} from '../src/domain/journal-filters';
 export type Database = {
+  postBankRow(subject:string,workspace:string,account:string,id:string,hash:string,row:unknown,operation:unknown):Promise<string>;
+  claimReceiptOcr(subject:string,workspace:string,account:string,hash:string):Promise<unknown>;
+  prepareReceipt(subject:string,workspace:string,account:string,hash:string,bytes:number,mime:string):Promise<unknown>;
+  completeReceipt(subject:string,workspace:string,account:string,hash:string):Promise<unknown>;
+  reviewReceipt(subject:string,workspace:string,account:string,hash:string,id:string,expected:number,data:unknown):Promise<string>;
+  postReceipt(subject:string,workspace:string,account:string,hash:string,review:string,operation:string,paid:string):Promise<string>;
+  readReceipts(subject:string,workspace:string,account:string,hash:string|null,before?:string|null):Promise<unknown>;
+  workspaceCommand(subject:string,workspace:string,payload:unknown):Promise<string>;
+  workspaceAdministration(subject:string,workspace:string):Promise<unknown>;
+  postManualOperation(subject:string,workspace:string,account:string,payload:unknown):Promise<string>;
   documentEvidence(subject:string,workspace:string,account:string,hash:string,fingerprints:string[]):Promise<unknown>;
   documentAccess(subject:string,workspace:string,account:string,write:boolean):Promise<unknown>;
   prepareDocument(subject:string,workspace:string,account:string,hash:string,bytes:number):Promise<unknown>;
@@ -24,6 +34,16 @@ export type Database = {
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async postBankRow(subject,workspace,account,id,hash,row,operation){return (await sql`SELECT nestwise.post_bank_row(${subject},${workspace}::uuid,${account}::uuid,${id}::uuid,${hash},${JSON.stringify(row)}::jsonb,${JSON.stringify(operation)}::jsonb) result`)[0].result;},
+    async claimReceiptOcr(subject,workspace,account,hash){return (await sql`SELECT nestwise.claim_receipt_ocr(${subject},${workspace}::uuid,${account}::uuid,${hash}) result`)[0].result;},
+    async prepareReceipt(subject,workspace,account,hash,bytes,mime){return (await sql`SELECT nestwise.prepare_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash},${bytes}::integer,${mime}) result`)[0].result;},
+    async completeReceipt(subject,workspace,account,hash){return (await sql`SELECT nestwise.complete_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash}) result`)[0].result;},
+    async reviewReceipt(subject,workspace,account,hash,id,expected,data){return (await sql`SELECT nestwise.review_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash},${id}::uuid,${expected}::integer,${JSON.stringify(data)}::jsonb) result`)[0].result;},
+    async postReceipt(subject,workspace,account,hash,review,operation,paid){return (await sql`SELECT nestwise.post_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash},${review}::uuid,${operation}::uuid,${paid}::date) result`)[0].result;},
+    async readReceipts(subject,workspace,account,hash,before=null){return (await sql`SELECT nestwise.read_receipts(${subject},${workspace}::uuid,${account}::uuid,${hash},${before}) result`)[0].result;},
+    async workspaceCommand(subject,workspace,payload){return (await sql`SELECT nestwise.workspace_command(${subject},${workspace}::uuid,${JSON.stringify(payload)}::jsonb) result`)[0].result;},
+    async workspaceAdministration(subject,workspace){return (await sql`SELECT nestwise.workspace_administration(${subject},${workspace}::uuid) result`)[0].result;},
+    async postManualOperation(subject,workspace,account,payload){return (await sql`SELECT nestwise.post_manual_operation(${subject},${workspace}::uuid,${account}::uuid,${JSON.stringify(payload)}::jsonb) result`)[0].result;},
     async documentEvidence(subject,workspace,account,hash,fingerprints){return (await sql`SELECT nestwise.document_evidence(${subject},${workspace}::uuid,${account}::uuid,${hash},${JSON.stringify(fingerprints)}::jsonb) result`)[0].result;},
     async documentAccess(subject,workspace,account,write){return (await sql`SELECT nestwise.document_access(${subject},${workspace}::uuid,${account}::uuid,${write}) result`)[0].result;},
     async prepareDocument(subject,workspace,account,hash,bytes){return (await sql`SELECT nestwise.prepare_document(${subject},${workspace}::uuid,${account}::uuid,${hash},${bytes}::integer) result`)[0].result;},

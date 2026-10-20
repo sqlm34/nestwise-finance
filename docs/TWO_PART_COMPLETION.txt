@@ -1,0 +1,52 @@
+NESTWISE — remaining delivery in TWO parts — 2026-10-20
+
+This plan supersedes the old phase breakdown in IMPLEMENTATION_PLAN.txt.
+User request: two large deliveries, one Nestwise PR per delivery, no small PRs.
+Current baseline: PR17 / 5f742e0. Existing PRs remain open and stacked.
+Part 1 branch: feature/financial-data-completion. Status: IN PROGRESS.
+
+PART 1 — complete financial data lifecycle (previous remaining blocks 1–6)
+[ ] Workspace, account, membership and account-grant management with live ACL,
+    owner protection, audit history and EN/RU mobile-first controls.
+[ ] Manual income/expense, split allocations, linked refunds and atomic
+    transfers. Immutable balanced postings, idempotency and no CRM duplication.
+[ ] Alex CRM producer: inspect all financial mutation paths; additive outbox,
+    ordered revisions, durable delivery leases, retry/backoff/DLQ and sync UI.
+    Historical cursor dry-run first; actual historical import requires approval.
+[ ] Receipt originals, capture/upload, reviewed OCR/item extraction, duplicate
+    detection and provenance. Never treat unreviewed OCR as booked money.
+[ ] CSV/PDF bank adapters, balances and statement gaps. Bank-specific adapters
+    require redacted representative samples; unsupported layouts stay explicit.
+[ ] Partial/many-to-many reconciliation, fees, transfers and explicit bank-only
+    booking with duplicate prevention and reversible decisions.
+[ ] Integrated tests: permissions, idempotency, concurrency, restore, CRM
+    regression, original-to-journal browser flow and native compatibility.
+
+PART 2 — accountant workflow and product completion (previous blocks 7–10)
+[ ] Versioned operational/accountant category mapping and policy approvals.
+[ ] Financial Statement with original category labels, zero lines, US Letter
+    PDF, exact journal lineage, exception gates and frozen report snapshots.
+[ ] Replace remaining demo screens with live data; notifications, safe offline
+    drafts/retry, export and operational recovery controls.
+[ ] Android/iOS signed builds, real-device scenarios and full regression.
+[ ] Resolve/review the existing stacked PR chain and prepare release/rollback.
+    Production and store submission remain separate owner-authorized actions.
+
+Delivery boundaries and safeguards
+- Two product parts do not mean skipping intermediate local tests or commits.
+- Create each Nestwise PR only after its whole part is reviewable; report
+  external prerequisites honestly, never mark an unavailable feature complete.
+- CRM source changes MUST stay in its own repository and its own review PR.
+  This necessary cross-repository companion is not a third product part.
+- Preserve existing CRM working-tree changes. Build from an isolated clean
+  checkout when modifying its code; never overwrite unrelated local work.
+- Before CRM edits, record exact mutation paths and additive migration/rollback
+  plan. Producer flag OFF; no production mutation/deployment or historical push.
+- Snapshot staging before new migrations; test restore and restricted runtime.
+- Workiz integration excluded. No new bank connections or paid OCR subscription
+  assumed. Secrets remain in existing secret stores, never repository contents.
+- Owner/accountant decisions still needed for accounting basis, inventory,
+  mixed-use expenses, tax/tip treatment and annual form version.
+
+Acceptance requires end-to-end data flow and failure recovery, not merely
+screens or passing unit tests. Native JS export is not a signed device build.

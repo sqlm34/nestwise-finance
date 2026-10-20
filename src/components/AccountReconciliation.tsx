@@ -12,8 +12,9 @@ import {JournalDetail} from './JournalDetail';
 import {parseEvidenceReview,type EvidenceReview} from '../domain/statement-evidence';
 import {StatementArchive} from './StatementArchive';
 import {SaveDraftButton,SavedReconciliations} from './SavedReconciliations';
+import {BankBooking} from './BankBooking';
 
-const kindLabels:Record<string,MessageKey>={'job.payment_recorded':'eventPayment','job.customer_refund_issued':'eventRefund','job.part_cost_recorded':'eventPart','job.supplier_credit_received':'eventCredit','job.processor_fee_recorded':'provenanceFee','job.processor_fee_refunded':'provenanceFeeRefund'};
+const kindLabels:Record<string,MessageKey>={'job.payment_recorded':'eventPayment','job.customer_refund_issued':'eventRefund','job.part_cost_recorded':'eventPart','job.supplier_credit_received':'eventCredit','job.processor_fee_recorded':'provenanceFee','job.processor_fee_refunded':'provenanceFeeRefund','manual.income':'manualIncome','manual.expense':'manualExpense','manual.transfer':'manualTransfer','manual.refund':'manualRefund'};
 export function AccountReconciliation({workspace,account,name,canWrite,onSessionExpired}:{workspace:string;account:string;name:string;canWrite:boolean;onSessionExpired:()=>void}){
   const {locale,t}=useApp(),ru=locale==='ru';
   const say=(en:string,ruText:string)=>ru?ruText:en;
@@ -147,6 +148,7 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
       <Card><Text style={styles.h2}>{say('3 · Draft groups','3 · Группы черновика')} · {groups.length}</Text>
         {groups.map((group,index)=><View key={group.rows.join(':')} style={{gap:8}}><Text style={styles.text}>#{index+1} · {insightMoney(BigInt(group.cents),locale)} · {say('Bank rows','Строки банка')}: {group.rows.join(', ')} · {group.transactions.length} {say('journal transactions','проводок')}</Text>{group.transactions.map(id=><Button key={id} label={`${t('provenanceOpen')} · ${id.slice(0,8)}`} onPress={()=>setDetail(id)}/>)}<SaveDraftButton workspace={workspace} account={account} file={file} group={group} alreadySaved={savedLocal.includes(group.rows.join(':'))} canWrite={canWrite} onSessionExpired={onSessionExpired} onSaved={()=>{setSavedLocal(current=>[...current,group.rows.join(':')]);setSavedRevision(current=>current+1);}}/><Button disabled={savedLocal.includes(group.rows.join(':'))} label={`${say('Undo group','Отменить группу')} ${index+1}`} onPress={()=>{setGroups(current=>current.filter(item=>item!==group));resetSelection();}}/></View>)}
         {!groups.length&&<Text style={styles.muted}>{say('No draft decisions yet. Unmatched rows remain unresolved.','Пока нет решений. Несопоставленные строки остаются нерешёнными.')}</Text>}
+        {canWrite&&archiveHash&&evidenceReady&&bank.length===1&&!usedRows.has(bank[0].line)&&request&&!busy&&result&&!result.error&&!result.truncated&&<BankBooking key={`${archiveHash}:${bank[0].line}`} workspace={workspace} account={account} hash={archiveHash} row={bank[0]} onSessionExpired={onSessionExpired} onSaved={()=>{resetSelection();setSavedRevision(v=>v+1);}}/>}
       </Card>
     </>}
     <StatementArchive workspace={workspace} account={account} canWrite={canWrite} file={file?original:null} onSessionExpired={onSessionExpired} revision={savedRevision} onJournal={setDetail} onResume={loaded=>{
