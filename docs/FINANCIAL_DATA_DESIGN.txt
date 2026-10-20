@@ -150,3 +150,23 @@ Staging browser acceptance checkpoint — 2026-10-20
   no receipt payment was confirmed. This attachment is not a real receipt.
 - TypeScript and targeted ESLint passed for the confirmation-copy correction.
 - Part 1 remains incomplete; no production, CRM backfill or store publication.
+
+Additional synthetic browser acceptance — 2026-10-20
+- Receipt review did not create a posting: journal still showed exactly three
+  entries after saving the attachment review (100 income, two 3 expenses).
+- Linked refund USD 10 against the USD 100 income saved successfully. A further
+  USD 91 refund was rejected with the remaining-amount message; no fifth entry
+  appeared until the separately confirmed transfer.
+- Created SYNTHETIC Transfer 5678 account and posted a USD 20 internal transfer.
+  Source has clearing credit / transfers debit; destination has clearing debit /
+  transfers credit, both share operation 1a4df435-973a-44b8-967e-c1aaf18b316a.
+  Source journal contains five operations; destination contains one.
+- These records are artificial acceptance data, not bank money movement.
+- Destination period summary: clearing movement +USD 20; customer income,
+  expenses and operating difference all USD 0. Transfers do not inflate income.
+- GitHub run 39515676815 completed successfully for f7fba20. This run verified
+  the confirmation-copy change; staging remains at verified 3fcccfd because the
+  temporary deployment-branch override has already been removed.
+- Follow-up copy issue: period insights still say bank reconciliation is not
+  available. Replace that obsolete wording when connecting completeness metrics;
+  do not imply tax/report approval from successful bank reconciliation.
