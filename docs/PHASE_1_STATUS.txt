@@ -21,7 +21,9 @@ Not yet verified / not complete:
   iOS simulator: 38b0629f-9b79-4af7-8892-5d30edc997ae
   Android is in the free-tier queue (~33 minutes at submission); no completed
   native artifact is claimed until EAS reports success.
-- Cloudflare automated GitHub deploy activation requires a scoped service token.
+- Cloudflare CI enabled using an account-owned token restricted to
+  nestwise-staging (Individual Workers Editor), expires 2027-01-18.
+  First automated deployment is pending verification.
 - Expo project linked. A dedicated Developer robot was explicitly approved by
   the owner; its token is encrypted in GitHub's staging EXPO_TOKEN secret.
   EAS_ENABLED and EAS_PROJECT_ID are configured. CI access check is pending.
@@ -34,5 +36,3 @@ Not yet verified / not complete:
 
 Production CRM, financial accounts, and production databases were not changed.
 Do not treat phase 1 as complete delivery of the full master specification.
-
-
