@@ -73,8 +73,9 @@ BEGIN
   IF data->>'currency' IS DISTINCT FROM 'USD' OR coalesce(length(btrim(data->>'supplier')),0) NOT BETWEEN 1 AND 200
     OR jsonb_typeof(data->'items') IS DISTINCT FROM 'array' OR jsonb_array_length(data->'items') NOT BETWEEN 1 AND 100
     OR data->>'date' IS NULL OR (data->>'date')!~'^[0-9]{4}-[0-9]{2}-[0-9]{2}$' THEN RAISE EXCEPTION 'invalid_receipt'; END IF;
+  IF (data->>'date')::date NOT BETWEEN '1900-01-01'::date AND '2199-12-31'::date THEN RAISE EXCEPTION 'invalid_receipt'; END IF;
   FOR item IN SELECT value FROM jsonb_array_elements(data->'items') LOOP
-    IF coalesce(length(btrim(item->>'description')),0) NOT BETWEEN 1 AND 300 OR item->>'cents' IS NULL OR (item->>'cents')!~'^(0|[1-9][0-9]{0,15})$' THEN RAISE EXCEPTION 'invalid_receipt'; END IF;
+    IF coalesce(length(btrim(item->>'description')),0) NOT BETWEEN 1 AND 300 OR jsonb_typeof(item->'cents') IS DISTINCT FROM 'string' OR (item->>'cents')!~'^(0|[1-9][0-9]{0,15})$' OR (item->>'cents')::numeric>9007199254740991 THEN RAISE EXCEPTION 'invalid_receipt'; END IF;
     total:=total+(item->>'cents')::numeric;
   END LOOP;
   FOREACH k IN ARRAY ARRAY['tax_cents','tip_cents','shipping_cents','discount_cents','total_cents'] LOOP
@@ -89,6 +90,7 @@ BEGIN
     'allocations',jsonb_build_array(jsonb_build_object('category','other_expense','cents',total::bigint::text)));
   PERFORM post_manual_operation(p_subject,p_workspace,p_account,payload);
   INSERT INTO receipt_postings VALUES(p_account,p_hash,p_review,p_operation,actor,clock_timestamp());RETURN p_operation;
+EXCEPTION WHEN invalid_text_representation OR datetime_field_overflow OR invalid_datetime_format OR numeric_value_out_of_range THEN RAISE EXCEPTION 'invalid_receipt';
 END $$;
 CREATE FUNCTION nestwise.read_receipts(p_subject text,p_workspace uuid,p_account uuid,p_hash text DEFAULT NULL,p_before text DEFAULT NULL) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=nestwise,pg_temp AS $$

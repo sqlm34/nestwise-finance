@@ -92,7 +92,8 @@ BEGIN
     INSERT INTO journal_entries VALUES(other_tx,p_workspace,1,'clearing',amount),(other_tx,p_workspace,2,'transfers',-amount);
   END IF;
   RETURN operation_id;
-EXCEPTION WHEN invalid_text_representation OR datetime_field_overflow OR invalid_datetime_format OR numeric_value_out_of_range OR not_null_violation OR check_violation
+EXCEPTION WHEN unique_violation THEN RAISE EXCEPTION 'manual_operation_conflict';
+  WHEN invalid_text_representation OR datetime_field_overflow OR invalid_datetime_format OR numeric_value_out_of_range OR not_null_violation OR check_violation
   THEN RAISE EXCEPTION 'invalid_manual_operation';
 END $$;
 REVOKE ALL ON nestwise.manual_operations FROM PUBLIC,nestwise_api;

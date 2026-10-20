@@ -9,6 +9,8 @@ CREATE TABLE nestwise.bank_bookings (
   FOREIGN KEY(account_id,file_hash) REFERENCES nestwise.statement_archived(account_id,file_hash)
 );
 CREATE TRIGGER bank_bookings_immutable BEFORE UPDATE OR DELETE ON nestwise.bank_bookings FOR EACH ROW EXECUTE FUNCTION nestwise.immutable();
+CREATE UNIQUE INDEX bank_booking_file_line ON nestwise.bank_bookings(account_id,file_hash,(row_data->>'line'));
+CREATE UNIQUE INDEX bank_booking_fact ON nestwise.bank_bookings(account_id,(row_data->>'date'),(row_data->>'cents'),(row_data->>'text_hash'));
 REVOKE ALL ON nestwise.bank_bookings FROM PUBLIC,nestwise_api;
 CREATE FUNCTION nestwise.post_bank_row(p_subject text,p_workspace uuid,p_account uuid,p_id uuid,p_hash text,p_row jsonb,p_operation jsonb) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=nestwise,pg_temp AS $$
