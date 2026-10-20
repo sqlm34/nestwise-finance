@@ -49,6 +49,8 @@ Unresolved external acceptance inputs
 - Representative redacted Chase/South National CSV/PDF layouts.
 - OCR provider/runtime choice without silently purchasing a subscription.
 - Accounting policies for Part 2; no tax approval inferred from a category key.
+  Owner confirmed CASH BASIS on 2026-10-20: actual payment dates determine
+  reporting periods; other category/tax-policy choices remain unresolved.
 - Real-device Android/iOS tests and credentials at build/signing time.
 
 Implementation checkpoint — 2026-10-20 (Part 1 remains IN PROGRESS)

@@ -5,6 +5,12 @@ User request: two large deliveries, one Nestwise PR per delivery, no small PRs.
 Current baseline: PR17 / 5f742e0. Existing PRs remain open and stacked.
 Part 1 branch: feature/financial-data-completion. Status: IN PROGRESS.
 
+Owner-confirmed accounting basis (2026-10-20): CASH BASIS, by actual payment.
+Use paid_on/paid_at for report periods, never upload or job-update timestamps.
+Unpaid accrued source facts remain available as evidence but must not silently
+enter the cash-basis income/expense report. This choice does not approve category
+tax treatment, deductibility, inventory policy or a specific annual tax form.
+
 PART 1 — complete financial data lifecycle (previous remaining blocks 1–6)
 [ ] Workspace, account, membership and account-grant management with live ACL,
     owner protection, audit history and EN/RU mobile-first controls.
@@ -45,7 +51,7 @@ Delivery boundaries and safeguards
 - Snapshot staging before new migrations; test restore and restricted runtime.
 - Workiz integration excluded. No new bank connections or paid OCR subscription
   assumed. Secrets remain in existing secret stores, never repository contents.
-- Owner/accountant decisions still needed for accounting basis, inventory,
+- Owner/accountant decisions still needed for inventory,
   mixed-use expenses, tax/tip treatment and annual form version.
 
 Acceptance requires end-to-end data flow and failure recovery, not merely
