@@ -6,6 +6,7 @@ import { apiURL, authClient, authenticatedFetch } from '../auth/client';
 import { Button, Card, Notice, styles, colors } from '../components/ui';
 import { useApp } from '../state';
 import {AccountJournal} from '../components/AccountJournal';
+import {AccountEvents} from '../components/AccountEvents';
 type Access={user:{name:string;email:string};workspaces:{id:string;name:string;role:string;accounts:{id:string;name:string;currency:string}[]}[]};
 export default function Account() {
   const {t,locale,setLocale}=useApp();
@@ -13,6 +14,7 @@ export default function Account() {
   const [access,setAccess]=useState<Access|null>(null),[busy,setBusy]=useState(!!apiURL),[error,setError]=useState('');
   const [selected,setSelected]=useState<{workspace:string;account:string;name:string;currency:string}|null>(null);
   const [expired,setExpired]=useState(false);
+  const [section,setSection]=useState<'journal'|'events'>('journal');
   const sessionExpired=useCallback(()=>{setAccess(null);setSelected(null);setExpired(true);},[]);
   useEffect(()=>{
     const controller=new AbortController();
@@ -76,8 +78,16 @@ export default function Account() {
           {space.accounts.map(account=><Button key={account.id} label={`${account.name} · ${account.currency}`} selected={selected?.workspace===space.id&&selected.account===account.id} disabled={busy} onPress={()=>setSelected({workspace:space.id,account:account.id,name:account.name,currency:account.currency})}/>)}
         </View>)}
       </Card>}
-      {access&&selected&&<AccountJournal key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
-        workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>}
+      {access&&selected&&<>
+        <View style={styles.row}>
+          <Button label={t('journalTitle')} selected={section==='journal'} onPress={()=>setSection('journal')}/>
+          <Button label={t('eventsTitle')} selected={section==='events'} onPress={()=>setSection('events')}/>
+        </View>
+        {section==='journal'?<AccountJournal key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
+          workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
+          <AccountEvents key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
+            workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>}
+      </>}
       <Button label={t('authDemoBack')} onPress={()=>router.replace('/')}/>
     </ScrollView>
   </SafeAreaView>;

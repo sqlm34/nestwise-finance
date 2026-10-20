@@ -16,7 +16,7 @@ function identifier(value:unknown):string{
 function time(value:unknown):string{
   if(typeof value!=='string'||!/^\d{4}-\d\d-\d\dT/.test(value)||!/(Z|[+-]\d\d:\d\d)$/.test(value)||!Number.isFinite(Date.parse(value)))throw new Error('invalid_detail');return value;
 }
-function source(value:unknown):SourceEvent{
+export function source(value:unknown):SourceEvent{
   const row=object(value);
   if(typeof row.order_id!=='string'||!/^[A-Za-z0-9_.:-]{1,128}$/.test(row.order_id)
     ||!Number.isInteger(row.revision)||Number(row.revision)<1||Number(row.revision)>2147483646

@@ -1,0 +1,28 @@
+Account incoming-event center — 2026-10-20
+
+Authenticated read-only account view for every received source event, including
+orders without any journal entries. Default: waiting + needs_review. Filter by
+status, literal case-insensitive source order/event ID; apply/reset/refresh.
+Counters cover the applied search across all statuses in this account, not just
+the page. Receipt is not posting; assertions are not monetary transactions.
+
+Newest received first, deterministic received_at/internal UUID keyset, 100 per
+page with next/previous. Cursor is scoped to account; grants rechecked each page.
+Same order IDs from distinct connections remain separate events. Counts use
+decimal strings, with no unsafe Number conversion. Status is live; refresh after
+processing. This is not a frozen report. No financial mutation or retry controls.
+
+Safe guidance categories explain waiting, excess refund, snapshot mismatch and
+reference problems. Unknown internal errors are reduced to generic review.
+No raw payload/error, secrets or customer contact information is exposed.
+Posted events link to transaction provenance and return to the same inbox page.
+UI aborts stale requests; account switching resets view data. EN/RU parity.
+
+Migration 0007 adds an index and scoped SECURITY DEFINER read function. Staging
+snapshot: 2026-10-20 19:38:17 UTC. Rollback redeploys the previous app while leaving
+the additive migration and all financial facts intact. No CRM/production changes.
+
+Validation: filters/parser, 103-event pagination with concurrent arrival, missing
+revision arrival and transition to posted, account grants and revocation, restricted
+SQL role, safe guidance, real authentication/API authorization. Typecheck/lint,
+full test suite and GitHub CI required before reporting completion.

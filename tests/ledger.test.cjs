@@ -47,11 +47,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0003_user_access.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0005_journal_history.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0006_journal_provenance.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0007_account_events.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,6);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,7);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -61,6 +62,40 @@ before(async () => {
   await sql(`INSERT INTO nestwise.sessions VALUES ($1,$2,now()+interval '1 hour',NULL),($3,$4,now()+interval '1 hour',NULL)`, [tokenHash,user,accountantHash,accountant]);
 });
 after(async () => { if (db?.close) await db.close(); else if (db) await db.end(); });
+
+test('account event center covers unposted orders, keyset pages, safe guidance and revoked grants',async()=>{
+  const {parseEventsPage}=require('../.test-build/src/domain/account-events.js');
+  const read=async(status='all',query='inbox-proof',cursor=null,subject='test-owner',target=account)=>
+    parseEventsPage((await sql('SELECT nestwise.user_account_events($1,$2,$3,$4,$5,$6) result',[subject,workspace,target,status,query,cursor]))[0].result);
+  for(let i=0;i<103;i++)await accept(money(`inbox-proof-${i}`,2,'job.payment_recorded',100));
+  const first=await read();assert.equal(first.events.length,100);assert.equal(first.counts.waiting,'103');
+  assert.ok(first.events.every(e=>e.journal_id===null&&e.guidance==='earlier_revision'));
+  await accept(money('inbox-proof-new',2,'job.payment_recorded',100));
+  const tail=await read('all','inbox-proof',first.next_cursor);assert.equal(tail.events.length,3);assert.equal(tail.next_cursor,null);
+  assert.equal(new Set([...first.events,...tail.events].map(e=>e.cursor)).size,103);
+  assert.equal((await read()).counts.waiting,'104');
+  assert.equal((await read('posted')).events.length,0);
+  assert.equal((await read('all','%')).events.length,0);
+  assert.equal((await read('all',first.events[0].id)).events.length,1);
+  await accept(money('inbox-proof-0',1,'job.payment_recorded',100));
+  const resolved=await read('all','inbox-proof-0');assert.equal(resolved.counts.waiting,'0');assert.equal(resolved.counts.posted,'2');
+  await assert.rejects(read('all','inbox-proof',randomUUID()),/invalid_cursor/);
+  await assert.rejects(read('invalid'),/invalid_filters/);
+  await assert.rejects(read('all','inbox-proof',null,'test-accountant'),/forbidden/);
+  await assert.rejects(read('all','inbox-proof',first.next_cursor,'test-owner',otherAccount),/forbidden/);
+  await sql('INSERT INTO nestwise.account_grants VALUES ($1,$2,$3)',[workspace,accountant,account]);
+  assert.equal((await read('waiting','inbox-proof',null,'test-accountant')).events.length,100);
+  await sql('DELETE FROM nestwise.account_grants WHERE user_id=$1',[accountant]);
+  await assert.rejects(read('waiting','inbox-proof',first.next_cursor,'test-accountant'),/forbidden/);
+  const payment=money('inbox-reasons',1,'job.payment_recorded',100);await accept(payment);
+  await accept(money('inbox-reasons',2,'job.customer_refund_issued',200,{reference_event_id:payment.source_event_id}));
+  const review=await read('needs_review','inbox-reasons');assert.equal(review.events[0].guidance,'excess_refund');
+  assert.deepEqual(review.counts,{waiting:'0',needs_review:'1',posted:'1',asserted:'0'});
+  assert.equal(JSON.stringify(review).includes('error_code'),false);assert.equal(JSON.stringify(review).includes('payload'),false);
+  await sql('BEGIN');try{await sql('SET LOCAL ROLE nestwise_api');assert.equal((await read()).events.length,100);
+    await assert.rejects(sql('SELECT * FROM nestwise.source_events'),/permission denied/);
+  }finally{await sql('ROLLBACK');}
+});
 
 test('provenance links corrections and refunds, paginates assertions and isolates source connections',async()=>{
   const {parseJournalDetail}=require('../.test-build/src/domain/journal-detail.js');

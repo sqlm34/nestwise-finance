@@ -4,6 +4,7 @@ import { limitedText } from './security';
 import { acceptInvitation, invitations } from './invitations';
 import {parseHistoryParams} from '../src/domain/journal-history';
 import {detailBefore} from '../src/domain/journal-detail';
+import {parseEventParams} from '../src/domain/account-events';
 
 export type UserEnv = {
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
@@ -57,10 +58,11 @@ export async function userApi(request: Request, env: UserEnv,
   }
   const authPaths = new Map([['/api/auth/sign-in/email','POST'],['/api/auth/sign-out','POST'],['/api/auth/get-session','GET']]);
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
+  const eventsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&!journalMatch&&!detailMatch) || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
-    request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch))) return finish(response({error:'not_found'},404));
+  if ((url.search&&!journalMatch&&!detailMatch&&!eventsMatch) || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
+    request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch))) return finish(response({error:'not_found'},404));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
   if (request.method==='POST') {
@@ -85,6 +87,10 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
+    if(eventsMatch){
+      let filters;try{filters=parseEventParams(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
+      return finish(response(await db.userAccountEvents(subject,eventsMatch[1],eventsMatch[2],filters.status,filters.query,filters.cursor)));
+    }
     if(detailMatch){
       let before;try{before=detailBefore(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
       return finish(response(await db.userJournalDetail(subject,detailMatch[1],detailMatch[2],detailMatch[3],before)));

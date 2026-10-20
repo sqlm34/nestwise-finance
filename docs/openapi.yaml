@@ -4,6 +4,48 @@ info:
   version: 0.3.0
   description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
 paths:
+  /v1/user/workspaces/{workspace}/accounts/{account}/events:
+    get:
+      description: >
+        Live Better Auth session and account access required on every page. Read-only
+        incoming events, including orders without postings. Sorted by received_at and
+        internal UUID descending. Counts cover the search across every status, not the
+        current page. Status is live; refresh after processing. No payload or raw errors.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: status, schema: {enum: [attention, all, waiting, needs_review, posted, asserted], default: attention}}
+        - {in: query, name: q, schema: {type: string, maxLength: 128}, description: Literal case-insensitive order or event ID substring}
+        - {in: query, name: cursor, schema: {type: string, format: uuid}, description: next_cursor from previous page with the same filters}
+      responses:
+        '200':
+          description: Up to 100 source event summaries, safe guidance and search-wide counts; Cache-Control no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events, counts, next_cursor]
+                properties:
+                  next_cursor: {type: [string, 'null'], format: uuid}
+                  counts:
+                    type: object
+                    required: [waiting, needs_review, posted, asserted]
+                    additionalProperties: {type: string, pattern: '^[0-9]+$'}
+                  events:
+                    type: array
+                    maxItems: 100
+                    items:
+                      allOf:
+                        - {$ref: '#/components/schemas/SourceEvent'}
+                        - type: object
+                          required: [cursor, guidance]
+                          properties:
+                            cursor: {type: string, format: uuid}
+                            guidance: {enum: [none, earlier_revision, excess_refund, snapshot_mismatch, reference, review]}
+        '400': {description: Invalid filter or unavailable account-scoped cursor}
+        '401': {description: Missing or expired session}
+        '404': {description: Account unavailable or access revoked}
+        '503': {description: Database unavailable}
   /health:
     get:
       responses:

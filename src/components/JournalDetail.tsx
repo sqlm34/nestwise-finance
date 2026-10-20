@@ -13,7 +13,7 @@ const kinds:Record<SourceEvent['kind'],MessageKey>={
   'job.financials_finalized':'provenanceFinalized','job.reopened':'provenanceReopened','job.voided':'provenanceVoided',
 };
 const statuses:Record<SourceEvent['status'],MessageKey>={waiting:'provenanceWaiting',posted:'provenancePosted',asserted:'provenanceAsserted',needs_review:'provenanceReview'};
-function EventSummary({event,onOpen}:{event:SourceEvent;onOpen:(id:string)=>void}){
+export function EventSummary({event,onOpen}:{event:SourceEvent;onOpen:(id:string)=>void}){
   const {t,locale}=useApp();
   return <View style={{gap:6,paddingVertical:12,borderTopWidth:1,borderColor:colors.line}}>
     <Text style={styles.h2}>{t(kinds[event.kind])}</Text>
@@ -27,8 +27,9 @@ function EventSummary({event,onOpen}:{event:SourceEvent;onOpen:(id:string)=>void
     {event.journal_id&&<Button label={t('provenanceOpen')} onPress={()=>onOpen(event.journal_id!)}/>}
   </View>;
 }
-export function JournalDetail({workspace,account,transaction,currency,name,onClose,onOpen,onSessionExpired}:{
+export function JournalDetail({workspace,account,transaction,currency,name,onClose,onOpen,onSessionExpired,backLabel='provenanceBack'}:{
   workspace:string;account:string;transaction:string;currency:string;name:string;onClose:()=>void;onOpen:(id:string)=>void;onSessionExpired:()=>void;
+  backLabel?:MessageKey;
 }){
   const {t,locale}=useApp();
   const [request,setRequest]=useState<{cursors:(number|null)[];revision:number}>({cursors:[null],revision:0});
@@ -49,7 +50,7 @@ export function JournalDetail({workspace,account,transaction,currency,name,onClo
   },[workspace,account,transaction,request,onSessionExpired]);
   return <Card>
     <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{t('provenanceTitle')}</Text>
-      <Button label={t('provenanceBack')} onPress={onClose}/></View>
+      <Button label={t(backLabel)} onPress={onClose}/></View>
     <Text style={styles.text}>{name} · {currency}</Text>
     <Notice text={t('provenanceScope')}/>
     <Button label={t('journalRefresh')} disabled={busy} onPress={()=>setRequest(current=>({cursors:[null],revision:current.revision+1}))}/>
