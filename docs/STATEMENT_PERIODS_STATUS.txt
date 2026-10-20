@@ -46,6 +46,8 @@ net USD 94 and closing USD 194 on a synthetic archived two-row statement.
 Grouped matching of USD 97 to USD 100 and USD -3 succeeded. A separate USD -3
 bank posting survived cancellation of its match, retained its journal link,
 and remained marked as already posted in original-document evidence.
-Signed native build acceptance and additional period revision UI cases remain.
+Browser revision 2 deliberately recorded closing USD 195 and displayed a USD 1
+difference while retaining revision 1. Revision 3 restores closing USD 194;
+all three immutable revisions remain visible. Signed native acceptance remains.
 Bank PDF extraction and bank-specific fixture validation remain separate open
 work; this implementation must not be represented as a PDF adapter.
