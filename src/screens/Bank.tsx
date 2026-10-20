@@ -1,8 +1,6 @@
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, Text, TextInput, View } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import { File } from 'expo-file-system';
-import * as Crypto from 'expo-crypto';
+import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
+import {readStatementFile} from '../statement-file';
 import { FileSpreadsheet, FileUp, ShieldCheck } from 'lucide-react-native';
 import { useApp } from '../state';
 import { previewStatement, sampleStatement, type Bank as BankId } from '../domain/statement';
@@ -26,25 +24,10 @@ export default function Bank() {
   async function load(sample: boolean) {
     const destination = workspace;
     setError(null); setBusy(true);
-    let cached: File | undefined;
     try {
-      let name: string; let bytes: Uint8Array; let text: string;
-      if (sample) {
-        name = 'sample-checking.csv'; text = sampleStatement; bytes = new TextEncoder().encode(text);
-      } else {
-        const result = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel', 'application/pdf', 'text/plain'], copyToCacheDirectory: true, base64: false });
-        if (result.canceled) return;
-        const asset = result.assets[0];
-        if (Platform.OS !== 'web') cached = new File(asset.uri);
-        if (!asset.name.toLowerCase().endsWith('.csv')) throw new Error('unsupportedFormat');
-        if ((asset.size ?? 0) > 2_000_000) throw new Error('fileTooLarge');
-        name = asset.name;
-        bytes = asset.file ? new Uint8Array(await asset.file.arrayBuffer()) : await cached!.bytes();
-        if (bytes.byteLength > 2_000_000) throw new Error('fileTooLarge');
-        text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-      }
-      const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, Uint8Array.from(bytes));
-      const hash = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
+      const loaded=await readStatementFile(sample?sampleStatement:undefined);
+      if(!loaded)return;
+      const {name,hash,text}=loaded;
       if (previews[destination]?.hash === hash) throw new Error('duplicateFile');
       const preview = previewStatement(text, sample ? 'chase' : bank, sample ? 'Demo · 1234' : alias);
       if (mounted.current) { savePreview(destination, { name, hash, preview, sample }); setPage(0); }
@@ -52,10 +35,6 @@ export default function Bank() {
       const message = cause instanceof Error ? cause.message : '';
       if (mounted.current) setError(message in messages.en ? message as MessageKey : 'importError');
     } finally {
-      // Only the temporary copy created by DocumentPicker, never the original.
-      if (cached?.exists) {
-        try { cached.delete(); } catch { /* The OS may have already cleaned its cache copy. */ }
-      }
       if (mounted.current) setBusy(false);
     }
   }

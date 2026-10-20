@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import type {JournalFilters} from '../src/domain/journal-filters';
 export type Database = {
+  userReconciliationCandidates(subject:string,workspace:string,account:string,from:string,to:string,cursor:string|null):Promise<unknown>;
   accept(connection: string, nonce: string, timestamp: number, raw: string): Promise<unknown>;
   journal(hash: string, workspace: string, account: string): Promise<unknown>;
   processPending(): Promise<void>;
@@ -15,6 +16,9 @@ export type Database = {
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async userReconciliationCandidates(subject,workspace,account,from,to,cursor) {
+      return (await sql`SELECT nestwise.user_reconciliation_candidates(${subject},${workspace}::uuid,${account}::uuid,${from}::date,${to}::date,${cursor}::uuid) result`)[0].result;
+    },
     async userPeriodInsights(subject,workspace,account,from,to) {
       return (await sql`SELECT nestwise.user_period_insights(${subject},${workspace}::uuid,${account}::uuid,${from}::date,${to}::date) result`)[0].result;
     },

@@ -8,6 +8,7 @@ import { useApp } from '../state';
 import {AccountJournal} from '../components/AccountJournal';
 import {AccountEvents} from '../components/AccountEvents';
 import {AccountInsights} from '../components/AccountInsights';
+import {AccountReconciliation} from '../components/AccountReconciliation';
 type Access={user:{name:string;email:string};workspaces:{id:string;name:string;role:string;accounts:{id:string;name:string;currency:string}[]}[]};
 export default function Account() {
   const {t,locale,setLocale}=useApp();
@@ -15,7 +16,7 @@ export default function Account() {
   const [access,setAccess]=useState<Access|null>(null),[busy,setBusy]=useState(!!apiURL),[error,setError]=useState('');
   const [selected,setSelected]=useState<{workspace:string;account:string;name:string;currency:string}|null>(null);
   const [expired,setExpired]=useState(false);
-  const [section,setSection]=useState<'insights'|'journal'|'events'>('insights');
+  const [section,setSection]=useState<'insights'|'journal'|'events'|'reconciliation'>('insights');
   const sessionExpired=useCallback(()=>{setAccess(null);setSelected(null);setExpired(true);},[]);
   useEffect(()=>{
     const controller=new AbortController();
@@ -84,8 +85,10 @@ export default function Account() {
           <Button label={t('insightsTitle')} selected={section==='insights'} onPress={()=>setSection('insights')}/>
           <Button label={t('journalTitle')} selected={section==='journal'} onPress={()=>setSection('journal')}/>
           <Button label={t('eventsTitle')} selected={section==='events'} onPress={()=>setSection('events')}/>
+          <Button label={t('reconciliationTitle')} selected={section==='reconciliation'} onPress={()=>setSection('reconciliation')}/>
         </View>
-        {section==='insights'?<AccountInsights key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
+        {section==='reconciliation'?<AccountReconciliation key={`${selected.workspace}:${selected.account}`} name={selected.name} workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
+          section==='insights'?<AccountInsights key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
           workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired} onEvents={()=>setSection('events')}/>:
           section==='journal'?<AccountJournal key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
           workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:

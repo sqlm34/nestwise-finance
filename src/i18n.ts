@@ -1,4 +1,5 @@
 export const en = {
+  reconciliationTitle:'Bank reconciliation',reconciliationBack:'Back to draft reconciliation',
   insightsTitle:'Period overview',insightsScope:'Draft operational overview of posted journal facts. Not a bank balance, tax profit or approved accountant report.',
   insightsMonth:'This month',insightsQuarter:'This quarter',insightsYear:'Calendar year',insightsDateBasis:'Inclusive event dates in UTC · YYYY-MM-DD · maximum 366 days. Comparison: the immediately preceding period of the same length.',
   insightsInvalidPeriod:'Enter valid start and end dates, in order, spanning at most 366 days (years 0002–9998).',
@@ -132,6 +133,7 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const ru: Record<MessageKey, string> = {
+  reconciliationTitle:'Сверка с банком',reconciliationBack:'Назад к черновику сверки',
   insightsTitle:'Сводка за период',insightsScope:'Рабочий черновик по проведённым записям журнала. Это не банковский остаток, налоговая прибыль или утверждённый отчёт бухгалтера.',
   insightsMonth:'Этот месяц',insightsQuarter:'Этот квартал',insightsYear:'Календарный год',insightsDateBasis:'Даты событий в UTC, включительно · ГГГГ-ММ-ДД · не более 366 дней. Сравнение: предшествующий период такой же длины.',
   insightsInvalidPeriod:'Укажите корректные даты по порядку: не более 366 дней, годы 0002–9998.',

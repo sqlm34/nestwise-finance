@@ -6,6 +6,7 @@ import {parseHistoryParams} from '../src/domain/journal-history';
 import {detailBefore} from '../src/domain/journal-detail';
 import {parseEventParams} from '../src/domain/account-events';
 import {parsePeriodParams} from '../src/domain/period-insights';
+import {candidateParams} from '../src/domain/reconciliation';
 
 export type UserEnv = {
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
@@ -59,13 +60,14 @@ export async function userApi(request: Request, env: UserEnv,
   }
   const authPaths = new Map([['/api/auth/sign-in/email','POST'],['/api/auth/sign-out','POST'],['/api/auth/get-session','GET']]);
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
+  const reconciliationMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliation-candidates$/i.exec(url.pathname);
   const insightsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/insights$/i.exec(url.pathname);
   const eventsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events$/i.exec(url.pathname);
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch) || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
-    request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch))) return finish(response({error:'not_found'},404));
+  if ((url.search&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch) || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
+    request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch))) return finish(response({error:'not_found'},404));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
   if (request.method==='POST') {
@@ -90,6 +92,10 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
+    if(reconciliationMatch){
+      let filters;try{filters=candidateParams(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
+      return finish(response(await db.userReconciliationCandidates(subject,reconciliationMatch[1],reconciliationMatch[2],filters.from,filters.to,filters.cursor)));
+    }
     if(insightsMatch){
       let period;try{period=parsePeriodParams(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
       return finish(response(await db.userPeriodInsights(subject,insightsMatch[1],insightsMatch[2],period.from,period.to)));

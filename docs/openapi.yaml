@@ -4,6 +4,41 @@ info:
   version: 0.3.0
   description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
 paths:
+  /v1/user/workspaces/{workspace}/accounts/{account}/reconciliation-candidates:
+    get:
+      description: >
+        Authenticated read-only cash journal candidates, ordered by paid_at and id.
+        Inclusive UTC paid-date range, maximum 366 days. Excludes cost corrections,
+        accruals, missing payment dates and unresolved events. Bank files/decisions
+        remain on the device. Access is rechecked for every page; not a frozen snapshot.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: from, required: true, schema: {type: string, format: date}}
+        - {in: query, name: to, required: true, schema: {type: string, format: date}}
+        - {in: query, name: cursor, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Up to 100 balanced journal transactions with source kind; Cache-Control no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, limit, next_cursor]
+                properties:
+                  entries:
+                    type: array
+                    maxItems: 100
+                    items:
+                      type: object
+                      description: Journal transaction shape plus kind; amounts are signed integer cent strings
+                      required: [id, occurred_at, paid_at, posted_at, source_event_id, source_order_id, entries, kind]
+                  limit: {const: 100}
+                  next_cursor: {type: [string, 'null'], format: uuid}
+        '400': {description: Invalid dates, unknown/duplicate filters or inaccessible cursor}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible account}
+        '503': {description: Temporarily unavailable; do not infer no matches}
   /v1/user/workspaces/{workspace}/accounts/{account}/insights:
     get:
       description: >

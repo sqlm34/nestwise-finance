@@ -51,11 +51,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0007_account_events.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0008_event_details.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0009_account_period_insights.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0010_reconciliation_candidates.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,9);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,10);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -392,4 +393,21 @@ test('PostgreSQL invitations are single-use under concurrent restricted-role act
     const access=(await sql('SELECT nestwise.user_access($1) result',[`better-auth:${invitation.user}`]))[0].result;
     assert.equal(access[0].role,'member');assert.deepEqual(access[0].accounts,[]);
   } finally {await Promise.all(clients.map(c=>c.end()));}
+});
+
+test('paid reconciliation candidates exclude corrections, accruals and unresolved events with scoped cursor access',async()=>{
+  const {parseCandidates}=require('../.test-build/src/domain/reconciliation.js');
+  const period={from:'2026-10-19',to:'2026-10-19'};
+  const read=async(subject='test-owner',target=periodAccount,cursor=null)=>(await sql('SELECT nestwise.user_reconciliation_candidates($1,$2,$3,$4,$5,$6) result',[subject,workspace,target,period.from,period.to,cursor]))[0].result;
+  const rows=[];let cursor=null;
+  do{const page=parseCandidates(await read('test-owner',periodAccount,cursor),period);rows.push(...page.entries);cursor=page.next_cursor;}while(cursor);
+  assert.equal(rows.length,215);assert.equal(new Set(rows.map(row=>row.id)).size,215);
+  assert.ok(rows.every(row=>row.kind!=='job.cost_corrected'&&row.paid_at));
+  assert.ok(rows.some(row=>row.source_order_id==='period-previous'));
+  assert.ok(!rows.some(row=>['period-wait','period-accrual'].includes(row.source_order_id)));
+  await assert.rejects(read('unknown'),/forbidden/);
+  await assert.rejects(read('test-accountant'),/forbidden/);
+  await assert.rejects(read('test-owner',otherAccount),/forbidden/);
+  await assert.rejects(read('test-owner',account,rows[0].id),/invalid_cursor/);
+  await sql('BEGIN');try{await sql('SET LOCAL ROLE nestwise_api');assert.equal((await read()).entries.length,100);}finally{await sql('ROLLBACK');}
 });
