@@ -41,6 +41,12 @@ test('real Better Auth login, workspace authorization, logout and stale cookie r
   }
   const first=await (await fixture.fetch(request(path,{cookie}))).json();
   assert.equal(first.entries.length,100);assert.ok(first.next_cursor);
+  const detailPath=path+'/'+first.entries[0].id;
+  const detail=await fixture.fetch(request(detailPath,{cookie}));assert.equal(detail.status,200);
+  assert.equal((await detail.json()).transaction.id,first.entries[0].id);
+  assert.equal((await fixture.fetch(request(detailPath))).status,401);
+  assert.equal((await fixture.fetch(request(detailPath+'?before=0',{cookie}))).status,400);
+  assert.equal((await fixture.fetch(request(path+'/'+randomUUID(),{cookie}))).status,404);
   const second=await (await fixture.fetch(request(path+`?cursor=${first.next_cursor}`,{cookie}))).json();
   assert.equal(second.entries.length,1);assert.equal(second.next_cursor,null);
   assert.equal(second.entries[0].source_order_id,'auth-order-0');
@@ -48,6 +54,7 @@ test('real Better Auth login, workspace authorization, logout and stale cookie r
   assert.deepEqual(match.entries,second.entries);
   await fixture.db.query('UPDATE nestwise.memberships SET all_accounts=false WHERE workspace_id=$1',[fixture.workspace]);
   assert.equal((await fixture.fetch(request(path+`?cursor=${first.next_cursor}`,{cookie}))).status,404);
+  assert.equal((await fixture.fetch(request(detailPath,{cookie}))).status,404);
   await fixture.db.query('UPDATE nestwise.memberships SET all_accounts=true WHERE workspace_id=$1',[fixture.workspace]);
   assert.equal((await fixture.fetch(request(`/v1/user/workspaces/${randomUUID()}/accounts/${fixture.account}/journal`,{cookie}))).status,404);
   assert.equal((await fixture.fetch(request('/api/auth/sign-out',{method:'POST',body:{},cookie}))).status,200);

@@ -46,11 +46,12 @@ before(async () => {
     await db.exec(migration);
     await db.exec(readFileSync('db/migrations/0003_user_access.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0005_journal_history.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0006_journal_provenance.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,5);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,6);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -60,6 +61,34 @@ before(async () => {
   await sql(`INSERT INTO nestwise.sessions VALUES ($1,$2,now()+interval '1 hour',NULL),($3,$4,now()+interval '1 hour',NULL)`, [tokenHash,user,accountantHash,accountant]);
 });
 after(async () => { if (db?.close) await db.close(); else if (db) await db.end(); });
+
+test('provenance links corrections and refunds, paginates assertions and isolates source connections',async()=>{
+  const {parseJournalDetail}=require('../.test-build/src/domain/journal-detail.js');
+  const order='provenance-proof',payment=money(order,1,'job.payment_recorded',10000),part=money(order,2,'job.part_cost_recorded',2000,{settlement:'paid'});
+  const correction=money(order,3,'job.cost_corrected',3000,{reference_event_id:part.source_event_id});
+  await accept(payment);await accept(part);await accept(correction);
+  await accept(money(order,4,'job.supplier_credit_received',1000,{reference_event_id:correction.source_event_id}));
+  await accept(money(order,5,'job.customer_refund_issued',2500,{reference_event_id:payment.source_event_id}));
+  const expected={payments_cents:10000,refunds_cents:2500,parts_net_cents:2000,fees_net_cents:0};
+  for(let i=6;i<=108;i++)await accept(assertion(order,i,'job.financials_finalized',{totals:expected}));
+  await accept(money(order,109,'job.customer_refund_issued',99999,{reference_event_id:payment.source_event_id}));
+  await accept(money(order,111,'job.payment_recorded',100));
+  const tx=(await sql('SELECT jt.id FROM nestwise.journal_transactions jt JOIN nestwise.source_events se ON se.id=jt.event_id WHERE se.source_event_id=$1',[correction.source_event_id]))[0].id;
+  const read=async(before=null,subject='test-owner',target=account)=>parseJournalDetail((await sql('SELECT nestwise.user_journal_detail($1,$2,$3,$4,$5) result',[subject,workspace,target,tx,before]))[0].result,tx);
+  await sql('INSERT INTO nestwise.source_connections VALUES ($1,$2,$3,true)',['other-provenance',workspace,account]);
+  await sql('SELECT nestwise.accept_event($1,$2,$3,$4)',['other-provenance',randomUUID(),Math.floor(Date.now()/1000),JSON.stringify({...payment,source_event_id:randomUUID(),source_fact_id:randomUUID()})]);
+  const detail=await read();assert.equal(detail.source.kind,'job.cost_corrected');assert.equal(detail.reference.id,part.source_event_id);
+  assert.equal(detail.transaction.entries[0].cents,'1000');assert.equal(detail.audit[0].action,'applied');
+  assert.equal(detail.history.length,100);assert.equal(detail.history[0].status,'waiting');assert.equal(detail.history[1].status,'needs_review');
+  assert.equal(detail.history[2].status,'asserted');assert.equal(detail.history[2].journal_id,null);
+  const tail=await read(detail.next_revision);assert.equal(tail.history.length,10);assert.equal(tail.next_revision,null);
+  assert.equal(new Set([...detail.history,...tail.history].map(event=>event.id)).size,110);
+  assert.equal(JSON.stringify(detail).includes('payload'),false);assert.equal(JSON.stringify(detail).includes('error_code'),false);
+  await assert.rejects(read(null,'nonexistent'),/forbidden/);await assert.rejects(read(null,'test-owner',otherAccount),/forbidden/);
+  await sql('BEGIN');try{await sql('SET LOCAL ROLE nestwise_api');assert.equal((await read()).source.id,correction.source_event_id);
+    await assert.rejects(sql('SELECT * FROM nestwise.event_provenance'),/permission denied/);
+  }finally{await sql('ROLLBACK');}
+});
 
 test('full history paginates tied timestamps, searches beyond page one and rechecks grants',async()=>{
   const {parseHistoryPage}=require('../.test-build/src/domain/journal-history.js');

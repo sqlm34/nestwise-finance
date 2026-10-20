@@ -106,10 +106,66 @@ paths:
         '401': {description: Missing, expired or revoked Better Auth session}
         '404': {description: Account not accessible; no cross-account disclosure}
         '503': {description: Database unavailable; retry without assuming history is empty}
+  /v1/user/workspaces/{workspace}/accounts/{account}/journal/{transaction}:
+    get:
+      description: >
+        Live Better Auth session required; ownership checked on every request.
+        Shows transaction provenance and same-source order history without raw payloads
+        or internal error messages. Historical order assertions are not finalized tax reports.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: transaction, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: before, schema: {type: integer, minimum: 1, maximum: 2147483646}, description: next_revision from the preceding history page}
+      responses:
+        '200':
+          description: Read-only provenance; no-store. Cents are decimal strings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transaction, source, reference, history, next_revision, audit, audit_truncated]
+                properties:
+                  transaction: {type: object, description: The complete balanced journal transaction, same shape as the journal page entry}
+                  source: {$ref: '#/components/schemas/SourceEvent'}
+                  reference:
+                    anyOf:
+                      - {$ref: '#/components/schemas/SourceEvent'}
+                      - {type: 'null'}
+                  history: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/SourceEvent'}}
+                  next_revision: {type: [integer, 'null']}
+                  audit:
+                    type: array
+                    maxItems: 50
+                    items:
+                      type: object
+                      properties:
+                        action: {enum: [applied, needs_review]}
+                        recorded_at: {type: string, format: date-time}
+                  audit_truncated: {type: boolean}
+        '400': {description: Invalid or duplicate query parameter}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible transaction}
+        '503': {description: Temporarily unavailable}
 components:
   securitySchemes:
     session: {type: http, scheme: bearer}
   schemas:
+    SourceEvent:
+      type: object
+      required: [id, order_id, revision, kind, status, occurred_at, paid_at, received_at, posted_at, journal_id, reference_id]
+      properties:
+        id: {type: string, format: uuid}
+        order_id: {type: string, maxLength: 128}
+        revision: {type: integer, minimum: 1}
+        kind: {type: string, description: Financial event kind defined by the CRM contract}
+        status: {enum: [waiting, posted, asserted, needs_review]}
+        occurred_at: {type: string, format: date-time}
+        paid_at: {type: [string, 'null'], format: date-time}
+        received_at: {type: string, format: date-time}
+        posted_at: {type: [string, 'null'], format: date-time}
+        journal_id: {type: [string, 'null'], format: uuid}
+        reference_id: {type: [string, 'null'], format: uuid}
     Event:
       type: object
       additionalProperties: false

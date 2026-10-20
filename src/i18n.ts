@@ -1,4 +1,14 @@
 export const en = {
+  provenanceTitle:'Transaction provenance',provenanceOpen:'View transaction details',provenanceBack:'Back to journal',
+  provenanceScope:'Source events and accounting history. A confirmed order snapshot is not a finalized tax report.',
+  provenanceSource:'Original event',provenanceReference:'Referenced event',provenanceReferenceId:'Referenced event ID',
+  provenanceRevision:'Revision',provenanceOccurred:'Event date',provenanceReceived:'Received',provenanceNotPosted:'No journal entry',
+  provenanceWaiting:'Waiting for earlier revisions',provenancePosted:'Posted',provenanceAsserted:'Assertion applied',provenanceReview:'Needs review',
+  provenanceFee:'Processing fee recorded',provenanceFeeRefund:'Processing fee refunded',provenanceFinalized:'Order snapshot confirmed',
+  provenanceReopened:'Order reopened',provenanceVoided:'Order voided',provenanceAudit:'Audit of this event',provenanceApplied:'Event applied',
+  provenanceNoAudit:'No audit entries available.',provenanceAuditLimit:'Only the latest 50 audit entries are shown.',
+  provenanceHistory:'Order event history',provenanceHistoryHint:'Newest revisions first, 100 per page. Includes events without journal entries.',
+  provenanceUnavailable:'This transaction is unavailable or you no longer have access.',
   journalApply:'Apply filters',journalUnapplied:'Filters have changed. Apply them to update the results.',
   journalInvalidQuery:'Use up to 128 characters without control characters.',
   journalRestart:'This page is no longer available. Refresh the journal to start from the first page.',
@@ -92,6 +102,16 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const ru: Record<MessageKey, string> = {
+  provenanceTitle:'Происхождение операции',provenanceOpen:'Посмотреть детали операции',provenanceBack:'Назад к журналу',
+  provenanceScope:'Исходные события и история учёта. Подтверждённый снимок заказа не означает финализированный налоговый отчёт.',
+  provenanceSource:'Исходное событие',provenanceReference:'Событие-основание',provenanceReferenceId:'ID события-основания',
+  provenanceRevision:'Ревизия',provenanceOccurred:'Дата события',provenanceReceived:'Получено',provenanceNotPosted:'Проводки нет',
+  provenanceWaiting:'Ожидает предыдущие ревизии',provenancePosted:'Проведено',provenanceAsserted:'Проверка применена',provenanceReview:'Нужна проверка',
+  provenanceFee:'Учтена комиссия обработки',provenanceFeeRefund:'Возвращена комиссия обработки',provenanceFinalized:'Подтверждён снимок заказа',
+  provenanceReopened:'Заказ открыт повторно',provenanceVoided:'Заказ аннулирован',provenanceAudit:'Аудит этого события',provenanceApplied:'Событие применено',
+  provenanceNoAudit:'Записей аудита пока нет.',provenanceAuditLimit:'Показаны только последние 50 записей аудита.',
+  provenanceHistory:'История событий заказа',provenanceHistoryHint:'Сначала новые ревизии, по 100 на страницу. Включены события без проводок.',
+  provenanceUnavailable:'Операция недоступна или у вас больше нет доступа.',
   journalApply:'Применить фильтры',journalUnapplied:'Фильтры изменены. Примените их, чтобы обновить результаты.',
   journalInvalidQuery:'Используйте до 128 символов без управляющих символов.',
   journalRestart:'Эта страница больше недоступна. Обновите журнал, чтобы начать с первой страницы.',

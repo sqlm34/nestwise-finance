@@ -7,6 +7,7 @@ export type Database = {
   userAccess(subject: string): Promise<unknown>;
   userJournal(subject: string, workspace: string, account: string): Promise<unknown>;
   userJournalPage(subject:string,workspace:string,account:string,filters:JournalFilters,cursor:string|null):Promise<unknown>;
+  userJournalDetail(subject:string,workspace:string,account:string,transaction:string,before:number|null):Promise<unknown>;
 };
 export function database(url: string): Database {
   const sql = neon(url);
@@ -29,6 +30,10 @@ export function database(url: string): Database {
     async userJournalPage(subject,workspace,account,filters,cursor) {
       return (await sql`SELECT nestwise.user_journal_page(${subject},${workspace}::uuid,${account}::uuid,
         ${filters.query},${filters.from||null}::date,${filters.to||null}::date,${filters.code},${filters.order},${cursor}::uuid) result`)[0].result;
+    },
+    async userJournalDetail(subject,workspace,account,transaction,before) {
+      return (await sql`SELECT nestwise.user_journal_detail(${subject},${workspace}::uuid,${account}::uuid,
+        ${transaction}::uuid,${before}::integer) result`)[0].result;
     },
   };
 }

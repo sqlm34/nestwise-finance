@@ -7,6 +7,7 @@ import {defaultJournalFilters,type JournalFilters} from '../domain/journal-filte
 import {historyParams,parseHistoryPage,validateHistoryFilters,type HistoryPage} from '../domain/journal-history';
 import {authenticatedFetch} from '../auth/client';
 import type {MessageKey} from '../i18n';
+import {JournalDetail} from './JournalDetail';
 const labels:Record<JournalCode,MessageKey>={
   clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',
   parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',
@@ -17,6 +18,7 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
 }) {
   const {t,locale}=useApp();
   const [filters,setFilters]=useState(defaultJournalFilters);
+  const [selectedTransaction,setSelectedTransaction]=useState<string|null>(null);
   const [request,setRequest]=useState<HistoryRequest>({filters:defaultJournalFilters,cursors:[null],revision:0});
   const [result,setResult]=useState<{request:HistoryRequest;page:HistoryPage|null;error:MessageKey|null}|null>(null);
   const busy=result?.request!==request;
@@ -46,6 +48,9 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
   },[workspace,account,request,onSessionExpired]);
   const restart=(next:JournalFilters)=>setRequest(current=>({filters:next,cursors:[null],revision:current.revision+1}));
   const emptyFiltered=!!(request.filters.query||request.filters.from||request.filters.to||request.filters.code!=='all');
+  if(selectedTransaction)return <JournalDetail key={selectedTransaction} workspace={workspace} account={account}
+    transaction={selectedTransaction} currency={currency} name={name} onOpen={setSelectedTransaction} onSessionExpired={onSessionExpired}
+    onClose={()=>{setSelectedTransaction(null);setRequest(current=>({...current,revision:current.revision+1}));}}/>;
   return <Card>
     <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{t('journalTitle')}</Text>
       <Button label={t('journalRefresh')} disabled={busy} onPress={()=>restart(request.filters)}/></View>
@@ -96,6 +101,7 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
         <Text selectable style={styles.muted}>{t('journalEntry')}: {transaction.id}</Text>
         <Text selectable style={styles.muted}>{t('journalEvent')}: {transaction.source_event_id}</Text>
         <Text style={styles.muted}>{t('journalPostedAt')}: {journalDate(transaction.posted_at,locale)}</Text>
+        <Button label={t('provenanceOpen')} onPress={()=>setSelectedTransaction(transaction.id)}/>
       </View>)}
       <Text style={styles.muted}>{t(page.next_cursor?'journalMore':'journalEnd')}</Text>
     </>}
