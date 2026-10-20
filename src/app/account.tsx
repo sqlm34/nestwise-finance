@@ -86,7 +86,7 @@ export default function Account() {
           {space.accounts.map(account=><Button key={account.id} label={`${account.name} · ${account.currency}`} selected={selected?.workspace===space.id&&selected.account===account.id} disabled={busy} onPress={()=>void readJournal(space.id,account.id,account.name,account.currency)}/>)}
         </View>)}
       </Card>}
-      {access&&selected&&<AccountJournal name={selected.name} currency={selected.currency} page={journal} busy={busy}
+      {access&&selected&&<AccountJournal key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency} page={journal} busy={busy}
         onRefresh={()=>void readJournal(selected.workspace,selected.account,selected.name,selected.currency)}/>}
       <Button label={t('authDemoBack')} onPress={()=>router.replace('/')}/>
     </ScrollView>

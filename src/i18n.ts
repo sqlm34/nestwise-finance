@@ -1,4 +1,11 @@
 export const en = {
+  journalSearch:'Search by order, journal or event ID',journalEvent:'Source event ID',
+  journalFilterScope:'Search and filters cover only the latest 100 loaded transactions, not the full account history.',
+  journalDateRange:'Event date (UTC), inclusive · YYYY-MM-DD',journalFrom:'From date',journalTo:'To date',
+  journalCodeFilter:'Contains an accounting line',journalReset:'Reset filters',
+  journalInvalidDate:'Enter a valid date as YYYY-MM-DD, or leave it blank.',
+  journalReversedRange:'The start date must not be after the end date.',
+  journalNoMatches:'No matches in the loaded transactions. Change or reset the filters.',
   journalTitle:'Account journal',journalRefresh:'Refresh journal',journalScope:'Posted transactions for the selected account. Debit and credit lines are not an account balance.',
   journalEmpty:'No posted transactions yet. CRM events and bank statements have not been posted to this account.',
   journalShown:'Shown:',journalLimit:'Latest 100 transactions only',journalPaidAt:'Payment date',journalNotPaid:'Not recorded',
@@ -80,6 +87,13 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const ru: Record<MessageKey, string> = {
+  journalSearch:'Поиск по ID заказа, проводки или события',journalEvent:'ID события источника',
+  journalFilterScope:'Поиск и фильтры охватывают только последние 100 загруженных операций, а не всю историю счёта.',
+  journalDateRange:'Дата события (UTC), включительно · ГГГГ-ММ-ДД',journalFrom:'Дата с',journalTo:'Дата по',
+  journalCodeFilter:'Содержит строку учёта',journalReset:'Сбросить фильтры',
+  journalInvalidDate:'Введите существующую дату в формате ГГГГ-ММ-ДД или оставьте поле пустым.',
+  journalReversedRange:'Начальная дата не должна быть позже конечной.',
+  journalNoMatches:'В загруженных операциях совпадений нет. Измените или сбросьте фильтры.',
   journalTitle:'Журнал счёта',journalRefresh:'Обновить журнал',journalScope:'Проведённые операции выбранного счёта. Дебет и кредит проводок не являются остатком на счёте.',
   journalEmpty:'Проведённых операций пока нет. События CRM и банковские выписки ещё не проведены по этому счёту.',
   journalShown:'Показано:',journalLimit:'Только последние 100 операций',journalPaidAt:'Дата оплаты',journalNotPaid:'Не указана',
