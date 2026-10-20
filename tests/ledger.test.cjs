@@ -53,11 +53,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0009_account_period_insights.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0010_reconciliation_candidates.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0011_saved_reconciliation.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0012_statement_archive.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,11);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,12);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -427,5 +428,20 @@ test('PostgreSQL serializes concurrent reconciliation claims and retains cancell
     await clients[0].query('SELECT nestwise.cancel_reconciliation($1,$2,$3,$4,$5)',['test-owner',workspace,periodAccount,id,'recheck']);
     assert.equal((await sql('SELECT count(*)::int n FROM nestwise.reconciliation_claims WHERE group_id=$1',[id]))[0].n,0);
     assert.equal((await sql('SELECT count(*)::int n FROM nestwise.reconciliation_cancellations WHERE group_id=$1',[id]))[0].n,1);
+  }finally{await Promise.all(clients.map(c=>c.end()));}
+});
+
+test('PostgreSQL document reservations serialize at quota and survive restore with immutable completion', {skip:!process.env.TEST_DATABASE_URL},async()=>{
+  const {Client}=require('pg'),clients=[new Client({connectionString:process.env.TEST_DATABASE_URL}),new Client({connectionString:process.env.TEST_DATABASE_URL})];
+  for(let i=0;i<99;i++)await sql('SELECT nestwise.prepare_document($1,$2,$3,$4,10)',['test-owner',workspace,periodAccount,createHash('sha256').update('quota-'+i).digest('hex')]);
+  await Promise.all(clients.map(c=>c.connect()));
+  try{
+    await Promise.all(clients.map(c=>c.query('SET ROLE nestwise_api')));
+    const hashes=['c'.repeat(64),'d'.repeat(64)];
+    const results=await Promise.allSettled(clients.map((c,i)=>c.query('SELECT nestwise.prepare_document($1,$2,$3,$4,10)',['test-owner',workspace,periodAccount,hashes[i]])));
+    assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.match(results.find(r=>r.status==='rejected').reason.message,/archive_full/);
+    const completed=hashes[results.findIndex(r=>r.status==='fulfilled')];
+    await clients[0].query('SELECT nestwise.complete_document($1,$2,$3,$4)',['test-owner',workspace,periodAccount,completed]);
+    assert.equal((await sql('SELECT count(*)::int n FROM nestwise.statement_archived WHERE account_id=$1',[periodAccount]))[0].n,1);
   }finally{await Promise.all(clients.map(c=>c.end()));}
 });

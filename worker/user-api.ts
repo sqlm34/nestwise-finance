@@ -1,4 +1,5 @@
 import { connectAuth, type AuthService, type AuthConfig } from './auth';
+import {documentApi,type DocumentEnv} from './documents';
 import { database } from './database';
 import { limitedText } from './security';
 import { acceptInvitation, invitations } from './invitations';
@@ -9,7 +10,7 @@ import {parsePeriodParams} from '../src/domain/period-insights';
 import {candidateParams} from '../src/domain/reconciliation';
 import {parseSave,parseCancellation,savedCursor} from '../src/domain/saved-reconciliation';
 
-export type UserEnv = {
+export type UserEnv = DocumentEnv & {
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
   AUTH_SECRET?: string; AUTH_BASE_URL?: string; AUTH_WEB_ORIGIN?: string;
   NESTWISE_DATABASE_URL?: string;
@@ -63,6 +64,9 @@ export async function userApi(request: Request, env: UserEnv,
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
   const savedMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations$/i.exec(url.pathname);
   const cancelMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations\/([0-9a-f-]{36})\/cancel$/i.exec(url.pathname);
+  const documentMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/documents(?:\/([0-9a-f]{64})(\/verify)?)?$/i.exec(url.pathname);
+  const documentRoute=!!documentMatch&&!url.search&&(request.method==='GET'||request.method==='POST'&&!!documentMatch[3]&&!documentMatch[4]);
+  const documentWrite=documentRoute&&request.method==='POST';
   const reconciliationWrite=request.method==='POST'&&(savedMatch||cancelMatch);
   const reconciliationMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliation-candidates$/i.exec(url.pathname);
   const insightsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/insights$/i.exec(url.pathname);
@@ -70,12 +74,12 @@ export async function userApi(request: Request, env: UserEnv,
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&(reconciliationWrite||!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
+  if ((url.search&&(reconciliationWrite||!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
-  if(reconciliationWrite&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
+  if((reconciliationWrite||documentWrite)&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
-  if (request.method==='POST') {
+  if (request.method==='POST'&&!documentWrite) {
     if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') return finish(response({error:'invalid_body'},415));
     let raw: string;
     try {raw=await limitedText(request); if(new TextEncoder().encode(raw).length>(reconciliationWrite?16384:4096)) throw new Error();}
@@ -97,6 +101,7 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
+    if(documentRoute&&documentMatch)return finish(await documentApi(request,env,db,subject,documentMatch[1],documentMatch[2],documentMatch[3]?.toLowerCase(),!!documentMatch[4]));
     if(cancelMatch){
       let reason;try{reason=parseCancellation(await safeRequest.json());}catch{return finish(response({error:'invalid_reconciliation'},400));}
       return finish(response({id:await db.cancelReconciliation(subject,cancelMatch[1],cancelMatch[2],cancelMatch[3],reason)}));
@@ -138,6 +143,7 @@ export async function userApi(request: Request, env: UserEnv,
     return finish(response({user:{id:session.user.id,name:session.user.name,email:session.user.email},
       workspaces:await db.userAccess(subject)}));
   } catch(error) {
+    if(error instanceof Error&&error.message==='archive_full')return finish(response({error:'archive_full'},409));
     if(error instanceof Error&&['reconciliation_conflict','reconciliation_mismatch'].includes(error.message))return finish(response({error:error.message},409));
     if(error instanceof Error&&error.message==='invalid_reconciliation')return finish(response({error:error.message},400));
     if(error instanceof Error && error.message==='forbidden') return finish(response({error:'not_found'},404));

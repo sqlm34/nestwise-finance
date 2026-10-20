@@ -35,6 +35,11 @@ async function verifyRestore(source,restored,runtime=restored) {
     await rejected('SELECT * FROM nestwise.reconciliation_groups',/permission denied/,true);
   }
   if(expected.reconciliation_cancellations?.count)await rejected('DELETE FROM nestwise.reconciliation_cancellations',/immutable_financial_history/);
+  if(expected.statement_documents?.count){
+    await rejected('DELETE FROM nestwise.statement_documents',/immutable_financial_history/);
+    await rejected('SELECT * FROM nestwise.statement_documents',/permission denied/,true);
+  }
+  if(expected.statement_archived?.count)await rejected('DELETE FROM nestwise.statement_archived',/immutable_financial_history/);
   await rejected('DELETE FROM nestwise.source_events',/immutable_source_event/);
   const revoked=(await restored.query(`SELECT s.token_hash,m.workspace_id,a.id account_id
     FROM nestwise.sessions s JOIN nestwise.memberships m ON m.user_id=s.user_id

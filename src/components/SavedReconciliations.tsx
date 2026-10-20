@@ -77,7 +77,7 @@ export function SavedReconciliations({workspace,account,revision,onSessionExpire
   const reasonLabel=(value:string)=>({mistake:ru?'Ошибка выбора':'Selection mistake',duplicate:ru?'Дубликат':'Duplicate',recheck:ru?'Повторная проверка':'Needs another review'}[value]||value);
   return <Card>
     <Text accessibilityRole="header" style={styles.h2}>{ru?'Сохранённые сверки и история':'Saved reconciliations and history'}</Text>
-    <Notice text={ru?'Сохранённое решение — проверка пользователя, не утверждённый отчёт бухгалтера. Хранятся даты, суммы, ссылки на проводки и хеши. Оригинал файла и описание банка не сохраняются: храните исходную выписку отдельно.':'A saved decision is a user assertion, not an approved accountant report. Dates, amounts, journal references and hashes are retained. Original files and bank descriptions are not archived; keep your original statement separately.'}/>
+    <Notice text={ru?'Сохранённое решение — проверка пользователя, не утверждённый отчёт бухгалтера. Хранятся даты, суммы, ссылки на проводки и хеши. Оригинал можно отдельно сохранить в приватном архиве выше; связь определяется по SHA-256 файла.':'A saved decision is a user assertion, not an approved accountant report. Dates, amounts, journal references and hashes are retained. Archive the original separately above; its SHA-256 links it to these decisions.'}/>
     <Button label={ru?'Обновить историю':'Refresh history'} disabled={busy||writing} onPress={()=>{setCancel(null);setRequest({cursors:[null],reload:request.reload+1});}}/>
     {!!error&&<Notice error text={error}/>}
     {busy?<ActivityIndicator/>:!data?<Notice error text={t('journalUnavailable')}/>:<>

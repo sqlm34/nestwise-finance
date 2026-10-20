@@ -4,6 +4,58 @@ info:
   version: 0.3.0
   description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
 paths:
+  /v1/user/workspaces/{workspace}/accounts/{account}/documents:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+    get:
+      description: Live account ACL; complete list capped at 100 records, including pending uploads and linked reconciliation counts.
+      responses:
+        '200': {description: Array of hash/bytes/created_at/uploaded_by/archived/linked_groups; no-store}
+        '401': {description: Session expired}
+        '404': {description: Account inaccessible}
+        '503': {description: Storage not configured}
+  /v1/user/workspaces/{workspace}/accounts/{account}/documents/{hash}:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: hash, required: true, schema: {type: string, minLength: 64, maxLength: 64}}
+    post:
+      description: Owner/accountant upload of original UTF-8 CSV bytes, max 2000000; SHA-256 must match path. Both private copies verified before completion. Same-file retry is safe. No ledger posting.
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: {type: string}
+      responses:
+        '200': {description: hash and archived true}
+        '400': {description: Invalid CSV or checksum}
+        '401': {description: Missing session}
+        '403': {description: Missing or untrusted origin}
+        '404': {description: Account write access unavailable}
+        '409': {description: Account quota reached}
+        '413': {description: Body exceeds 2000000 bytes}
+        '415': {description: Expected text/csv}
+        '503': {description: Partial upload or integrity failure; refresh and retry same file}
+    get:
+      description: Authenticated attachment; verify bytes by hash and size, fall back to verified backup. Never serve corrupted content. No public links.
+      responses:
+        '200': {description: Exact original bytes; no-store and nosniff}
+        '401': {description: Session expired}
+        '404': {description: Original not archived or account inaccessible}
+        '503': {description: Neither copy passes integrity verification}
+  /v1/user/workspaces/{workspace}/accounts/{account}/documents/{hash}/verify:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: hash, required: true, schema: {type: string, minLength: 64, maxLength: 64}}
+    get:
+      description: Live account ACL; compute SHA-256 of both stored copies without returning private content.
+      responses:
+        '200': {description: hash and primary/backup integrity booleans; at least one verified copy}
+        '401': {description: Session expired}
+        '404': {description: Original not archived or account inaccessible}
+        '503': {description: Neither copy verified}
   /v1/user/workspaces/{workspace}/accounts/{account}/reconciliations:
     parameters:
       - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
