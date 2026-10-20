@@ -72,3 +72,24 @@ test('quota counts pending reservations, permits same-file retry, and cannot be 
   assert.equal((await fixture.fetch(request('/'+hash(another),another))).status,409);
   await assert.rejects(fixture.db.query('SELECT nestwise.prepare_document($1,$2,$3,$4,1)',[subject,fixture.workspace,fixture.account,digest]),/invalid_document/);
 });
+
+test('live evidence review detects forged descriptions, releases canceled claims and identifies cross-file reservations',async()=>{
+  const {parseEvidenceReview}=require('../.test-build/src/domain/statement-evidence.js');
+  await fixture.db.query('INSERT INTO nestwise.source_connections VALUES ($1,$2,$3,true)',['document-evidence',fixture.workspace,fixture.account]);
+  await fixture.db.query('SELECT nestwise.accept_event($1,$2,$3,$4)',['document-evidence',randomUUID(),Math.floor(Date.now()/1000),JSON.stringify({schema_version:1,source_event_id:randomUUID(),source_order_id:'evidence-only',source_fact_id:randomUUID(),order_revision:1,type:'job.payment_recorded',currency:'USD',occurred_at:'2026-10-20T12:00:00Z',paid_at:'2026-10-20T12:00:00Z',amount_cents:1234})]);
+  const tx=(await fixture.db.query('SELECT id FROM nestwise.journal_transactions')).rows[0].id;
+  const subject=`better-auth:${fixture.id}`,base={file_hash:digest,rows:[{line:2,date:'2026-10-20',cents:'1234',text_hash:hash('synthetic, only')}],transactions:[tx]};
+  const save=async body=>{await fixture.db.query('SELECT nestwise.save_reconciliation($1,$2,$3,$4)',[subject,fixture.workspace,fixture.account,JSON.stringify(body)]);return body.id;};
+  const cancel=async id=>fixture.db.query('SELECT nestwise.cancel_reconciliation($1,$2,$3,$4,$5)',[subject,fixture.workspace,fixture.account,id,'recheck']);
+  const review=async()=>{const result=await fixture.fetch(request('/'+digest+'/review'));assert.equal(result.status,200,await result.clone().text());return parseEvidenceReview(await result.json(),digest);};
+  const correct=await save({...base,id:randomUUID()});assert.equal((await review()).totals.matched.count,1);
+  await cancel(correct);let report=await review();assert.equal(report.totals.unmatched.count,1);assert.equal(report.canceled,1);
+  const forged=await save({...base,id:randomUUID(),rows:[{...base.rows[0],text_hash:hash('invented description')}]});
+  report=await review();assert.equal(report.totals.mismatch.count,1);assert.equal(report.groups[0].valid,false);await cancel(forged);
+  const external=await save({...base,id:randomUUID(),file_hash:'e'.repeat(64)});report=await review();assert.equal(report.totals.reserved.count,1);assert.equal(report.totals.matched.count,0);await cancel(external);
+  assert.equal((await fixture.fetch(request('/'+digest+'/review',undefined,{noCookie:true}))).status,401);
+  await fixture.db.query('UPDATE nestwise.memberships SET all_accounts=false WHERE workspace_id=$1',[fixture.workspace]);
+  assert.equal((await fixture.fetch(request('/'+digest+'/review'))).status,404);
+  await fixture.db.query('UPDATE nestwise.memberships SET all_accounts=true WHERE workspace_id=$1',[fixture.workspace]);
+  assert.equal((await fixture.db.query('SELECT count(*)::int n FROM nestwise.journal_transactions')).rows[0].n,1,'review never posts additional money');
+});

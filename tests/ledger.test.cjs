@@ -54,11 +54,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0010_reconciliation_candidates.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0011_saved_reconciliation.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0012_statement_archive.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0013_statement_evidence.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,12);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,13);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -443,5 +444,6 @@ test('PostgreSQL document reservations serialize at quota and survive restore wi
     const completed=hashes[results.findIndex(r=>r.status==='fulfilled')];
     await clients[0].query('SELECT nestwise.complete_document($1,$2,$3,$4)',['test-owner',workspace,periodAccount,completed]);
     assert.equal((await sql('SELECT count(*)::int n FROM nestwise.statement_archived WHERE account_id=$1',[periodAccount]))[0].n,1);
+    assert.deepEqual((await clients[0].query('SELECT nestwise.document_evidence($1,$2,$3,$4,$5) result',['test-owner',workspace,periodAccount,completed,'[]'])).rows[0].result,{groups:[],reserved:[],canceled:0});
   }finally{await Promise.all(clients.map(c=>c.end()));}
 });

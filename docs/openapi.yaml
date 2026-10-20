@@ -4,6 +4,23 @@ info:
   version: 0.3.0
   description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
 paths:
+  /v1/user/workspaces/{workspace}/accounts/{account}/documents/{hash}/review:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: hash, required: true, schema: {type: string, minLength: 64, maxLength: 64}}
+    get:
+      description: >
+        Live account ACL and verified original required. Compare active saved assertions against original row dates,
+        exact cents and normalized description hashes. Every row in a group must agree. Canceled decisions release rows.
+        Return matched/unmatched/blocked/mismatch/reserved statuses, exact credit/debit subtotals, active group journal
+        references and canceled count. Other-file fingerprint reservations are distinct from matched rows.
+        Read-only working review; never accountant approval or a final report.
+      responses:
+        '200': {description: hash, checked_at, copy, canceled, groups, rows and totals; no-store}
+        '401': {description: Missing session}
+        '404': {description: Original not archived or account inaccessible}
+        '503': {description: Original integrity or evidence verification unavailable}
   /v1/user/workspaces/{workspace}/accounts/{account}/documents:
     parameters:
       - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}

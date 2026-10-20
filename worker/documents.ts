@@ -1,3 +1,4 @@
+import {statementFingerprints,reviewEvidence} from '../src/domain/statement-evidence';
 import {documentLimit,parseDocuments} from '../src/domain/documents';
 import {previewStatement} from '../src/domain/statement';
 import type {Database} from './database';
@@ -22,7 +23,7 @@ async function verified(bucket:PrivateBucket,key:string,hash:string,size:number)
     const bytes=new Uint8Array(await object.arrayBuffer());return bytes.length===size&&await sha256(bytes)===hash?bytes:null;
   }catch{return null;}
 }
-export async function documentApi(request:Request,env:DocumentEnv,db:Database,subject:string,workspace:string,account:string,hash?:string,verify=false){
+export async function documentApi(request:Request,env:DocumentEnv,db:Database,subject:string,workspace:string,account:string,hash?:string,mode:string='download'){
   const write=request.method==='POST';
   // Recheck live ACL before consuming a private body or touching storage.
   await db.documentAccess(subject,workspace,account,write);
@@ -51,11 +52,17 @@ export async function documentApi(request:Request,env:DocumentEnv,db:Database,su
   const doc=parseDocuments(await db.readDocuments(subject,workspace,account)).find(d=>d.hash===hash&&d.archived);
   if(!doc)return json({error:'not_found'},404);
   const primary=await verified(env.STATEMENTS,key,hash,doc.bytes);
-  const backup=verify||!primary?await verified(env.STATEMENTS_BACKUP,key,hash,doc.bytes):null;
-  if(verify)return json({hash,primary:!!primary,backup:!!backup},primary||backup?200:503);
+  const backup=mode==='verify'||!primary?await verified(env.STATEMENTS_BACKUP,key,hash,doc.bytes):null;
+  if(mode==='verify')return json({hash,primary:!!primary,backup:!!backup},primary||backup?200:503);
   const bytes=primary??backup;if(!bytes)return json({error:'archive_integrity_error'},503);
   // Check access again after storage I/O, including membership revoked mid-request.
   await db.documentAccess(subject,workspace,account,false);
+  if(mode==='review'){
+    const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes),preview=previewStatement(text,'chase','Archive');
+    const fingerprints=await statementFingerprints(preview.rows,text=>sha256(new TextEncoder().encode(text)));
+    const evidence=await db.documentEvidence(subject,workspace,account,hash,[...fingerprints.values()]);
+    return json(reviewEvidence(text,hash,fingerprints,evidence,primary?'primary':'backup',new Date().toISOString()));
+  }
   return new Response(Uint8Array.from(bytes),{headers:{'Content-Type':'application/octet-stream',
     'Content-Disposition':`attachment; filename="statement-${hash.slice(0,12)}.csv"`,'Content-Security-Policy':"sandbox; default-src 'none'",'X-Archive-Copy':primary?'primary':'backup'}});
 }

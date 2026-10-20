@@ -9,6 +9,7 @@ import {readStatementFile} from '../statement-file';
 import {authenticatedFetch} from '../auth/client';
 import {messages,type MessageKey} from '../i18n';
 import {JournalDetail} from './JournalDetail';
+import {parseEvidenceReview,type EvidenceReview} from '../domain/statement-evidence';
 import {StatementArchive} from './StatementArchive';
 import {SaveDraftButton,SavedReconciliations} from './SavedReconciliations';
 
@@ -17,6 +18,8 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
   const {locale,t}=useApp(),ru=locale==='ru';
   const say=(en:string,ruText:string)=>ru?ruText:en;
   const [savedRevision,setSavedRevision]=useState(0),[savedLocal,setSavedLocal]=useState<string[]>([]);
+  const [archiveHash,setArchiveHash]=useState<string|null>(null);
+  const [archiveEvidence,setArchiveEvidence]=useState<{hash:string;revision:number;data:EvidenceReview|null}|null>(null);
   const [original,setOriginal]=useState<{hash:string;bytes:Uint8Array}|null>(null);
   const [file,setFile]=useState<PreviewFile|null>(null),[alias,setAlias]=useState('');
   const [loading,setLoading]=useState(false),[error,setError]=useState<MessageKey|null>(null);
@@ -32,12 +35,15 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
   const rows=file?.preview.rows??[];
   const bank=useMemo(()=>(file?.preview.rows??[]).filter(row=>selected.includes(row.line)),[file,selected]);
   const eligible=useMemo(()=>eligibleBankRows(file?.preview.rows??[]),[file]);
-  const usedRows=new Set(groups.flatMap(group=>group.rows)),usedIds=new Set(groups.flatMap(group=>group.transactions));
-  const suggestions=useMemo(()=>suggestGroups(bank,candidates,new Set(groups.flatMap(group=>group.transactions))),[bank,candidates,groups]);
+  const evidenceReady=!archiveHash||archiveEvidence?.hash===archiveHash&&archiveEvidence.revision===savedRevision&&!!archiveEvidence.data;
+  const lockedRows=archiveHash&&archiveEvidence?.hash===archiveHash?archiveEvidence.data?.rows.filter(row=>['matched','mismatch','reserved'].includes(row.status)).map(row=>row.line)??[]:[];
+  const lockedIds=useMemo(()=>archiveHash&&archiveEvidence?.hash===archiveHash?archiveEvidence.data?.groups.flatMap(group=>group.transactions)??[]:[],[archiveHash,archiveEvidence]);
+  const usedRows=new Set([...groups.flatMap(group=>group.rows),...lockedRows]),usedIds=new Set([...groups.flatMap(group=>group.transactions),...lockedIds]);
+  const suggestions=useMemo(()=>suggestGroups(bank,candidates,new Set([...groups.flatMap(group=>group.transactions),...lockedIds])),[bank,candidates,groups,lockedIds]);
   const selectedJournal=candidates.filter(row=>chosen.includes(row.id));
   const difference=bankAmount(bank)-selectedJournal.reduce((sum,row)=>sum+cashAmount(row),0n);
   let draft:DraftGroup|null=null;
-  try{draft=createDraft(rows,selected,candidates,chosen,groups);}catch{/* Incomplete or ambiguous selections stay unconfirmed. */}
+  try{if(evidenceReady)draft=createDraft(rows,selected,candidates,chosen,[...groups,{rows:lockedRows,transactions:lockedIds,cents:'0'}]);}catch{/* Incomplete or ambiguous selections stay unconfirmed. */}
   let period:Period|null=null;try{period=bankWindow(bank);}catch{/* Select at most 20 nearby rows. */}
   const resetSelection=()=>{setSelected([]);setChosen([]);setRequest(null);setResult(null);setCandidatePage(0);};
   async function load(sample:boolean){
@@ -45,7 +51,7 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
     try{
       const loaded=await readStatementFile(sample?reconciliationSample:undefined);if(!loaded||!mounted.current)return;
       const preview=previewStatement(loaded.text,'chase',sample?'DEMO · 1234':alias);
-      setOriginal({hash:loaded.hash,bytes:loaded.bytes});setFile({name:loaded.name,hash:loaded.hash,preview,sample});setGroups([]);setSavedLocal([]);resetSelection();setSearch('');setPage(0);
+      setArchiveHash(null);setArchiveEvidence(null);setOriginal({hash:loaded.hash,bytes:loaded.bytes});setFile({name:loaded.name,hash:loaded.hash,preview,sample});setGroups([]);setSavedLocal([]);resetSelection();setSearch('');setPage(0);
     }catch(cause){if(mounted.current){const message=cause instanceof Error?cause.message:'';setError(message in messages.en?message as MessageKey:'importError');}}
     finally{if(mounted.current)setLoading(false);}
   }
@@ -69,6 +75,17 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
     }catch{if(active)setResult({request,entries:[],truncated:false,error:true});}})();
     return()=>{active=false;controller.abort();};
   },[request,workspace,account,onSessionExpired]);
+  useEffect(()=>{
+    if(!archiveHash)return;
+    const controller=new AbortController();let active=true;
+    (async()=>{try{
+      const response=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/documents/${archiveHash}/review`,controller.signal);
+      if(!active)return;if(response.status===401){onSessionExpired();return;}if(!response.ok)throw new Error();
+      const data=parseEvidenceReview(await response.json(),archiveHash);
+      if(active){setArchiveEvidence({hash:archiveHash,revision:savedRevision,data});setSelected([]);setChosen([]);}
+    }catch{if(active)setArchiveEvidence({hash:archiveHash,revision:savedRevision,data:null});}})();
+    return()=>{active=false;controller.abort();};
+  },[workspace,account,archiveHash,savedRevision,onSessionExpired]);
   if(detail)return <JournalDetail key={detail} workspace={workspace} account={account} name={name} transaction={detail} currency="USD" onSessionExpired={onSessionExpired} onClose={()=>setDetail(null)} onOpen={setDetail} backLabel="reconciliationBack"/>;
   const visible=rows.filter(row=>`${row.date} ${row.description}`.toLowerCase().includes(search.toLowerCase()));
   const maxPage=Math.max(0,Math.ceil(visible.length/25)-1),currentPage=Math.min(page,maxPage);
@@ -84,7 +101,7 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
       </>:<>
         <Text style={styles.h2}>{file.name}</Text><Text style={styles.text}>{file.sample?'DEMO · ':''}{file.preview.accountAlias} · {rows.length} {t('rows')}</Text>
         <Text selectable style={styles.muted}>SHA-256: {file.hash}</Text>
-        <Button label={say('Discard file and all drafts','Удалить файл из просмотра и все черновики')} onPress={()=>{setFile(null);setOriginal(null);setGroups([]);resetSelection();setError(null);}}/>
+        <Button label={say('Discard file and all drafts','Удалить файл из просмотра и все черновики')} onPress={()=>{setFile(null);setOriginal(null);setArchiveHash(null);setArchiveEvidence(null);setGroups([]);resetSelection();setError(null);}}/>
       </>}
       {loading&&<ActivityIndicator/>}{error&&<Notice error text={t(error)}/>}
     </Card>
@@ -93,12 +110,14 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
         <Text style={styles.h2}>{say('1 · Select statement rows','1 · Выберите строки выписки')}</Text>
         <Notice text={say('Duplicates, ambiguous signs and invalid rows cannot be matched. Fix the source CSV and reload. Select up to 20 rows; grouped totals must not be zero.','Дубли, неоднозначные знаки и ошибочные строки нельзя сопоставить. Исправьте CSV и загрузите снова. Выберите до 20 строк; итог группы не должен быть нулевым.')}/>
         {file.preview.errors.length>0&&<Notice error text={`${t('reviewCount')}: ${file.preview.errors.length} · ${file.preview.errors.slice(0,10).map(row=>`${row.line}: ${t(row.code)}`).join('; ')}`}/>}
-        <Text style={styles.text}>{say('Draft-linked / available / blocked','В черновиках / доступно / заблокировано')}: {usedRows.size} / {eligible.size-usedRows.size} / {rows.length-eligible.size}</Text>
+        <Text style={styles.text}>{say('Draft or saved / available / row issues','В черновиках или сохранено / доступно / ошибки строк')}: {usedRows.size} / {[...eligible].filter(line=>!usedRows.has(line)).length} / {rows.length-eligible.size}</Text>
+        {archiveHash&&!evidenceReady&&<Notice text={say('Checking saved claims against the archived original. Selections stay blocked until verification succeeds.','Проверяем сохранённые решения по оригиналу. Выбор строк недоступен до успешной проверки.')}/>}
+        {archiveHash&&<Button label={say('Refresh saved claims','Обновить занятые строки')} onPress={()=>setSavedRevision(value=>value+1)}/>}
         <SearchField value={search} onChange={value=>{setSearch(value);setPage(0);}} placeholder={say('Search statement rows','Поиск по выписке')}/>
         {visible.slice(currentPage*25,currentPage*25+25).map(row=><View key={row.line} style={{gap:6,paddingVertical:8}}>
           <Text style={styles.text}>#{row.line} · {row.date} · {row.description}</Text>
           <Button label={`${usedRows.has(row.line)?say('Draft linked','В черновике'):!eligible.has(row.line)?say('Review required','Нужна проверка'):selected.includes(row.line)?say('Deselect','Снять выбор'):say('Select','Выбрать')} #${row.line} · ${insightMoney(BigInt(row.amountCents),locale)}`}
-            selected={selected.includes(row.line)} disabled={!eligible.has(row.line)||usedRows.has(row.line)||!selected.includes(row.line)&&selected.length>=20}
+            selected={selected.includes(row.line)} disabled={!evidenceReady||!eligible.has(row.line)||usedRows.has(row.line)||!selected.includes(row.line)&&selected.length>=20}
             onPress={()=>{setSelected(current=>current.includes(row.line)?current.filter(id=>id!==row.line):[...current,row.line]);setChosen([]);setRequest(null);setResult(null);setCandidatePage(0);}}/>
         </View>)}
         <View style={styles.row}><Button label={t('previous')} disabled={currentPage===0} onPress={()=>setPage(currentPage-1)}/><Text>{currentPage+1} / {maxPage+1}</Text><Button label={t('next')} disabled={currentPage===maxPage} onPress={()=>setPage(currentPage+1)}/></View>
@@ -130,7 +149,9 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
         {!groups.length&&<Text style={styles.muted}>{say('No draft decisions yet. Unmatched rows remain unresolved.','Пока нет решений. Несопоставленные строки остаются нерешёнными.')}</Text>}
       </Card>
     </>}
-    <StatementArchive workspace={workspace} account={account} canWrite={canWrite} file={file?original:null} onSessionExpired={onSessionExpired}/>
+    <StatementArchive workspace={workspace} account={account} canWrite={canWrite} file={file?original:null} onSessionExpired={onSessionExpired} revision={savedRevision} onJournal={setDetail} onResume={loaded=>{
+      setFile({name:`archive-${loaded.hash.slice(0,12)}.csv`,hash:loaded.hash,preview:loaded.preview,sample:false});setOriginal({hash:loaded.hash,bytes:loaded.bytes});setArchiveHash(loaded.hash);setArchiveEvidence(null);setGroups([]);setSavedLocal([]);resetSelection();setSearch('');setPage(0);setSavedRevision(value=>value+1);
+    }}/>
     <SavedReconciliations workspace={workspace} account={account} revision={savedRevision} onSessionExpired={onSessionExpired} onOpen={setDetail} onChanged={canceled=>{if(file?.hash===canceled.file_hash){const key=canceled.rows.map(row=>row.line).join(':');setGroups(current=>current.filter(group=>group.rows.join(':')!==key));setSavedLocal(current=>current.filter(value=>value!==key));resetSelection();}setSavedRevision(current=>current+1);}}/>
   </>;
 }

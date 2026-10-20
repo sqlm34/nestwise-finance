@@ -64,7 +64,7 @@ export async function userApi(request: Request, env: UserEnv,
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
   const savedMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations$/i.exec(url.pathname);
   const cancelMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations\/([0-9a-f-]{36})\/cancel$/i.exec(url.pathname);
-  const documentMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/documents(?:\/([0-9a-f]{64})(\/verify)?)?$/i.exec(url.pathname);
+  const documentMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/documents(?:\/([0-9a-f]{64})(\/(?:verify|review))?)?$/i.exec(url.pathname);
   const documentRoute=!!documentMatch&&!url.search&&(request.method==='GET'||request.method==='POST'&&!!documentMatch[3]&&!documentMatch[4]);
   const documentWrite=documentRoute&&request.method==='POST';
   const reconciliationWrite=request.method==='POST'&&(savedMatch||cancelMatch);
@@ -101,7 +101,7 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
-    if(documentRoute&&documentMatch)return finish(await documentApi(request,env,db,subject,documentMatch[1],documentMatch[2],documentMatch[3]?.toLowerCase(),!!documentMatch[4]));
+    if(documentRoute&&documentMatch)return finish(await documentApi(request,env,db,subject,documentMatch[1],documentMatch[2],documentMatch[3]?.toLowerCase(),documentMatch[4]?.slice(1)));
     if(cancelMatch){
       let reason;try{reason=parseCancellation(await safeRequest.json());}catch{return finish(response({error:'invalid_reconciliation'},400));}
       return finish(response({id:await db.cancelReconciliation(subject,cancelMatch[1],cancelMatch[2],cancelMatch[3],reason)}));
@@ -145,7 +145,7 @@ export async function userApi(request: Request, env: UserEnv,
   } catch(error) {
     if(error instanceof Error&&error.message==='archive_full')return finish(response({error:'archive_full'},409));
     if(error instanceof Error&&['reconciliation_conflict','reconciliation_mismatch'].includes(error.message))return finish(response({error:error.message},409));
-    if(error instanceof Error&&error.message==='invalid_reconciliation')return finish(response({error:error.message},400));
+    if(error instanceof Error&&['invalid_reconciliation','invalid_document'].includes(error.message))return finish(response({error:error.message},400));
     if(error instanceof Error && error.message==='forbidden') return finish(response({error:'not_found'},404));
     if(error instanceof Error && ['invalid_cursor','invalid_filters'].includes(error.message))return finish(response({error:error.message},400));
     return finish(response({error:'temporarily_unavailable'},503));

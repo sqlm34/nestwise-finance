@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import type {JournalFilters} from '../src/domain/journal-filters';
 export type Database = {
+  documentEvidence(subject:string,workspace:string,account:string,hash:string,fingerprints:string[]):Promise<unknown>;
   documentAccess(subject:string,workspace:string,account:string,write:boolean):Promise<unknown>;
   prepareDocument(subject:string,workspace:string,account:string,hash:string,bytes:number):Promise<unknown>;
   completeDocument(subject:string,workspace:string,account:string,hash:string):Promise<unknown>;
@@ -23,6 +24,7 @@ export type Database = {
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async documentEvidence(subject,workspace,account,hash,fingerprints){return (await sql`SELECT nestwise.document_evidence(${subject},${workspace}::uuid,${account}::uuid,${hash},${JSON.stringify(fingerprints)}::jsonb) result`)[0].result;},
     async documentAccess(subject,workspace,account,write){return (await sql`SELECT nestwise.document_access(${subject},${workspace}::uuid,${account}::uuid,${write}) result`)[0].result;},
     async prepareDocument(subject,workspace,account,hash,bytes){return (await sql`SELECT nestwise.prepare_document(${subject},${workspace}::uuid,${account}::uuid,${hash},${bytes}::integer) result`)[0].result;},
     async completeDocument(subject,workspace,account,hash){return (await sql`SELECT nestwise.complete_document(${subject},${workspace}::uuid,${account}::uuid,${hash}) result`)[0].result;},
