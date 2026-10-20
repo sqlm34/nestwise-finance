@@ -1,4 +1,8 @@
 export const en = {
+  eventsDetailTitle:'Event details and history',eventsDetailOpen:'Inspect event',eventsOrderSearch:'Search this order ID',
+  eventsDetailUnavailable:'This event is unavailable or you no longer have access.',
+  eventsNoPosting:'This event has no monetary journal entry. Its status and audit explain the current processing state.',
+  eventsMissingReference:'The referenced event is not available in this source order history.',
   eventsTitle:'Incoming events',eventsAttention:'Needs attention',eventsAll:'All events',eventsBack:'Back to incoming events',
   eventsScope:'Received source events, including orders without journal entries. Receipt is not a financial posting. Review is read-only; resolve source discrepancies with the administrator.',
   eventsSearch:'Search by source order or event ID',eventsRefresh:'Refresh events',eventsRestart:'This page is unavailable. Refresh events to start again.',
@@ -114,6 +118,10 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const ru: Record<MessageKey, string> = {
+  eventsDetailTitle:'Карточка и история события',eventsDetailOpen:'Разобрать событие',eventsOrderSearch:'Найти по ID этого заказа',
+  eventsDetailUnavailable:'Событие недоступно или у вас больше нет доступа.',
+  eventsNoPosting:'У события нет денежной проводки. Статус и аудит показывают текущее состояние обработки.',
+  eventsMissingReference:'Событие-основание недоступно в истории этого заказа источника.',
   eventsTitle:'Входящие события',eventsAttention:'Требуют внимания',eventsAll:'Все события',eventsBack:'Назад к входящим событиям',
   eventsScope:'Полученные события источника, включая заказы без проводок. Получение события не означает проведение. Раздел доступен для просмотра; расхождения источника разбирайте с администратором.',
   eventsSearch:'Поиск по ID заказа или события источника',eventsRefresh:'Обновить события',eventsRestart:'Страница недоступна. Обновите события, чтобы начать сначала.',

@@ -3,7 +3,7 @@ const {readFileSync}=require('node:fs');
 const {randomUUID,randomBytes}=require('node:crypto');
 async function createAuthFixture() {
   const {db,pool}=await require('./auth-test-db.cjs').authTestDatabase();
-  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql'])
+  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql','0008_event_details.sql'])
     await db.exec(readFileSync(`db/migrations/${name}`,'utf8'));
   const {hashPassword}=await import('better-auth/crypto');
   const id=randomUUID(),workspace=randomUUID(),account=randomUUID(),localUser=randomUUID();
@@ -22,6 +22,7 @@ async function createAuthFixture() {
   const {authConfiguration,userApi}=require('../.test-build/worker/user-api.js');
   const auth=await createAuth(authConfiguration(env),pool);
   const ledger=()=>({
+    userEventDetail:async(...args)=>(await db.query('SELECT nestwise.user_event_detail($1,$2,$3,$4,$5) result',args)).rows[0].result,
     userAccountEvents:async(...args)=>(await db.query('SELECT nestwise.user_account_events($1,$2,$3,$4,$5,$6) result',args)).rows[0].result,
     userAccess:async subject=>(await db.query('SELECT nestwise.user_access($1) result',[subject])).rows[0].result,
     userJournal:async(...args)=>(await db.query('SELECT nestwise.user_journal($1,$2,$3) result',args)).rows[0].result,

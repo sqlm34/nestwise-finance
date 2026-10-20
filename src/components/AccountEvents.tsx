@@ -12,7 +12,8 @@ type RequestState={status:EventStatus;query:string;cursors:(string|null)[];revis
 export function AccountEvents({workspace,account,name,currency,onSessionExpired}:{workspace:string;account:string;name:string;currency:string;onSessionExpired:()=>void}){
   const {t}=useApp();
   const [status,setStatus]=useState<EventStatus>('attention'),[query,setQuery]=useState('');
-  const [selected,setSelected]=useState<string|null>(null);
+  const [selected,setSelected]=useState<{kind:'event'|'journal';id:string}|null>(null);
+  const openJournal=(id:string)=>setSelected({kind:'journal',id});
   const [request,setRequest]=useState<RequestState>({status:'attention',query:'',cursors:[null],revision:0});
   const [result,setResult]=useState<{request:RequestState;data:EventsPage|null;error:MessageKey|null}|null>(null);
   const busy=result?.request!==request,data=busy?null:result?.data;
@@ -32,8 +33,9 @@ export function AccountEvents({workspace,account,name,currency,onSessionExpired}
     }catch{if(active)setResult({request,data:null,error:'journalUnavailable'});}})();
     return()=>{active=false;controller.abort();};
   },[workspace,account,request,onSessionExpired]);
-  if(selected)return <JournalDetail key={selected} workspace={workspace} account={account} name={name} currency={currency}
-    transaction={selected} onOpen={setSelected} onSessionExpired={onSessionExpired} backLabel="eventsBack"
+  if(selected)return <JournalDetail key={`${selected.kind}:${selected.id}`} workspace={workspace} account={account} name={name} currency={currency}
+    transaction={selected.kind==='journal'?selected.id:undefined} event={selected.kind==='event'?selected.id:undefined}
+    onOpen={openJournal} onSessionExpired={onSessionExpired} backLabel="eventsBack"
     onClose={()=>{setSelected(null);setRequest(current=>({...current,revision:current.revision+1}));}}/>;
   return <Card>
     <Text accessibilityRole="header" style={styles.h2}>{t('eventsTitle')}</Text>
@@ -52,13 +54,18 @@ export function AccountEvents({workspace,account,name,currency,onSessionExpired}
     {!busy&&result?.error&&<Notice error text={t(result.error)}/>}
     {data&&<>
       <Text style={styles.muted}>{t('eventsCountScope')}</Text>
-      {(['waiting','needs_review','posted','asserted'] as const).map(value=><Text key={value} style={styles.text}>{t(statusLabels[value])}: {data.counts[value]}</Text>)}
+      {(['waiting','needs_review','posted','asserted'] as const).map(value=><Button key={value} label={`${t(statusLabels[value])}: ${data.counts[value]}`}
+        onPress={()=>{setStatus(value);setQuery(request.query);restart(value,request.query);}}/>)}
       <Text style={styles.muted}>{t('page')} {request.cursors.length} · {t('journalShown')} {data.events.length} · {t('eventsOrder')}</Text>
       {data.events.length===0&&<Notice text={t('eventsEmpty')}/>}
       {data.events.map(event=><View key={event.cursor} style={{gap:8,paddingTop:16}}>
         <Text selectable style={styles.h2}>{t('journalOrder')}: {event.order_id}</Text>
         <Notice text={t(guidanceLabels[event.guidance])}/>
-        <EventSummary event={event} onOpen={setSelected}/>
+        <View style={styles.row}>
+          <Button label={t('eventsDetailOpen')} onPress={()=>setSelected({kind:'event',id:event.cursor})}/>
+          <Button label={t('eventsOrderSearch')} onPress={()=>{setStatus('all');setQuery(event.order_id);restart('all',event.order_id);}}/>
+        </View>
+        <EventSummary event={event} onOpen={openJournal}/>
       </View>)}
       <Text style={styles.muted}>{t(data.next_cursor?'eventsMore':'journalEnd')}</Text>
     </>}

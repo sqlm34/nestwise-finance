@@ -1,5 +1,5 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const {randomUUID}=require('node:crypto');
-const {parseJournalDetail,detailBefore}=require('../.test-build/src/domain/journal-detail.js');
+const {parseJournalDetail,parseEventDetail,detailBefore}=require('../.test-build/src/domain/journal-detail.js');
 function fixture(){
   const id=randomUUID(),event=randomUUID(),date='2026-10-20T12:00:00Z';
   const source={id:event,order_id:'job-126',revision:1,kind:'job.payment_recorded',status:'posted',occurred_at:date,
@@ -21,4 +21,15 @@ test('detail cursor validates range and rejects duplicate or unrelated query par
   assert.equal(detailBefore(new URLSearchParams()),null);assert.equal(detailBefore(new URLSearchParams('before=101')),101);
   for(const query of ['before=0','before=-1','before=2147483647','before=1&before=2','q=abc','before=1.2','before=1e3'])
     assert.throws(()=>detailBefore(new URLSearchParams(query)),/invalid_filters/);
+});
+
+test('unposted event details preserve history without inventing journal lines',()=>{
+  const original=fixture(),cursor=randomUUID();
+  const data={...original,event_cursor:cursor,transaction:null,source:{...original.source,status:'waiting',journal_id:null,posted_at:null},audit:[]};
+  data.history=[data.source];
+  assert.equal(parseEventDetail(data,cursor).transaction,null);
+  assert.throws(()=>parseEventDetail(data,randomUUID()));
+  assert.throws(()=>parseEventDetail({...data,source:original.source},cursor));
+  assert.throws(()=>parseEventDetail({...data,transaction:original.transaction},cursor));
+  assert.equal(parseEventDetail({...original,event_cursor:cursor},cursor).transaction.id,original.transaction.id);
 });

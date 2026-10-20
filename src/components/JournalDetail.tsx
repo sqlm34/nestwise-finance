@@ -4,7 +4,7 @@ import {Button,Card,Notice,styles,colors} from './ui';
 import {useApp} from '../state';
 import {authenticatedFetch} from '../auth/client';
 import {journalDate,journalMoney} from '../domain/journal';
-import {parseJournalDetail,type JournalDetail as Detail,type SourceEvent} from '../domain/journal-detail';
+import {parseJournalDetail,parseEventDetail,type EventDetail,type JournalDetail as Detail,type SourceEvent} from '../domain/journal-detail';
 import type {MessageKey} from '../i18n';
 const kinds:Record<SourceEvent['kind'],MessageKey>={
   'job.payment_recorded':'eventPayment','job.part_cost_recorded':'eventPart','job.customer_refund_issued':'eventRefund',
@@ -27,45 +27,47 @@ export function EventSummary({event,onOpen}:{event:SourceEvent;onOpen:(id:string
     {event.journal_id&&<Button label={t('provenanceOpen')} onPress={()=>onOpen(event.journal_id!)}/>}
   </View>;
 }
-export function JournalDetail({workspace,account,transaction,currency,name,onClose,onOpen,onSessionExpired,backLabel='provenanceBack'}:{
-  workspace:string;account:string;transaction:string;currency:string;name:string;onClose:()=>void;onOpen:(id:string)=>void;onSessionExpired:()=>void;
+export function JournalDetail({workspace,account,transaction,event,currency,name,onClose,onOpen,onSessionExpired,backLabel='provenanceBack'}:{
+  workspace:string;account:string;transaction?:string;event?:string;currency:string;name:string;onClose:()=>void;onOpen:(id:string)=>void;onSessionExpired:()=>void;
   backLabel?:MessageKey;
 }){
   const {t,locale}=useApp();
   const [request,setRequest]=useState<{cursors:(number|null)[];revision:number}>({cursors:[null],revision:0});
-  const [result,setResult]=useState<{request:typeof request;data:Detail|null;error:MessageKey|null}|null>(null);
+  const [result,setResult]=useState<{request:typeof request;data:Detail|EventDetail|null;error:MessageKey|null}|null>(null);
   const busy=result?.request!==request,data=busy?null:result?.data;
   useEffect(()=>{
     const controller=new AbortController();let active=true;
     (async()=>{try{
       const before=request.cursors.at(-1);
-      const response=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/journal/${transaction}${before?`?before=${before}`:''}`,controller.signal);
+      const response=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/${event?'events/'+event:'journal/'+transaction}${before?`?before=${before}`:''}`,controller.signal);
       if(!active)return;
       if(response.status===401){onSessionExpired();return;}
-      if(!response.ok){setResult({request,data:null,error:response.status===404?'provenanceUnavailable':'journalUnavailable'});return;}
-      const detail=parseJournalDetail(await response.json(),transaction);
+      if(!response.ok){setResult({request,data:null,error:response.status===404?(event?'eventsDetailUnavailable':'provenanceUnavailable'):'journalUnavailable'});return;}
+      const payload=await response.json();
+      const detail=event?parseEventDetail(payload,event):parseJournalDetail(payload,transaction!);
       if(active)setResult({request,data:detail,error:null});
     }catch{if(active)setResult({request,data:null,error:'journalUnavailable'});}})();
     return ()=>{active=false;controller.abort();};
-  },[workspace,account,transaction,request,onSessionExpired]);
+  },[workspace,account,transaction,event,request,onSessionExpired]);
   return <Card>
-    <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{t('provenanceTitle')}</Text>
+    <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{t(event?'eventsDetailTitle':'provenanceTitle')}</Text>
       <Button label={t(backLabel)} onPress={onClose}/></View>
     <Text style={styles.text}>{name} · {currency}</Text>
     <Notice text={t('provenanceScope')}/>
-    <Button label={t('journalRefresh')} disabled={busy} onPress={()=>setRequest(current=>({cursors:[null],revision:current.revision+1}))}/>
+    <Button label={t(event?'eventsRefresh':'journalRefresh')} disabled={busy} onPress={()=>setRequest(current=>({cursors:[null],revision:current.revision+1}))}/>
     {busy&&<ActivityIndicator color={colors.green} accessibilityLabel={t('authLoading')}/>}
     {!busy&&result?.error&&<Notice error text={t(result.error)}/>}
     {data&&<>
-      <Text selectable style={styles.text}>{t('journalOrder')}: {data.transaction.source_order_id}</Text>
-      <Text selectable style={styles.muted}>{t('journalEntry')}: {data.transaction.id}</Text>
-      {data.transaction.entries.map((line,index)=><Text key={index} style={styles.text}>
+      <Text selectable style={styles.text}>{t('journalOrder')}: {data.source.order_id}</Text>
+      {data.transaction?<Text selectable style={styles.muted}>{t('journalEntry')}: {data.transaction.id}</Text>:<Notice text={t('eventsNoPosting')}/>}
+      {data.transaction?.entries.map((line,index)=><Text key={index} style={styles.text}>
         {t(({clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees'} as const)[line.code])}
         {' · '}{t(BigInt(line.cents)>0n?'journalDebit':'journalCredit')}{' · '}{journalMoney((BigInt(line.cents)<0n?-BigInt(line.cents):BigInt(line.cents)).toString(),locale,currency)}
       </Text>)}
       <Text accessibilityRole="header" style={styles.h2}>{t('provenanceSource')}</Text>
       <EventSummary event={data.source} onOpen={onOpen}/>
       {data.reference&&<><Text accessibilityRole="header" style={styles.h2}>{t('provenanceReference')}</Text><EventSummary event={data.reference} onOpen={onOpen}/></>}
+      {data.source.reference_id&&!data.reference&&<Notice text={t('eventsMissingReference')}/>}
       <Text accessibilityRole="header" style={styles.h2}>{t('provenanceAudit')}</Text>
       {data.audit.map((entry,index)=><Text key={index} style={styles.muted}>{journalDate(entry.recorded_at,locale)} · {t(entry.action==='applied'?'provenanceApplied':'provenanceReview')}</Text>)}
       {data.audit.length===0&&<Notice text={t('provenanceNoAudit')}/>}

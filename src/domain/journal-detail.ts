@@ -5,6 +5,7 @@ export type SourceEvent={id:string;order_id:string;revision:number;kind:typeof e
   received_at:string;posted_at:string|null;journal_id:string|null;reference_id:string|null};
 export type JournalDetail={transaction:JournalTransaction;source:SourceEvent;reference:SourceEvent|null;
   history:SourceEvent[];next_revision:number|null;audit:{action:'applied'|'needs_review';recorded_at:string}[];audit_truncated:boolean};
+export type EventDetail=Omit<JournalDetail,'transaction'> & {transaction:JournalTransaction|null;event_cursor:string};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function object(value:unknown):Record<string,unknown>{
   if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('invalid_detail');
@@ -30,9 +31,21 @@ export function source(value:unknown):SourceEvent{
 }
 export function parseJournalDetail(value:unknown,expectedTransaction:string):JournalDetail{
   const row=object(value),transaction=parseJournal({entries:[row.transaction],limit:100}).entries[0];
-  const origin=source(row.source),reference=row.reference===null?null:source(row.reference);
+  const provenance=parseProvenance(row),origin=provenance.source;
   if(transaction.id!==expectedTransaction||origin.journal_id!==transaction.id||origin.id!==transaction.source_event_id
-    ||origin.order_id!==transaction.source_order_id||reference&&(reference.id.toLowerCase()!==origin.reference_id?.toLowerCase()
+    ||origin.order_id!==transaction.source_order_id)throw new Error('invalid_detail');
+  return {...provenance,transaction};
+}
+export function parseEventDetail(value:unknown,expectedEvent:string):EventDetail{
+  const row=object(value),provenance=parseProvenance(row);
+  if(identifier(row.event_cursor)!==expectedEvent)throw new Error('invalid_detail');
+  if(row.transaction!==null)return {...parseJournalDetail(row,provenance.source.journal_id!),event_cursor:expectedEvent};
+  if(provenance.source.journal_id!==null)throw new Error('invalid_detail');
+  return {...provenance,transaction:null,event_cursor:expectedEvent};
+}
+function parseProvenance(row:Record<string,unknown>):Omit<JournalDetail,'transaction'>{
+  const origin=source(row.source),reference=row.reference===null?null:source(row.reference);
+  if(reference&&(reference.id.toLowerCase()!==origin.reference_id?.toLowerCase()
       ||reference.order_id!==origin.order_id))throw new Error('invalid_detail');
   if(!Array.isArray(row.history)||row.history.length>100||!Array.isArray(row.audit)||row.audit.length>50
     ||typeof row.audit_truncated!=='boolean')throw new Error('invalid_detail');
@@ -46,7 +59,7 @@ export function parseJournalDetail(value:unknown,expectedTransaction:string):Jou
     if(a.action!=='applied'&&a.action!=='needs_review')throw new Error('invalid_detail');
     return {action:a.action,recorded_at:time(a.recorded_at)};
   });
-  return {transaction,source:origin,reference,history,next_revision:row.next_revision as number|null,audit,audit_truncated:row.audit_truncated};
+  return {source:origin,reference,history,next_revision:row.next_revision as number|null,audit,audit_truncated:row.audit_truncated};
 }
 export function detailBefore(params:URLSearchParams):number|null{
   if(!params.size)return null;

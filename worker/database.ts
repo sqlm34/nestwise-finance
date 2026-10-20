@@ -9,10 +9,14 @@ export type Database = {
   userJournalPage(subject:string,workspace:string,account:string,filters:JournalFilters,cursor:string|null):Promise<unknown>;
   userJournalDetail(subject:string,workspace:string,account:string,transaction:string,before:number|null):Promise<unknown>;
   userAccountEvents(subject:string,workspace:string,account:string,status:string,query:string,cursor:string|null):Promise<unknown>;
+  userEventDetail(subject:string,workspace:string,account:string,event:string,before:number|null):Promise<unknown>;
 };
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async userEventDetail(subject,workspace,account,event,before) {
+      return (await sql`SELECT nestwise.user_event_detail(${subject},${workspace}::uuid,${account}::uuid,${event}::uuid,${before}::integer) result`)[0].result;
+    },
     async userAccountEvents(subject,workspace,account,status,query,cursor) {
       return (await sql`SELECT nestwise.user_account_events(${subject},${workspace}::uuid,${account}::uuid,${status},${query},${cursor}::uuid) result`)[0].result;
     },

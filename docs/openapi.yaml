@@ -4,6 +4,25 @@ info:
   version: 0.3.0
   description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
 paths:
+  /v1/user/workspaces/{workspace}/accounts/{account}/events/{event}:
+    get:
+      description: >
+        Authenticated provenance for any received event, including waiting or review
+        events without a journal transaction. Use the account event row cursor as the
+        event identifier. History and reference are restricted to the same account,
+        connection and order. Ownership is checked again on every request.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: event, required: true, schema: {type: string, format: uuid}, description: Internal cursor from an authorized account event row}
+        - {in: query, name: before, schema: {type: integer, minimum: 1, maximum: 2147483646}}
+      responses:
+        '200':
+          description: Same provenance fields as journal detail, plus event_cursor; transaction is null when no posting exists. History max 100, audit max 50 with audit_truncated. No-store.
+        '400': {description: Invalid or duplicate cursor parameter}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible event}
+        '503': {description: Temporarily unavailable}
   /v1/user/workspaces/{workspace}/accounts/{account}/events:
     get:
       description: >

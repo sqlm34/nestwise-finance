@@ -59,10 +59,11 @@ export async function userApi(request: Request, env: UserEnv,
   const authPaths = new Map([['/api/auth/sign-in/email','POST'],['/api/auth/sign-out','POST'],['/api/auth/get-session','GET']]);
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
   const eventsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events$/i.exec(url.pathname);
+  const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&!journalMatch&&!detailMatch&&!eventsMatch) || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
-    request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch))) return finish(response({error:'not_found'},404));
+  if ((url.search&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch) || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
+    request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch))) return finish(response({error:'not_found'},404));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
   if (request.method==='POST') {
@@ -87,6 +88,10 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
+    if(eventDetailMatch){
+      let before;try{before=detailBefore(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
+      return finish(response(await db.userEventDetail(subject,eventDetailMatch[1],eventDetailMatch[2],eventDetailMatch[3],before)));
+    }
     if(eventsMatch){
       let filters;try{filters=parseEventParams(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
       return finish(response(await db.userAccountEvents(subject,eventsMatch[1],eventsMatch[2],filters.status,filters.query,filters.cursor)));
