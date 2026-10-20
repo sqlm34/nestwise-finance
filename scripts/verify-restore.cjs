@@ -1,5 +1,6 @@
 const { Client } = require('pg');
 const { createHash } = require('node:crypto');
+const assert=require('node:assert/strict');
 async function fingerprint(client) {
   const tables=(await client.query("SELECT tablename FROM pg_tables WHERE schemaname='nestwise' ORDER BY tablename")).rows;
   const output={};
@@ -10,7 +11,45 @@ async function fingerprint(client) {
   }
   return output;
 }
-(async()=>{
+async function verifyRestore(source,restored,runtime=restored) {
+  const expected=await fingerprint(source);
+  assert.ok(expected.journal_entries?.count>0,'Recovery proof requires populated financial evidence');
+  assert.deepEqual(await fingerprint(restored),expected);
+  const migrations='SELECT version,sha256,applied_at FROM public.nestwise_schema_migrations ORDER BY version';
+  assert.deepEqual((await restored.query(migrations)).rows,(await source.query(migrations)).rows);
+  // Every permission probe is rolled back even if a broken control permits it.
+  async function rejected(query,pattern,role) {
+    const client=role?runtime:restored;
+    await client.query('BEGIN');
+    try {
+      if(role && runtime===restored) await client.query('SET LOCAL ROLE nestwise_api');
+      await assert.rejects(client.query(query),pattern);
+    } finally {await client.query('ROLLBACK');}
+  }
+  await rejected('SELECT * FROM nestwise.journal_entries',/permission denied/,true);
+  await rejected('DELETE FROM nestwise.journal_entries',/immutable_financial_history/);
+  await rejected('UPDATE nestwise.journal_transactions SET posted_at=now()',/immutable_financial_history/);
+  await rejected('DELETE FROM nestwise.audit_logs',/immutable_financial_history/);
+  await rejected('DELETE FROM nestwise.source_events',/immutable_source_event/);
+  const revoked=(await restored.query(`SELECT s.token_hash,m.workspace_id,a.id account_id
+    FROM nestwise.sessions s JOIN nestwise.memberships m ON m.user_id=s.user_id
+    JOIN nestwise.financial_accounts a ON a.workspace_id=m.workspace_id
+    WHERE s.revoked_at IS NOT NULL LIMIT 1`)).rows[0];
+  if(revoked) {
+    await runtime.query('BEGIN');
+    try {
+      if(runtime===restored) await runtime.query('SET LOCAL ROLE nestwise_api');
+      await assert.rejects(runtime.query('SELECT nestwise.read_journal($1,$2,$3)',
+        [revoked.token_hash,revoked.workspace_id,revoked.account_id]),/unauthorized/);
+    } finally {await runtime.query('ROLLBACK');}
+  }
+  assert.deepEqual(await fingerprint(restored),expected,'Verification must not change restored data');
+  return {tables:Object.keys(expected).length,rows:Object.fromEntries(Object.entries(expected).map(([name,value])=>[name,value.count])),
+    fingerprintsMatch:true,migrationsMatch:true,permissionsPreserved:true,immutableHistory:true,
+    revokedSessionRejected:!!revoked};
+}
+module.exports={fingerprint,verifyRestore};
+if(require.main===module) (async()=>{
   const source=new Client({connectionString:process.env.TEST_DATABASE_URL});
   const restoredUrl=new URL(process.env.TEST_DATABASE_URL);
   if(!['localhost','127.0.0.1'].includes(restoredUrl.hostname)||restoredUrl.pathname!=='/nestwise_test') throw new Error('Restore verification must be local and disposable');
@@ -18,12 +57,7 @@ async function fingerprint(client) {
   const restored=new Client({connectionString:restoredUrl.href});
   try {
     await source.connect(); await restored.connect();
-    const assert=require('node:assert/strict');
-    assert.deepEqual(await fingerprint(restored),await fingerprint(source));
-    await restored.query('SET ROLE nestwise_api');
-    await assert.rejects(restored.query('SELECT * FROM nestwise.journal_entries'),/permission denied/);
-    await restored.query('RESET ROLE');
-    await assert.rejects(restored.query('DELETE FROM nestwise.journal_entries'),/immutable_financial_history/);
+    await verifyRestore(source,restored);
     console.log('Restore verified: every Nestwise table matches; privileges and immutable-history triggers preserved.');
   } finally {await source.end(); await restored.end();}
 })().catch(()=>{console.error('Restore verification failed.');process.exitCode=1;});

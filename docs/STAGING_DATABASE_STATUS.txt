@@ -51,10 +51,10 @@ Cloudflare has the runtime secret, but financial ingestion remains OFF.
 No CRM_SERVICE_KEYS, live sender, public login, mobile session integration,
 or scheduled catch-up was activated. The Worker end-to-end HTTP-to-database
 flow still needs a subsequent synthetic activation test.
-CI backup/restore is verified on disposable PostgreSQL 17. Neon displays a
-one-day history retention; an actual cloud recovery drill has NOT yet run.
-Do that before enabling any financial ingestion, and configure retention
-and private backup storage before real data is introduced.
+CI backup/restore is verified on disposable PostgreSQL 17. A Neon snapshot
+recovery drill also passed on 2026-10-20; see CLOUD_RECOVERY_STATUS.txt.
+Neon displays one-day history retention. Configure long-term retention and
+private backup storage before real data is introduced.
 The Neon organization already uses Launch billing. No plan upgrade was made.
 The created project uses its existing plan; usage may be billable.
 CRM projects, production application, and app stores were not modified.
