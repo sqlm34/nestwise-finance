@@ -116,7 +116,7 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
         <SearchField value={search} onChange={value=>{setSearch(value);setPage(0);}} placeholder={say('Search statement rows','Поиск по выписке')}/>
         {visible.slice(currentPage*25,currentPage*25+25).map(row=><View key={row.line} style={{gap:6,paddingVertical:8}}>
           <Text style={styles.text}>#{row.line} · {row.date} · {row.description}</Text>
-          <Button label={`${usedRows.has(row.line)?say('Draft linked','В черновике'):!eligible.has(row.line)?say('Review required','Нужна проверка'):selected.includes(row.line)?say('Deselect','Снять выбор'):say('Select','Выбрать')} #${row.line} · ${insightMoney(BigInt(row.amountCents),locale)}`}
+          <Button label={`${lockedRows.includes(row.line)?say('Saved claim','Занято сохранённым решением'):usedRows.has(row.line)?say('Draft linked','В черновике'):!eligible.has(row.line)?say('Review required','Нужна проверка'):selected.includes(row.line)?say('Deselect','Снять выбор'):say('Select','Выбрать')} #${row.line} · ${insightMoney(BigInt(row.amountCents),locale)}`}
             selected={selected.includes(row.line)} disabled={!evidenceReady||!eligible.has(row.line)||usedRows.has(row.line)||!selected.includes(row.line)&&selected.length>=20}
             onPress={()=>{setSelected(current=>current.includes(row.line)?current.filter(id=>id!==row.line):[...current,row.line]);setChosen([]);setRequest(null);setResult(null);setCandidatePage(0);}}/>
         </View>)}

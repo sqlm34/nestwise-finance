@@ -25,7 +25,7 @@ export function StatementArchive({workspace,account,canWrite,file,onSessionExpir
       const data=parseDocuments(await response.json());if(active)setDocuments(data);
     }catch{if(active)setError(ru?'Архив недоступен. Обновите список.':'Archive unavailable. Refresh the list.');}})();
     return()=>{active=false;controller.abort();};
-  },[base,revision,onSessionExpired,ru]);
+  },[base,revision,evidenceRevision,onSessionExpired,ru]);
   async function action(kind:'upload'|'open'|'verify',hash:string){
     if(lock.current)return;lock.current=true;setBusy(true);setError('');setNotice('');
     try{
