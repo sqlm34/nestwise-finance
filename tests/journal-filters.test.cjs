@@ -8,6 +8,14 @@ const refund={...payment,id:'bbbbbbbb-0000-0000-0000-000000000002',source_order_
   occurred_at:'2026-10-20T23:59:59.999Z',entries:[{code:'refunds',cents:'1000'},{code:'clearing',cents:'-1000'}]};
 const rows=[payment,refund];
 const select=patch=>filterJournal(rows,{...defaultJournalFilters,...patch});
+
+test('payment-date filtering excludes unknown dates and sorts by actual payment rather than arrival',()=>{
+  const a={...payment,paid_at:'2026-09-01T00:00:00Z'},b={...refund,paid_at:'2026-08-31T23:59:59Z'};
+  const source=[payment,a,b];
+  assert.deepEqual(filterJournal(source,{...defaultJournalFilters,basis:'paid',from:'2026-09-01',to:'2026-09-01'}).entries,[a]);
+  assert.deepEqual(filterJournal(source,{...defaultJournalFilters,basis:'paid',order:'oldest'}).entries,[b,a]);
+  assert.deepEqual(source,[payment,a,b]);
+});
 test('journal dates filter inclusive UTC event days rather than payment or posting dates',()=>{
   assert.deepEqual(select({from:'2026-10-19',to:'2026-10-19'}).entries,[payment]);
   assert.deepEqual(select({from:'2026-10-20',to:'2026-10-20'}).entries,[refund]);

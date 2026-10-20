@@ -32,6 +32,7 @@ export type Database = {
   userAccountEvents(subject:string,workspace:string,account:string,status:string,query:string,cursor:string|null):Promise<unknown>;
   userEventDetail(subject:string,workspace:string,account:string,event:string,before:number|null):Promise<unknown>;
   userPeriodInsights(subject:string,workspace:string,account:string,from:string,to:string):Promise<unknown>;
+  userCashInsights(subject:string,workspace:string,account:string,from:string,to:string):Promise<unknown>;
 };
 export function database(url: string): Database {
   const sql = neon(url);
@@ -62,6 +63,9 @@ export function database(url: string): Database {
     async userPeriodInsights(subject,workspace,account,from,to) {
       return (await sql`SELECT nestwise.user_period_insights(${subject},${workspace}::uuid,${account}::uuid,${from}::date,${to}::date) result`)[0].result;
     },
+    async userCashInsights(subject,workspace,account,from,to) {
+      return (await sql`SELECT nestwise.user_cash_insights(${subject},${workspace}::uuid,${account}::uuid,${from}::date,${to}::date) result`)[0].result;
+    },
     async userEventDetail(subject,workspace,account,event,before) {
       return (await sql`SELECT nestwise.user_event_detail(${subject},${workspace}::uuid,${account}::uuid,${event}::uuid,${before}::integer) result`)[0].result;
     },
@@ -84,6 +88,8 @@ export function database(url: string): Database {
       return (await sql`SELECT nestwise.user_journal(${subject},${workspace}::uuid,${account}::uuid) result`)[0].result;
     },
     async userJournalPage(subject,workspace,account,filters,cursor) {
+      if(filters.basis==='paid')return (await sql`SELECT nestwise.user_cash_journal_page(${subject},${workspace}::uuid,${account}::uuid,
+        ${filters.query},${filters.from||null}::date,${filters.to||null}::date,${filters.code},${filters.order},${cursor}::uuid) result`)[0].result;
       return (await sql`SELECT nestwise.user_journal_page(${subject},${workspace}::uuid,${account}::uuid,
         ${filters.query},${filters.from||null}::date,${filters.to||null}::date,${filters.code},${filters.order},${cursor}::uuid) result`)[0].result;
     },

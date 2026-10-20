@@ -83,7 +83,7 @@ export async function userApi(request: Request, env: UserEnv,
   const documentWrite=documentRoute&&request.method==='POST';
   const reconciliationWrite=request.method==='POST'&&(savedMatch||cancelMatch);
   const reconciliationMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliation-candidates$/i.exec(url.pathname);
-  const insightsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/insights$/i.exec(url.pathname);
+  const insightsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/(?:cash-)?insights$/i.exec(url.pathname);
   const eventsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events$/i.exec(url.pathname);
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
@@ -145,7 +145,7 @@ export async function userApi(request: Request, env: UserEnv,
     }
     if(insightsMatch){
       let period;try{period=parsePeriodParams(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
-      return finish(response(await db.userPeriodInsights(subject,insightsMatch[1],insightsMatch[2],period.from,period.to)));
+      return finish(response(await (url.pathname.endsWith('/cash-insights')?db.userCashInsights:db.userPeriodInsights)(subject,insightsMatch[1],insightsMatch[2],period.from,period.to)));
     }
     if(eventDetailMatch){
       let before;try{before=detailBefore(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}

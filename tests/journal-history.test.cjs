@@ -10,6 +10,9 @@ test('history query contract rejects duplicate, unknown, oversized and invalid v
   const filters={...defaultJournalFilters,query:'job:126_A',from:'2026-10-01',to:'2026-10-20',code:'fees',order:'oldest'};
   const cursor=randomUUID();
   assert.deepEqual(parseHistoryParams(new URLSearchParams(historyParams(filters,cursor))),{filters,cursor});
+  const paid={...filters,basis:'paid'};
+  assert.deepEqual(parseHistoryParams(new URLSearchParams(historyParams(paid,cursor))),{filters:paid,cursor});
+  for(const value of ['basis=posting','basis=paid&basis=event','basis='])assert.throws(()=>parseHistoryParams(new URLSearchParams(value)),/invalid_filters/);
 });
 test('history page requires a valid continuation and accepts CRM order identifiers',()=>{
   assert.deepEqual(parseHistoryPage({entries:[],limit:100,next_cursor:null}),{entries:[],limit:100,next_cursor:null});

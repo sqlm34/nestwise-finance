@@ -19,15 +19,16 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
   let invalid=false;try{validatePeriod(period);}catch{invalid=true;}
   const dirty=period.from!==request.period.from||period.to!==request.period.to;
   const apply=(next:Period)=>setRequest(current=>({period:next,revision:current.revision+1}));
-  const openJournal=(range:Period,code:JournalCode|'all'='all')=>setDrill({...defaultJournalFilters,...range,code});
+  const openJournal=(range:Period,code:JournalCode|'all'='all')=>setDrill({...defaultJournalFilters,...range,code,basis:'paid'});
   useEffect(()=>{
     const controller=new AbortController();let active=true;
     (async()=>{try{
-      const response=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/insights?${new URLSearchParams(request.period)}`,controller.signal);
+      const response=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/cash-insights?${new URLSearchParams(request.period)}`,controller.signal);
       if(!active)return;
       if(response.status===401){onSessionExpired();return;}
       if(!response.ok){setResult({request,data:null,error:response.status===404?'journalAccessLost':response.status===400?'insightsInvalidPeriod':'journalUnavailable'});return;}
-      const loaded=parsePeriodInsights(await response.json(),request.period);
+      const raw=await response.json();if(raw.basis!=='cash')throw new Error('invalid_basis');
+      const loaded=parsePeriodInsights(raw,request.period);
       if(active)setResult({request,data:loaded,error:null});
     }catch{if(active)setResult({request,data:null,error:'journalUnavailable'});}})();
     return()=>{active=false;controller.abort();};

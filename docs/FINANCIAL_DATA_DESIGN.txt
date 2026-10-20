@@ -170,3 +170,30 @@ Additional synthetic browser acceptance — 2026-10-20
 - Follow-up copy issue: period insights still say bank reconciliation is not
   available. Replace that obsolete wording when connecting completeness metrics;
   do not imply tax/report approval from successful bank reconciliation.
+
+Cash basis implementation checkpoint — 2026-10-20 (not deployed)
+- Additive migration 0019 adds cash-insights and payment-date journal reads.
+  Legacy event-date journal/history remains available for audit. No posting is
+  edited; payment date, event date and recorded date retain their meanings.
+- Cash summaries use paid_at in UTC. Undated entries are counted by occurred_at
+  as review exceptions, but excluded from all monetary totals. Transaction count
+  includes these exceptions; drilldown returns only dated paid entries.
+- Summary drilldowns preserve payment-date filters through paging and live ACL
+  checks. Ordinary journal users can explicitly select event/payment dates.
+- Late-delivery test spans October/November source events paid in September,
+  an unpaid accrual, and 107 paid rows across multiple pages; totals reconcile
+  exactly and keep midnight UTC boundaries in an Indianapolis DB session.
+- Full local suite initially: 127 cases, 122 pass, five PostgreSQL-only skipped;
+  further date-filter assertions added. TypeScript and full ESLint passed.
+- This is an operational cash view, not approved tax mapping or a finalized
+  Financial Statement. Remaining policy decisions stay unresolved.
+- Android build 86a57a3 is running independently; it predates this new change.
+  Do not claim that pending APK includes cash-basis UI until a later build.
+
+Cash verification update — 2026-10-20
+- Final local suite: 128 cases, 123 passed, five PostgreSQL-only cases skipped.
+  TypeScript and full ESLint passed. Web export completed; generated output
+  retained locally under .local/dist-cash-proof and is not source-controlled.
+- Current Android EAS build: 37a51748-0a11-4259-b27e-e4aec92fcdff, commit
+  86a57a3, in progress. Apple Developer account is unavailable; signed iOS
+  device/store acceptance remains an external dependency. No store submission.

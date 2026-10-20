@@ -59,7 +59,11 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
     <Text style={styles.muted}>{t('journalScope')}</Text>
     <Text style={styles.muted}>{t('journalFilterScope')}</Text>
     <SearchField value={filters.query} onChange={query=>setFilters(current=>({...current,query}))} placeholder={t('journalSearch')}/>
-    <Text style={styles.text}>{t('journalDateRange')}</Text>
+    <View style={styles.row}>
+      <Button label={locale==='ru'?'По дате события':'By event date'} selected={filters.basis!=='paid'} onPress={()=>setFilters(current=>({...current,basis:'event'}))}/>
+      <Button label={locale==='ru'?'По дате оплаты':'By payment date'} selected={filters.basis==='paid'} onPress={()=>setFilters(current=>({...current,basis:'paid'}))}/>
+    </View>
+    <Text style={styles.text}>{filters.basis==='paid'?(locale==='ru'?'Дата фактической оплаты (UTC). Операции без даты оплаты исключены.':'Actual payment date (UTC). Transactions without a payment date are excluded.'):t('journalDateRange')}</Text>
     <View style={styles.row}>
       <View style={{flexGrow:1,gap:4}}><Text style={styles.muted}>{t('journalFrom')}</Text>
         <TextInput accessibilityLabel={t('journalFrom')} placeholder="YYYY-MM-DD" value={filters.from} maxLength={10}

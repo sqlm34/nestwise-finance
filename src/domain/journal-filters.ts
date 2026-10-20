@@ -2,6 +2,7 @@ import type {JournalCode,JournalTransaction} from './journal';
 
 export type JournalFilters={
   query:string;from:string;to:string;code:JournalCode|'all';order:'newest'|'oldest';
+  basis?:'event'|'paid';
 };
 export const defaultJournalFilters:JournalFilters={query:'',from:'',to:'',code:'all',order:'newest'};
 
@@ -19,13 +20,15 @@ export function filterJournal(entries:JournalTransaction[],filters:JournalFilter
   if(filters.from&&filters.to&&filters.from>filters.to)return {entries:[],error:'reversedRange'};
   const query=filters.query.trim().toLowerCase();
   const result=entries.filter(row=>{
-    const day=new Date(row.occurred_at).toISOString().slice(0,10);
+    const timestamp=filters.basis==='paid'?row.paid_at:row.occurred_at;
+    if(timestamp===null)return false;
+    const day=new Date(timestamp).toISOString().slice(0,10);
     return (!filters.from||day>=filters.from)&&(!filters.to||day<=filters.to)
       &&(filters.code==='all'||row.entries.some(line=>line.code===filters.code))
       &&(!query||[row.id,row.source_order_id,row.source_event_id].some(id=>id.toLowerCase().includes(query)));
   });
   result.sort((a,b)=>{
-    const time=Date.parse(a.occurred_at)-Date.parse(b.occurred_at);
+    const time=Date.parse(filters.basis==='paid'?a.paid_at!:a.occurred_at)-Date.parse(filters.basis==='paid'?b.paid_at!:b.occurred_at);
     const tie=a.id<b.id?-1:a.id>b.id?1:0;
     return (filters.order==='oldest'?1:-1)*(time||tie);
   });

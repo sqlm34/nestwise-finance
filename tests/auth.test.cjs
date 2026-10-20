@@ -30,6 +30,13 @@ test('real Better Auth login, workspace authorization, logout and stale cookie r
   assert.equal((await fixture.fetch(request(candidatePath+'&amount=100',{cookie}))).status,400);
   assert.equal((await fixture.fetch(request(candidatePath,{method:'POST',body:{},cookie}))).status,404);
   const insightsPath=path.replace(/journal$/,'insights'),periodQuery='?from=2026-10-01&to=2026-10-31';
+  const cashPath=path.replace(/journal$/,'cash-insights');
+  assert.equal((await fixture.fetch(request(cashPath+periodQuery))).status,401);
+  const cashResponse=await fixture.fetch(request(cashPath+periodQuery,{cookie}));
+  assert.equal(cashResponse.status,200);assert.equal((await cashResponse.json()).basis,'cash');
+  assert.equal((await fixture.fetch(request(cashPath+'?from=invalid&to=2026-10-31',{cookie}))).status,400);
+  assert.equal((await fixture.fetch(request(path+'?basis=paid',{cookie}))).status,200);
+  assert.equal((await fixture.fetch(request(path+'?basis=unknown',{cookie}))).status,400);
   assert.equal((await fixture.fetch(request(insightsPath+periodQuery))).status,401);
   const emptyInsights=await fixture.fetch(request(insightsPath+periodQuery,{cookie}));assert.equal(emptyInsights.status,200);
   assert.equal(emptyInsights.headers.get('cache-control'),'no-store');assert.equal((await emptyInsights.json()).current.transaction_count,'0');

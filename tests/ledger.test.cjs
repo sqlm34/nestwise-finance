@@ -60,11 +60,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0016_receipt_evidence.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0017_bank_booking.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0018_statement_periods.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0019_cash_basis_reads.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,18);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,19);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -505,4 +506,32 @@ test('PostgreSQL serializes concurrent refunds and opposite transfers under the 
     const transfers=await Promise.all(clients.map((c,i)=>c.query('SELECT nestwise.post_manual_operation($1,$2,$3,$4)',['test-owner',workspace,i?periodAccount:account,JSON.stringify({...original,id:randomUUID(),kind:'transfer',destination_account:i?account:periodAccount,allocations:[]})])));
     assert.equal(transfers.length,2);
   }finally{await Promise.all(clients.map(c=>c.end()));}
+});
+
+test('cash summary and paged drilldown use payment dates, exclude accruals and enforce live scope',async()=>{
+  const {parsePeriodInsights,periodMetrics}=require('../.test-build/src/domain/period-insights.js');
+  const cashAccount=randomUUID();await sql("INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES($1,$2,'Cash proof')",[cashAccount,workspace]);
+  await sql("INSERT INTO nestwise.source_connections VALUES('cash-proof',$1,$2,true)",[workspace,cashAccount]);
+  const send=async event=>{validateEvent(event);return sql('SELECT nestwise.accept_event($1,$2,$3,$4)',['cash-proof',randomUUID(),Math.floor(Date.now()/1000),JSON.stringify(event)]);};
+  await send(money('cash-late',1,'job.payment_recorded',10000,{occurred_at:'2026-10-20T12:00:00Z',paid_at:'2026-09-01T00:00:00Z'}));
+  await send(money('cash-later',1,'job.payment_recorded',2000,{occurred_at:'2026-11-20T12:00:00Z',paid_at:'2026-09-30T23:59:59Z'}));
+  await send(money('cash-unpaid',1,'job.part_cost_recorded',5000,{occurred_at:'2026-09-15T12:00:00Z',paid_at:null,settlement:'accrued'}));
+  for(let i=0;i<105;i++)await send(money(`cash-page-${i}`,1,'job.payment_recorded',100,{occurred_at:'2026-10-20T12:00:00Z',paid_at:'2026-09-15T12:00:00Z'}));
+  await sql("SET timezone='America/Indianapolis'");
+  const period={from:'2026-09-01',to:'2026-09-30'};
+  const read=async(subject='test-owner')=>(await sql('SELECT nestwise.user_cash_insights($1,$2,$3,$4,$5) result',[subject,workspace,cashAccount,period.from,period.to]))[0].result;
+  const raw=await read();assert.equal(raw.basis,'cash');const report=parsePeriodInsights(raw,period),metrics=periodMetrics(report.current);
+  assert.equal(report.current.transaction_count,'108');assert.equal(report.current.missing_paid_date,'1');
+  assert.equal(metrics.receipts,22500n);assert.equal(metrics.parts_cost,0n);assert.equal(metrics.clearing,22500n);
+  assert.deepEqual(report.months[0],report.current);
+  const rows=[];let cursor=null;
+  do{const page=(await sql('SELECT nestwise.user_cash_journal_page($1,$2,$3,$4,$5,$6,$7,$8,$9) result',['test-owner',workspace,cashAccount,'',period.from,period.to,'all','oldest',cursor]))[0].result;rows.push(...page.entries);cursor=page.next_cursor;}while(cursor);
+  assert.equal(rows.length,107);assert.equal(new Set(rows.map(r=>r.id)).size,107);
+  assert.equal(rows[0].source_order_id,'cash-late');assert.equal(rows.at(-1).source_order_id,'cash-later');
+  assert.equal(rows.flatMap(r=>r.entries).filter(e=>e.code==='clearing').reduce((n,e)=>n+BigInt(e.cents),0n),metrics.clearing);
+  await assert.rejects(read('test-accountant'),/forbidden/);
+  await sql('BEGIN');try{
+    await sql('SET LOCAL ROLE nestwise_api');assert.equal((await read()).basis,'cash');
+    await assert.rejects(sql('SELECT nestwise.user_cash_journal_page($1,$2,$3)',['test-accountant',workspace,cashAccount]),/forbidden/);
+  }finally{await sql('ROLLBACK');}
 });
