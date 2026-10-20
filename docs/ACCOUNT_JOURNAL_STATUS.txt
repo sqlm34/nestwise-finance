@@ -1,0 +1,25 @@
+Account journal UI — 2026-10-20
+
+The authenticated account screen now selects an assigned account and displays its
+protected journal response, rather than only the number of transactions.
+Includes empty-account state, selected-account indicator, refresh, explicit UTC
+event/payment/posting timestamps, debit/credit lines, source order and journal IDs.
+Amounts remain bigint strings through validation and formatting, preserving cents
+beyond JavaScript Number precision. USD is the only supported ledger currency.
+
+The response is validated before rendering: UUIDs, timestamps, bounded row count,
+known ledger codes, bigint range, unique transactions and balanced entries.
+Invalid responses show an error, not a partially trusted financial report.
+Account changes and refresh clear previous journal data before fetching.
+Expired sessions hide the account and journal; revoked account access returns an
+explicit error. No financial writes or changes to the database schema are added.
+
+The API returns the latest 100 transactions only. The UI labels this limit and
+does not present those entries as a complete balance or aggregate financial report.
+Pagination and broader reporting remain future work.
+
+Validation includes unit tests for exact amounts, invalid payloads, dates and
+empty data, plus parsing actual journal results in the SQL integration suite.
+The user's staging account is empty; do not seed synthetic transactions into it.
+After CI deploys, verify selecting its real account, empty state and refresh in
+the built-in browser without signing the user out or reading their password.

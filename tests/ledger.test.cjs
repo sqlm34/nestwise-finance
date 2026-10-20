@@ -170,6 +170,7 @@ test('session identity, workspace and account grants are enforced by SQL functio
     assert.equal((await accept(money(randomUUID(),1,'job.payment_recorded',101))).status,'posted');
     const result=(await sql('SELECT nestwise.read_journal($1,$2,$3) data',[tokenHash,workspace,account]))[0].data;
     assert.ok(result.length>0);
+    assert.equal(require('../.test-build/src/domain/journal.js').parseJournal({entries:result,limit:100}).entries.length,result.length);
     await assert.rejects(sql('SELECT * FROM nestwise.journal_entries'),/permission denied/);
     await assert.rejects(sql('SELECT nestwise.read_journal($1,$2,$3)',[tokenHash,otherWorkspace,otherAccount]),/forbidden/);
     await assert.rejects(sql('SELECT nestwise.read_journal($1,$2,$3)',[accountantHash,workspace,account]),/forbidden/);

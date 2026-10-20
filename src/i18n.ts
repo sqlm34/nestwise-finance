@@ -1,4 +1,13 @@
 export const en = {
+  journalTitle:'Account journal',journalRefresh:'Refresh journal',journalScope:'Posted transactions for the selected account. Debit and credit lines are not an account balance.',
+  journalEmpty:'No posted transactions yet. CRM events and bank statements have not been posted to this account.',
+  journalShown:'Shown:',journalLimit:'Latest 100 transactions only',journalPaidAt:'Payment date',journalNotPaid:'Not recorded',
+  journalDebit:'Debit',journalCredit:'Credit',journalOrder:'Source order',journalEntry:'Journal ID',journalPostedAt:'Posted',
+  journalClearing:'Clearing',journalReceipts:'Customer receipts',journalRefunds:'Customer refunds',
+  journalPartsCost:'Parts cost',journalPartsPayable:'Parts payable',journalFees:'Processing fees',
+  journalUnavailable:'Unable to load a valid journal. Please refresh and try again.',
+  journalAccessLost:'This account is no longer accessible. Reload the account page to update your access.',
+  journalNoAccounts:'No accounts have been assigned in this workspace.',
   inviteTitle:'Activate an invitation',inviteCode:'Invitation code',invitePassword:'New password (12–128 characters)',
   inviteRepeat:'Repeat password',inviteSubmit:'Set password',
   inviteHint:'Enter your private invitation code and choose your own password. Codes expire after 24 hours and work once.',
@@ -71,6 +80,15 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const ru: Record<MessageKey, string> = {
+  journalTitle:'Журнал счёта',journalRefresh:'Обновить журнал',journalScope:'Проведённые операции выбранного счёта. Дебет и кредит проводок не являются остатком на счёте.',
+  journalEmpty:'Проведённых операций пока нет. События CRM и банковские выписки ещё не проведены по этому счёту.',
+  journalShown:'Показано:',journalLimit:'Только последние 100 операций',journalPaidAt:'Дата оплаты',journalNotPaid:'Не указана',
+  journalDebit:'Дебет',journalCredit:'Кредит',journalOrder:'Заказ источника',journalEntry:'ID проводки',journalPostedAt:'Проведено',
+  journalClearing:'Расчётный клиринг',journalReceipts:'Поступления от клиентов',journalRefunds:'Возвраты клиентам',
+  journalPartsCost:'Стоимость запчастей',journalPartsPayable:'Задолженность за запчасти',journalFees:'Комиссии обработки',
+  journalUnavailable:'Не удалось загрузить корректный журнал. Попробуйте обновить его.',
+  journalAccessLost:'Доступ к этому счёту больше недоступен. Перезагрузите страницу аккаунта, чтобы обновить права.',
+  journalNoAccounts:'В этом пространстве вам ещё не назначены счета.',
   inviteTitle:'Активировать приглашение',inviteCode:'Код приглашения',invitePassword:'Новый пароль (12–128 символов)',
   inviteRepeat:'Повторите пароль',inviteSubmit:'Установить пароль',
   inviteHint:'Введите личный код приглашения и придумайте пароль. Код действует 24 часа и используется один раз.',
