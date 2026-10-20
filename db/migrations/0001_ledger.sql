@@ -128,7 +128,9 @@ END $$;
 CREATE TRIGGER immutable_event BEFORE UPDATE OR DELETE ON nestwise.source_events
   FOR EACH ROW EXECUTE FUNCTION nestwise.protect_event();
 
-CREATE FUNCTION nestwise.balanced() RETURNS trigger LANGUAGE plpgsql AS $$
+-- Deferred triggers run after the API function returns to the restricted role.
+CREATE FUNCTION nestwise.balanced() RETURNS trigger LANGUAGE plpgsql
+SECURITY DEFINER SET search_path=nestwise,pg_temp AS $$
 DECLARE target uuid; total numeric; lines integer;
 BEGIN
   IF TG_TABLE_NAME='journal_transactions' THEN target:=NEW.id;
@@ -176,7 +178,7 @@ BEGIN
               THEN RAISE EXCEPTION 'invalid_cost_reference'; END IF;
             -- A linear correction chain prevents two corrections using the same base.
             IF EXISTS (SELECT 1 FROM source_events WHERE connection_id=e.connection_id
-              AND status='posted' AND payload->>'reference_event_id'=ref.source_event_id::text)
+              AND status='posted' AND (payload->>'reference_event_id')::uuid=ref.source_event_id)
               THEN RAISE EXCEPTION 'reference_already_adjusted'; END IF;
             debit:='parts_cost';
             SELECT je.code INTO credit FROM journal_transactions jt JOIN journal_entries je
@@ -189,11 +191,11 @@ BEGIN
               THEN RAISE EXCEPTION 'invalid_reference_type'; END IF;
             IF EXISTS (SELECT 1 FROM source_events WHERE connection_id=e.connection_id
               AND status='posted' AND kind='job.cost_corrected'
-              AND payload->>'reference_event_id'=ref.source_event_id::text)
+              AND (payload->>'reference_event_id')::uuid=ref.source_event_id)
               THEN RAISE EXCEPTION 'use_latest_cost_revision'; END IF;
             IF amount + coalesce((SELECT sum(effective_amount) FROM source_events
               WHERE connection_id=e.connection_id AND status='posted' AND kind=e.kind
-                AND payload->>'reference_event_id'=ref.source_event_id::text),0) > ref.effective_amount
+                AND (payload->>'reference_event_id')::uuid=ref.source_event_id),0) > ref.effective_amount
               THEN RAISE EXCEPTION 'refund_exceeds_source'; END IF;
             IF e.kind='job.customer_refund_issued' THEN debit:='refunds'; credit:='clearing';
             ELSIF e.kind='job.processor_fee_refunded' THEN debit:='clearing'; credit:='fees';

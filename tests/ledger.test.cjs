@@ -81,7 +81,7 @@ test('full customer refund retains nonreturnable parts cost', async () => {
 test('partial refunds are limited by the original payment', async () => {
   const order=randomUUID(), payment=money(order,1,'job.payment_recorded'); await accept(payment);
   await accept(money(order,2,'job.customer_refund_issued',10000,{reference_event_id:payment.source_event_id}));
-  assert.equal((await accept(money(order,3,'job.customer_refund_issued',25001,{reference_event_id:payment.source_event_id}))).status,'needs_review');
+  assert.equal((await accept(money(order,3,'job.customer_refund_issued',25001,{reference_event_id:payment.source_event_id.toUpperCase()}))).status,'needs_review');
   assert.equal((await totals(order)).refunds,10000);
 });
 test('supplier credit reverses parts cost, never customer refund or revenue', async () => {
