@@ -95,7 +95,7 @@ export function SavedReconciliations({workspace,account,revision,onSessionExpire
           cancel===group.id?<>
             <Text style={styles.text}>{ru?'Причина отмены:':'Cancellation reason:'}</Text>
             <View style={styles.row}>{cancellationReasons.map(value=><Button key={value} label={reasonLabel(value)} selected={reason===value} disabled={writing} onPress={()=>setReason(value)}/>)}</View>
-            <Notice text={ru?'Исходное решение останется в истории. Строки и проводки освободятся для новой сверки.':'The original decision remains in history. Rows and transactions become available for a new reconciliation.'}/>
+            <Notice text={ru?'Исходное решение останется в истории. Отмена снимает сопоставление, но не удаляет операции из журнала. Если операция создана по выписке, её строка остаётся защищённой от повторного учёта.':'The original decision remains in history. Cancellation removes the match but does not delete journal transactions. A row used to create a bank transaction remains protected against duplicate posting.'}/>
             <Button label={ru?'Подтвердить отмену':'Confirm cancellation'} disabled={writing} onPress={()=>void cancelGroup()}/>
             <Button label={ru?'Оставить решение':'Keep decision'} disabled={writing} onPress={()=>setCancel(null)}/>
           </>:<Button label={ru?'Отменить сохранённую сверку':'Cancel saved reconciliation'} disabled={!data.can_write||writing} onPress={()=>{setCancel(group.id);setReason('recheck');setError('');}}/>}

@@ -117,3 +117,36 @@ GitHub verification checkpoint — 2026-10-20
   financial order. Reassigning an offline source fact to another job is blocked.
 - No new PR yet: Part 1 product scope is still incomplete. Existing frontend
   browser acceptance restriction and remaining delivery checklist still apply.
+
+Staging schema checkpoint — 2026-10-20 19:17 America/Indianapolis
+- Neon manual snapshot: staging at 2026-10-20 23:17:06 UTC; visible in the
+  snapshot list (12 snapshots). Frozen browser tab recovered using a new tab.
+- Verified database nestwise_staging and the checksums of migrations 0001–0013.
+- Applied migrations 0014–0018 in one explicit transaction under the migration
+  advisory lock. Guard rejects a different database, CRM jobs or baseline drift.
+- Independent post-COMMIT query reports 18 migrations, latest
+  0018_statement_periods.sql. CRM database and production were not changed.
+- CI commit 3fcccfd3d17a4490421923598bb7e6174fb0becc passed run 39513333767.
+  A second attempt was requested with a temporary STAGING_DEPLOY_BRANCH variable
+  to deploy that same verified commit. Remove this variable after deployment.
+- UI acceptance is in progress; schema success alone is not product completion.
+
+Staging browser acceptance checkpoint — 2026-10-20
+- CI run 39513333767 attempt 2 succeeded, including EAS access and staging.
+  Temporary STAGING_DEPLOY_BRANCH was deleted and absence verified (HTTP 404).
+- Synthetic workspace/account: SYNTHETIC — приёмка 20 октября / Clearing 1234.
+  Manual income USD 100 and expense USD 3 were saved through the browser.
+- Archived a two-row synthetic CSV with verified dual copies. Saved October
+  period revision 1: opening 100, movement 94, closing 194, zero difference.
+- Saved a USD 97 reconciliation to two journal entries (100 and -3).
+  Created an explicit USD 3 bank expense for the second statement row.
+- Canceled the bank expense reconciliation for recheck. The decision remains
+  in audit; original evidence reports one matched row and one posted row, zero
+  unmatched rows. Its journal detail remains accessible after cancellation.
+- Corrected cancellation confirmation copy: cancellation does not remove a
+  journal operation or release a bank-origin row for duplicate posting.
+- Uploaded a synthetic screenshot as a receipt test attachment and saved reviewed
+  version 1 with synthetic merchant/item and USD 1 total. No OCR was invoked and
+  no receipt payment was confirmed. This attachment is not a real receipt.
+- TypeScript and targeted ESLint passed for the confirmation-copy correction.
+- Part 1 remains incomplete; no production, CRM backfill or store publication.
