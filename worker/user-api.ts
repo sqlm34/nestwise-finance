@@ -7,6 +7,7 @@ import {detailBefore} from '../src/domain/journal-detail';
 import {parseEventParams} from '../src/domain/account-events';
 import {parsePeriodParams} from '../src/domain/period-insights';
 import {candidateParams} from '../src/domain/reconciliation';
+import {parseSave,parseCancellation,savedCursor} from '../src/domain/saved-reconciliation';
 
 export type UserEnv = {
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
@@ -60,20 +61,24 @@ export async function userApi(request: Request, env: UserEnv,
   }
   const authPaths = new Map([['/api/auth/sign-in/email','POST'],['/api/auth/sign-out','POST'],['/api/auth/get-session','GET']]);
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
+  const savedMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations$/i.exec(url.pathname);
+  const cancelMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations\/([0-9a-f-]{36})\/cancel$/i.exec(url.pathname);
+  const reconciliationWrite=request.method==='POST'&&(savedMatch||cancelMatch);
   const reconciliationMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliation-candidates$/i.exec(url.pathname);
   const insightsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/insights$/i.exec(url.pathname);
   const eventsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events$/i.exec(url.pathname);
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch) || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
-    request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch))) return finish(response({error:'not_found'},404));
+  if ((url.search&&(reconciliationWrite||!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
+    request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
+  if(reconciliationWrite&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
   if (request.method==='POST') {
     if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') return finish(response({error:'invalid_body'},415));
     let raw: string;
-    try {raw=await limitedText(request); if(new TextEncoder().encode(raw).length>4096) throw new Error();}
+    try {raw=await limitedText(request); if(new TextEncoder().encode(raw).length>(reconciliationWrite?16384:4096)) throw new Error();}
     catch {return finish(response({error:'invalid_body'},413));}
     safeRequest=new Request(request.url,{method:request.method,headers:request.headers,body:raw});
   }
@@ -92,6 +97,18 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
+    if(cancelMatch){
+      let reason;try{reason=parseCancellation(await safeRequest.json());}catch{return finish(response({error:'invalid_reconciliation'},400));}
+      return finish(response({id:await db.cancelReconciliation(subject,cancelMatch[1],cancelMatch[2],cancelMatch[3],reason)}));
+    }
+    if(savedMatch){
+      if(reconciliationWrite){
+        let payload;try{payload=parseSave(await safeRequest.json());}catch{return finish(response({error:'invalid_reconciliation'},400));}
+        return finish(response({id:await db.saveReconciliation(subject,savedMatch[1],savedMatch[2],payload)}));
+      }
+      let cursor;try{cursor=savedCursor(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
+      return finish(response(await db.readReconciliations(subject,savedMatch[1],savedMatch[2],cursor)));
+    }
     if(reconciliationMatch){
       let filters;try{filters=candidateParams(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
       return finish(response(await db.userReconciliationCandidates(subject,reconciliationMatch[1],reconciliationMatch[2],filters.from,filters.to,filters.cursor)));
@@ -121,6 +138,8 @@ export async function userApi(request: Request, env: UserEnv,
     return finish(response({user:{id:session.user.id,name:session.user.name,email:session.user.email},
       workspaces:await db.userAccess(subject)}));
   } catch(error) {
+    if(error instanceof Error&&['reconciliation_conflict','reconciliation_mismatch'].includes(error.message))return finish(response({error:error.message},409));
+    if(error instanceof Error&&error.message==='invalid_reconciliation')return finish(response({error:error.message},400));
     if(error instanceof Error && error.message==='forbidden') return finish(response({error:'not_found'},404));
     if(error instanceof Error && ['invalid_cursor','invalid_filters'].includes(error.message))return finish(response({error:error.message},400));
     return finish(response({error:'temporarily_unavailable'},503));

@@ -29,3 +29,9 @@ export async function authenticatedFetch(path: string, signal?: AbortSignal) {
     credentials:'include',signal,headers:cookie?{Cookie:cookie}:{},
   });
 }
+export async function authenticatedPost(path:string,body:unknown,signal?:AbortSignal){
+  if(!apiURL)throw new Error('unconfigured');
+  const cookie=Platform.OS==='web'?'':await authClient.getCookie();
+  return fetch(`${apiURL}${path}`,{method:'POST',credentials:'include',signal,
+    headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie,'Expo-Origin':`${typeof scheme==='string'?scheme:'nestwise-development'}://`}:{})},body:JSON.stringify(body)});
+}

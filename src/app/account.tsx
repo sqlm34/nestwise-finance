@@ -87,7 +87,7 @@ export default function Account() {
           <Button label={t('eventsTitle')} selected={section==='events'} onPress={()=>setSection('events')}/>
           <Button label={t('reconciliationTitle')} selected={section==='reconciliation'} onPress={()=>setSection('reconciliation')}/>
         </View>
-        {section==='reconciliation'?<AccountReconciliation key={`${selected.workspace}:${selected.account}`} name={selected.name} workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
+        {section==='reconciliation'?<AccountReconciliation canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} key={`${selected.workspace}:${selected.account}`} name={selected.name} workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
           section==='insights'?<AccountInsights key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
           workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired} onEvents={()=>setSection('events')}/>:
           section==='journal'?<AccountJournal key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}

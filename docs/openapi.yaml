@@ -4,6 +4,70 @@ info:
   version: 0.3.0
   description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
 paths:
+  /v1/user/workspaces/{workspace}/accounts/{account}/reconciliations:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+    get:
+      description: Scoped immutable decision history, newest first, including cancellations; no original bank documents
+      parameters:
+        - {in: query, name: cursor, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Up to 50 groups, can_write boolean and nullable next_cursor; no-store}
+        '400': {description: Invalid cursor or filters}
+        '401': {description: Missing or expired session}
+        '404': {description: Account is unknown or inaccessible}
+    post:
+      description: >
+        Explicit user assertion, owners/accountants only. Body id (UUID idempotency key),
+        file_hash (SHA-256), rows (1-20 objects with line/date/cents/text_hash), transactions
+        (1-20 journal UUIDs). Rejects extra fields, duplicate rows, invalid dates/amounts,
+        non-cash journals and active reservations. Same request retries are idempotent.
+        Does not store original CSV or create any income/expense.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, file_hash, rows, transactions]
+              properties:
+                id: {type: string, format: uuid}
+                file_hash: {type: string, pattern: '^[0-9a-f]{64}$'}
+                rows: {type: array, minItems: 1, maxItems: 20, items: {type: object}}
+                transactions: {type: array, minItems: 1, maxItems: 20, items: {type: string, format: uuid}}
+      responses:
+        '200': {description: Durable assertion ID; retry does not resurrect canceled decisions}
+        '400': {description: Invalid body}
+        '401': {description: Missing or expired session}
+        '403': {description: Missing or untrusted origin}
+        '404': {description: Account write permission unavailable}
+        '409': {description: Reservation/idempotency conflict or amount/date mismatch}
+        '413': {description: Body exceeds 16 KiB}
+        '503': {description: Uncertain result; retry same idempotency ID or inspect history}
+  /v1/user/workspaces/{workspace}/accounts/{account}/reconciliations/{group}/cancel:
+    post:
+      description: Retains assertion and first cancellation actor/time/reason; releases active reservations; idempotent
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: group, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: {enum: [mistake, duplicate, recheck]}
+      responses:
+        '200': {description: Canceled assertion ID}
+        '400': {description: Invalid reason}
+        '401': {description: Missing or expired session}
+        '404': {description: Group or account write permission unavailable}
   /v1/user/workspaces/{workspace}/accounts/{account}/reconciliation-candidates:
     get:
       description: >

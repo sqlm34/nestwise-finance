@@ -1,6 +1,9 @@
 import { neon } from '@neondatabase/serverless';
 import type {JournalFilters} from '../src/domain/journal-filters';
 export type Database = {
+  readReconciliations(subject:string,workspace:string,account:string,cursor:string|null):Promise<unknown>;
+  saveReconciliation(subject:string,workspace:string,account:string,payload:unknown):Promise<string>;
+  cancelReconciliation(subject:string,workspace:string,account:string,id:string,reason:string):Promise<string>;
   userReconciliationCandidates(subject:string,workspace:string,account:string,from:string,to:string,cursor:string|null):Promise<unknown>;
   accept(connection: string, nonce: string, timestamp: number, raw: string): Promise<unknown>;
   journal(hash: string, workspace: string, account: string): Promise<unknown>;
@@ -16,6 +19,9 @@ export type Database = {
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async readReconciliations(subject,workspace,account,cursor){return (await sql`SELECT nestwise.read_reconciliations(${subject},${workspace}::uuid,${account}::uuid,${cursor}::uuid) result`)[0].result;},
+    async saveReconciliation(subject,workspace,account,payload){return (await sql`SELECT nestwise.save_reconciliation(${subject},${workspace}::uuid,${account}::uuid,${JSON.stringify(payload)}::jsonb) result`)[0].result;},
+    async cancelReconciliation(subject,workspace,account,id,reason){return (await sql`SELECT nestwise.cancel_reconciliation(${subject},${workspace}::uuid,${account}::uuid,${id}::uuid,${reason}) result`)[0].result;},
     async userReconciliationCandidates(subject,workspace,account,from,to,cursor) {
       return (await sql`SELECT nestwise.user_reconciliation_candidates(${subject},${workspace}::uuid,${account}::uuid,${from}::date,${to}::date,${cursor}::uuid) result`)[0].result;
     },

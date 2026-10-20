@@ -52,11 +52,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0008_event_details.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0009_account_period_insights.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0010_reconciliation_candidates.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0011_saved_reconciliation.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,10);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,11);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -410,4 +411,21 @@ test('paid reconciliation candidates exclude corrections, accruals and unresolve
   await assert.rejects(read('test-owner',otherAccount),/forbidden/);
   await assert.rejects(read('test-owner',account,rows[0].id),/invalid_cursor/);
   await sql('BEGIN');try{await sql('SET LOCAL ROLE nestwise_api');assert.equal((await read()).entries.length,100);}finally{await sql('ROLLBACK');}
+});
+
+test('PostgreSQL serializes concurrent reconciliation claims and retains cancellation audit', {skip:!process.env.TEST_DATABASE_URL},async()=>{
+  const {Client}=require('pg'),clients=[new Client({connectionString:process.env.TEST_DATABASE_URL}),new Client({connectionString:process.env.TEST_DATABASE_URL})];
+  const tx=(await sql("SELECT jt.id FROM nestwise.journal_transactions jt JOIN nestwise.source_events se ON se.id=jt.event_id WHERE se.source_order_id='period-bulk-0'"))[0].id;
+  const payload={file_hash:'a'.repeat(64),rows:[{line:2,date:'2026-10-19',cents:'100',text_hash:'b'.repeat(64)}],transactions:[tx]};
+  await Promise.all(clients.map(c=>c.connect()));
+  try{
+    await Promise.all(clients.map(c=>c.query('SET ROLE nestwise_api')));
+    const results=await Promise.allSettled(clients.map(c=>c.query('SELECT nestwise.save_reconciliation($1,$2,$3,$4) id',['test-owner',workspace,periodAccount,JSON.stringify({...payload,id:randomUUID()})])));
+    assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+    assert.match(results.find(r=>r.status==='rejected').reason.message,/reconciliation_conflict/);
+    const id=results.find(r=>r.status==='fulfilled').value.rows[0].id;
+    await clients[0].query('SELECT nestwise.cancel_reconciliation($1,$2,$3,$4,$5)',['test-owner',workspace,periodAccount,id,'recheck']);
+    assert.equal((await sql('SELECT count(*)::int n FROM nestwise.reconciliation_claims WHERE group_id=$1',[id]))[0].n,0);
+    assert.equal((await sql('SELECT count(*)::int n FROM nestwise.reconciliation_cancellations WHERE group_id=$1',[id]))[0].n,1);
+  }finally{await Promise.all(clients.map(c=>c.end()));}
 });
