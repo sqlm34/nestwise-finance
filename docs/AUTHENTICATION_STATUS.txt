@@ -28,12 +28,11 @@ CI separately applies all migrations to PostgreSQL 17 and verifies backup restor
 Recovery fingerprints now include both financial and authentication tables.
 
 Deployment state
-AUTH_ENABLED is unset/false. Cloud auth database credentials, signing secret,
-trusted web origin and real users have NOT been provisioned. Migration 0002/0003
-have NOT been applied to Neon staging in this phase. Existing staging financial
-ingestion remains disabled. Cloudflare bundle compilation is not a live auth test.
-Browser end-to-end validation remains pending: automatic approval review rejected
-starting Expo with local API configuration in this session, without a detailed reason.
+Superseded by STAGING_AUTH_STATUS.txt: staging authentication and same-origin web
+hosting are now enabled. Migration 0002/0003 are applied to Neon staging. Cloud
+API and browser login/logout have been verified with a temporary synthetic user.
+Existing staging financial ingestion remains disabled. Real users, invitations
+and password recovery remain unprovisioned.
 
 Activation checklist for a later stage
 1. Snapshot staging, apply versioned migrations using owner credentials.
@@ -57,4 +56,4 @@ access after a real recovery. Never reopen a recovered branch automatically.
 
 Release limitations
 No production approval, no store release, no public signup, no password recovery,
-no live cloud authentication proof or new native device authentication proof yet.
+and no new native device authentication proof yet.
