@@ -5,7 +5,7 @@ on:
       platform:
         type: choice
         options: [android, ios, all]
-        default: all
+        default: android
 permissions:
   contents: read
 jobs:

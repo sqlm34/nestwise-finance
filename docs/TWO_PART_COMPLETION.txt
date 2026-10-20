@@ -73,3 +73,17 @@ screens or passing unit tests. Native JS export is not a signed device build.
   acceptance are not yet verified. Production APK and data were not changed.
 - Migration 0017 remains unapplied to staging. This checkpoint does not mark
   either product part complete or authorize deployment to production.
+
+2026-10-20 — Release scope and source review checkpoint
+- Owner has no Apple Developer account. Android and web implementation continues;
+  signed iOS distribution remains externally blocked. Simulator exports do not
+  establish a releasable signed iPhone build. No store account is assumed.
+- Staging is now at migrations 0001–0018 and application 3fcccfd. The earlier
+  'unapplied migration 0017' checkpoint above is historical and superseded.
+- CRM companion f7cf952 adds immutable owner-reviewed paid Stripe/fee and parts
+  source conversion, source evidence UI, idempotent release and signed receiver
+  proof. Source correction/lifecycle and live browser acceptance remain open.
+- Production authentication and ingestion currently fail closed by design. A
+  production release still needs reviewed environment configuration, isolated
+  databases/storage, a verified backup, signed build QA, operational acceptance
+  and the owner's final release approval. Do not remove gates just to claim ready.
