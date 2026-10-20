@@ -1,7 +1,8 @@
 import { validateEvent, uuid } from './contract';
 import { authenticateEvent, limitedText, sha256 } from './security';
 import { database, type Database } from './database';
-export type Env = {
+import { userApi, type UserEnv } from './user-api';
+export type Env = UserEnv & {
   ENVIRONMENT: 'development' | 'staging' | 'production';
   FINANCIAL_INGESTION_ENABLED?: string;
   NESTWISE_DATABASE_URL?: string;
@@ -17,6 +18,9 @@ export function createWorker(connect: (url: string) => Database = database) {
       const url = new URL(request.url);
       if (url.pathname === '/health' && request.method === 'GET') {
         return json({ service: 'nestwise', environment: env.ENVIRONMENT, status: 'ok', financialIngestion: enabled(env) });
+      }
+      if (url.pathname.startsWith('/api/auth/') || url.pathname === '/v1/session' || url.pathname.startsWith('/v1/user/')) {
+        return userApi(request, env);
       }
       if (!enabled(env)) return json({ error: 'not_found' }, 404);
       if (url.pathname === '/v1/crm/events' && request.method === 'POST' && !url.search) {

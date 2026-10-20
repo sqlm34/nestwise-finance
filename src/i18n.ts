@@ -1,4 +1,12 @@
 export const en = {
+  authAccount:'Account',authSignIn:'Sign in',authSignOut:'Sign out',authEmail:'Email',authPassword:'Password',
+  authHint:'Access is available to invited users. Your workspaces are assigned by an administrator.',
+  authNotConfigured:'Sign-in is not connected in this build. The demo remains available.',
+  authUnavailable:'Unable to reach the sign-in service. Please try again.',
+  authInvalid:'Unable to sign in. Check your email and password.',authRateLimit:'Too many attempts. Please wait a minute.',
+  authLogoutFailed:'Sign-out was not confirmed. Please reconnect and try again.',authExpired:'Your session expired. Please sign in again.',
+  authLoading:'Loading account',authSpaces:'Your available workspaces',authNoAccess:'You are signed in, but no workspaces have been assigned yet.',
+  authEntries:'Journal transactions:',authDemoBack:'Back to the demo',
   next: 'Next', previous: 'Previous', page: 'Page',
   overview: 'Overview', transactions: 'Transactions', bank: 'Bank statements', reconcile: 'Reconciliation',
   crm: 'CRM integration', mapping: 'Accountant categories', settings: 'Settings',
@@ -58,6 +66,14 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const ru: Record<MessageKey, string> = {
+  authAccount:'Аккаунт',authSignIn:'Войти',authSignOut:'Выйти',authEmail:'Электронная почта',authPassword:'Пароль',
+  authHint:'Вход доступен приглашённым пользователям. Доступ к пространствам назначает администратор.',
+  authNotConfigured:'В этой сборке вход ещё не подключён. Демонстрация остаётся доступной.',
+  authUnavailable:'Не удалось связаться с сервисом входа. Попробуйте ещё раз.',
+  authInvalid:'Не удалось войти. Проверьте почту и пароль.',authRateLimit:'Слишком много попыток. Подождите минуту.',
+  authLogoutFailed:'Выход не подтверждён. Восстановите соединение и повторите.',authExpired:'Сессия истекла. Войдите снова.',
+  authLoading:'Загрузка аккаунта',authSpaces:'Доступные вам пространства',authNoAccess:'Вход выполнен, но доступ к пространствам ещё не назначен.',
+  authEntries:'Операций в журнале:',authDemoBack:'Вернуться к демонстрации',
   next: 'Далее', previous: 'Назад', page: 'Страница',
   overview: 'Обзор', transactions: 'Операции', bank: 'Банковские выписки', reconcile: 'Сверка',
   crm: 'Интеграция CRM', mapping: 'Категории бухгалтера', settings: 'Настройки',

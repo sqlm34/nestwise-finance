@@ -3,6 +3,8 @@ export type Database = {
   accept(connection: string, nonce: string, timestamp: number, raw: string): Promise<unknown>;
   journal(hash: string, workspace: string, account: string): Promise<unknown>;
   processPending(): Promise<void>;
+  userAccess(subject: string): Promise<unknown>;
+  userJournal(subject: string, workspace: string, account: string): Promise<unknown>;
 };
 export function database(url: string): Database {
   const sql = neon(url);
@@ -16,5 +18,11 @@ export function database(url: string): Database {
       return rows[0].result;
     },
     async processPending() { await sql`SELECT nestwise.process_pending()`; },
+    async userAccess(subject) {
+      return (await sql`SELECT nestwise.user_access(${subject}) result`)[0].result;
+    },
+    async userJournal(subject, workspace, account) {
+      return (await sql`SELECT nestwise.user_journal(${subject},${workspace}::uuid,${account}::uuid) result`)[0].result;
+    },
   };
 }

@@ -1,0 +1,60 @@
+Nestwise authentication development — 2026-10-20
+
+Implemented
+Email/password sign-in and sign-out through Better Auth 1.7.12, with persistent
+one-hour sessions, immediate revocation, database-backed login rate limiting,
+explicit trusted origins and bounded JSON request bodies. Public registration
+and other auth routes are denied. Production auth is deliberately disabled.
+
+The /account Expo screen supports English/Russian, lists only assigned workspaces
+and accounts, and reads their protected journal endpoint. It is separate from
+the synthetic finance demo. Browser sessions use HttpOnly cookies; native sessions
+use Expo SecureStore. Adding SecureStore requires a new native development build.
+
+Database migration 0002 creates nestwise_auth and its dedicated NOLOGIN role.
+Migration 0003 adds subject-based financial access functions. Only the server
+derives the subject from a validated session. Memberships and account grants are
+checked in SQL. Authentication credentials have no financial table access;
+the financial role has no authentication table access.
+
+Local verification
+npm run demo:auth starts an in-memory, loopback-only synthetic service on 8083.
+Its only test identity is demo@nestwise.test / Synthetic-only-2468!
+Never provision that identity in staging or production.
+For local Expo development set EXPO_PUBLIC_API_URL=http://localhost:8083 and use
+http://localhost:8081/account. HTTP loopback is allowed only in development.
+Unit/integration tests exercise the actual auth library and SQL using PGlite.
+CI separately applies all migrations to PostgreSQL 17 and verifies backup restore.
+Recovery fingerprints now include both financial and authentication tables.
+
+Deployment state
+AUTH_ENABLED is unset/false. Cloud auth database credentials, signing secret,
+trusted web origin and real users have NOT been provisioned. Migration 0002/0003
+have NOT been applied to Neon staging in this phase. Existing staging financial
+ingestion remains disabled. Cloudflare bundle compilation is not a live auth test.
+Browser end-to-end validation remains pending: automatic approval review rejected
+starting Expo with local API configuration in this session, without a detailed reason.
+
+Activation checklist for a later stage
+1. Snapshot staging, apply versioned migrations using owner credentials.
+2. Provision an auth-only LOGIN role inheriting nestwise_auth_api, with no owner,
+   financial, role-management or DDL privileges.
+3. Store AUTH_DATABASE_URL and a random >=32-byte AUTH_SECRET in Worker secrets.
+   Configure exact HTTPS AUTH_BASE_URL and AUTH_WEB_ORIGIN; no wildcard origins.
+4. Provision real users through a controlled invitation/credential setup flow and
+   assign explicit subject mappings/memberships. Invitation and password recovery
+   are not implemented yet; do not expose public registration.
+5. Enable only staging, verify login/logout/expiry/permissions on the deployed
+   Worker with actual Neon credentials, then build native clients.
+
+Recovery
+Take a snapshot before migrations. Roll back application code and disable auth
+if verification fails; keep additive schemas to avoid deleting users/history.
+Restore into a separate isolated branch and compare fingerprints before cutover.
+A historical snapshot can resurrect sessions revoked after the snapshot: revoke
+all restored auth sessions and rotate the auth signing secret before reopening
+access after a real recovery. Never reopen a recovered branch automatically.
+
+Release limitations
+No production approval, no store release, no public signup, no password recovery,
+no live cloud authentication proof or new native device authentication proof yet.

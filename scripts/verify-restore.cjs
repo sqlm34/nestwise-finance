@@ -2,12 +2,12 @@ const { Client } = require('pg');
 const { createHash } = require('node:crypto');
 const assert=require('node:assert/strict');
 async function fingerprint(client) {
-  const tables=(await client.query("SELECT tablename FROM pg_tables WHERE schemaname='nestwise' ORDER BY tablename")).rows;
+  const tables=(await client.query("SELECT schemaname,tablename FROM pg_tables WHERE schemaname IN ('nestwise','nestwise_auth') ORDER BY schemaname,tablename")).rows;
   const output={};
-  for(const {tablename} of tables) {
-    if(!/^[a-z_]+$/.test(tablename)) throw new Error('Unexpected identifier');
-    const rows=(await client.query(`SELECT to_jsonb(t)::text row FROM nestwise.${tablename} t ORDER BY to_jsonb(t)::text`)).rows;
-    output[tablename]={count:rows.length,sha256:createHash('sha256').update(JSON.stringify(rows)).digest('hex')};
+  for(const {schemaname,tablename} of tables) {
+    if(!/^[a-zA-Z_]+$/.test(tablename)) throw new Error('Unexpected identifier');
+    const rows=(await client.query(`SELECT to_jsonb(t)::text row FROM "${schemaname}"."${tablename}" t ORDER BY to_jsonb(t)::text`)).rows;
+    output[schemaname==='nestwise'?tablename:`${schemaname}.${tablename}`]={count:rows.length,sha256:createHash('sha256').update(JSON.stringify(rows)).digest('hex')};
   }
   return output;
 }

@@ -42,11 +42,14 @@ before(async () => {
     db = new PGlite(); await db.waitReady;
   }
   const migration = readFileSync('db/migrations/0001_ledger.sql', 'utf8');
-  if (db.exec) await db.exec(migration);
+  if (db.exec) {
+    await db.exec(migration);
+    await db.exec(readFileSync('db/migrations/0003_user_access.sql','utf8'));
+  }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,1);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,3);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -187,4 +190,16 @@ test('real PostgreSQL serializes simultaneous duplicate deliveries', {skip:!proc
     assert.deepEqual(results.map(r=>r.rows[0].result.duplicate).sort(),[false,true]);
     assert.equal((await totals(event.source_order_id)).receipts,-7500);
   } finally { await Promise.all(clients.map(c=>c.end())); }
+});
+test('authenticated subjects receive only assigned workspaces and accounts',async()=>{
+  await sql('SET ROLE nestwise_api');
+  try {
+    assert.deepEqual((await sql('SELECT nestwise.user_access($1) result',['unknown']))[0].result,[]);
+    const access=(await sql('SELECT nestwise.user_access($1) result',['test-owner']))[0].result;
+    assert.equal(access.length,1); assert.equal(access[0].id,workspace);
+    assert.equal(access[0].accounts.length,1); assert.equal(access[0].accounts[0].id,account);
+    assert.ok((await sql('SELECT nestwise.user_journal($1,$2,$3) result',['test-owner',workspace,account]))[0].result.length>0);
+    await assert.rejects(sql('SELECT nestwise.user_journal($1,$2,$3)',['test-owner',otherWorkspace,otherAccount]),/forbidden/);
+    await assert.rejects(sql('SELECT * FROM nestwise_auth.account'),/permission denied|does not exist/);
+  } finally {await sql('RESET ROLE');}
 });

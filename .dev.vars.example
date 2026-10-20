@@ -5,3 +5,9 @@ NESTWISE_DATABASE_URL=
 # JSON map: key ID -> connectionId, random secret bytes in hex, notBefore, expiresAt.
 # Provision actual values through Wrangler/GitHub secrets; never EXPO_PUBLIC_*.
 CRM_SERVICE_KEYS={}
+# Login remains disabled until migrations, separate auth credentials and origin are provisioned.
+AUTH_ENABLED=false
+AUTH_BASE_URL=
+AUTH_WEB_ORIGIN=
+AUTH_DATABASE_URL=
+AUTH_SECRET=

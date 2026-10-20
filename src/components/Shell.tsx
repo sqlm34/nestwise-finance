@@ -57,6 +57,7 @@ export function Shell({ children, title, actions }: { children: React.ReactNode;
             {wide && <House size={15} color={colors.muted} />}<Text style={styles.muted}>{t(workspace)}</Text>{wide && <><ChevronRight size={13} color={colors.muted} /><Text style={styles.text}>{t(title)}</Text></>}
           </View>
           <View style={styles.row}>{width > 650 && <Badge>{t('demo')}</Badge>}
+            <Pressable accessibilityRole="button" accessibilityLabel={t('authAccount')} onPress={()=>router.push('/account')} style={{padding:10}}><UserRound size={20} color={colors.green}/></Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={locale === 'ru' ? 'English' : 'Русский'} onPress={() => setLocale(locale === 'ru' ? 'en' : 'ru')} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, borderWidth: 1, borderColor: colors.line, borderRadius: 8 }}><Text style={styles.text}>{locale === 'ru' ? 'EN' : 'RU'}</Text></Pressable>
           </View>
         </View>
