@@ -22,10 +22,14 @@ test('explicit bank booking uses verified original values and atomic reconciliat
  assert.equal((await fixture.fetch(request(path,{...p,id:randomUUID()}))).status,409,'canceling a match must not erase bank posting origin');
  assert.equal((await fixture.fetch(request(path,p))).status,200,'old retry does not recreate canceled reconciliation');
  assert.equal((await fixture.db.query('SELECT count(*)::int n FROM nestwise.reconciliation_claims')).rows[0].n,0);
+ const review=await (await fixture.fetch(request(root()+`/documents/${hash}/review`))).json();
+ assert.equal(review.rows[0].status,'posted');assert.equal(review.totals.posted.debits,'300');assert.equal(review.canceled,1);
 });
 test('overlapping statement versions cannot book the same bank fact again',async()=>{
  const other=text.replace('Posting Date','Date'),otherHash=createHash('sha256').update(other).digest('hex');
  assert.equal((await fixture.fetch(request(root()+`/documents/${otherHash}`,other,'text/csv'))).status,200);
  assert.equal((await fixture.fetch(request(root()+`/documents/${otherHash}/book`,{id:randomUUID(),line:2,category:'fees',confirm_no_existing_entry:true}))).status,409);
  assert.equal((await fixture.db.query('SELECT count(*)::int n FROM nestwise.journal_transactions')).rows[0].n,1);
+ const review=await (await fixture.fetch(request(root()+`/documents/${otherHash}/review`))).json();
+ assert.equal(review.rows[0].status,'posted');assert.equal(review.totals.posted.debits,'300');
 });

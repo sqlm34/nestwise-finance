@@ -42,3 +42,21 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION nestwise.post_bank_row(text,uuid,uuid,uuid,text,jsonb,jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION nestwise.post_bank_row(text,uuid,uuid,uuid,text,jsonb,jsonb) TO nestwise_api;
+
+-- Posting origin remains visible after a matching decision is canceled or the
+-- same bank fact appears in an overlapping statement.
+ALTER FUNCTION nestwise.document_evidence(text,uuid,uuid,text,jsonb) RENAME TO document_evidence_without_booking;
+REVOKE ALL ON FUNCTION nestwise.document_evidence_without_booking(text,uuid,uuid,text,jsonb) FROM nestwise_api;
+CREATE FUNCTION nestwise.document_evidence(p_subject text,p_workspace uuid,p_account uuid,p_hash text,p_fingerprints jsonb) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=nestwise,pg_temp AS $$
+DECLARE evidence jsonb;
+BEGIN
+ evidence:=document_evidence_without_booking(p_subject,p_workspace,p_account,p_hash,p_fingerprints);
+ RETURN evidence||jsonb_build_object('booked',coalesce((SELECT jsonb_agg(jsonb_build_object(
+  'id',b.id,'transaction',jt.id,'fingerprint',(b.row_data->>'date')||':'||(b.row_data->>'cents')||':'||(b.row_data->>'text_hash')) ORDER BY b.id)
+  FROM bank_bookings b JOIN journal_transactions jt ON jt.manual_id=b.id AND jt.account_id=b.account_id
+  WHERE b.account_id=p_account AND b.workspace_id=p_workspace
+   AND (b.row_data->>'date')||':'||(b.row_data->>'cents')||':'||(b.row_data->>'text_hash') IN(SELECT jsonb_array_elements_text(p_fingerprints))),'[]'::jsonb));
+END $$;
+REVOKE ALL ON FUNCTION nestwise.document_evidence(text,uuid,uuid,text,jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION nestwise.document_evidence(text,uuid,uuid,text,jsonb) TO nestwise_api;

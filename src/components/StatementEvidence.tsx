@@ -9,7 +9,7 @@ export function StatementEvidence({workspace,account,hash,revision,onSessionExpi
   const {locale}=useApp(),ru=locale==='ru';
   const [reload,setReload]=useState(0),[result,setResult]=useState<{reload:number;revision:number;data:EvidenceReview|null}|null>(null);
   const [filter,setFilter]=useState<'all'|EvidenceStatus>('all'),[page,setPage]=useState(0);
-  const labels={matched:ru?'Сопоставлено':'Matched',unmatched:ru?'Не сопоставлено':'Unmatched',blocked:ru?'Ошибка строки':'Row issue',mismatch:ru?'Расхождение с решением':'Evidence mismatch',reserved:ru?'Занято другой выпиской':'Claimed by another statement'};
+  const labels={matched:ru?'Сопоставлено':'Matched',unmatched:ru?'Не сопоставлено':'Unmatched',blocked:ru?'Ошибка строки':'Row issue',mismatch:ru?'Расхождение с решением':'Evidence mismatch',reserved:ru?'Занято другой выпиской':'Claimed by another statement',posted:ru?'Учтено по выписке':'Posted from bank'};
   useEffect(()=>{
     const controller=new AbortController();let active=true;
     (async()=>{try{
@@ -24,7 +24,7 @@ export function StatementEvidence({workspace,account,hash,revision,onSessionExpi
   return <View style={{gap:12}}>
     <Text accessibilityRole="header" style={styles.h2}>{ru?'Проверка сверок по оригиналу':'Statement evidence review'}</Text>
     <Text selectable style={styles.muted}>SHA-256: {hash}</Text>
-    <Notice text={ru?'Сопоставлено означает, что даты, суммы и описания строк совпали с сохранённым решением. Это не утверждённый отчёт бухгалтера. Отменённые решения не занимают строки.':'Matched means row dates, amounts and descriptions agree with the saved decision. This is not accountant approval. Canceled decisions do not reserve rows.'}/>
+    <Notice text={ru?'Сопоставлено означает совпадение с сохранённым решением. Учтено по выписке означает, что операция уже создана в журнале: отмена сверки не удаляет её и не разрешает повторное списание. Это не утверждённый отчёт бухгалтера.':'Matched means the original agrees with the saved decision. Posted from bank means a journal entry already exists: canceling reconciliation does not delete it or permit duplicate booking. This is not accountant approval.'}/>
     <Button label={ru?'Обновить проверку':'Refresh evidence review'} disabled={busy} onPress={()=>setReload(value=>value+1)}/>
     {busy?<ActivityIndicator/>:!data?<Notice error text={ru?'Не удалось проверить оригинал. Доступность строк не подтверждена.':'Could not verify original. Row availability is unconfirmed.'}/>:<>
       <Text style={styles.muted}>{ru?'Проверено':'Checked'}: {new Date(data.checked_at).toLocaleString(locale)} · {data.copy==='primary'?(ru?'основная копия':'primary copy'):(ru?'резервная копия':'backup copy')} · {ru?'отменённых решений':'canceled decisions'}: {data.canceled}</Text>
@@ -35,7 +35,7 @@ export function StatementEvidence({workspace,account,hash,revision,onSessionExpi
       {rows.slice(currentPage*25,currentPage*25+25).map(row=><View key={row.line} style={{gap:6,paddingVertical:8}}>
         <Text style={styles.text}>#{row.line} · {row.date} · {insightMoney(BigInt(row.cents),locale)} · {labels[row.status]}</Text>
         {row.groups.map(id=><Text key={id} selectable style={styles.muted}>{ru?'Решение':'Decision'}: {id}</Text>)}
-        {Array.from(new Set(data.groups.filter(group=>row.groups.includes(group.id)).flatMap(group=>group.transactions))).map(id=><Button key={id} label={`${ru?'Детали проводки':'Journal details'} · ${id.slice(0,8)}`} onPress={()=>onJournal(id)}/>)}
+        {Array.from(new Set([...row.posted_transactions,...data.groups.filter(group=>row.groups.includes(group.id)).flatMap(group=>group.transactions)])).map(id=><Button key={id} label={`${ru?'Детали проводки':'Journal details'} · ${id.slice(0,8)}`} onPress={()=>onJournal(id)}/>)}
       </View>)}
       <View style={styles.row}><Button label={ru?'Назад':'Previous'} disabled={currentPage===0} onPress={()=>setPage(currentPage-1)}/><Text>{currentPage+1} / {Math.max(1,Math.ceil(rows.length/25))}</Text><Button label={ru?'Далее':'Next'} disabled={(currentPage+1)*25>=rows.length} onPress={()=>setPage(currentPage+1)}/></View>
     </>}

@@ -60,3 +60,16 @@ Delivery boundaries and safeguards
 
 Acceptance requires end-to-end data flow and failure recovery, not merely
 screens or passing unit tests. Native JS export is not a signed device build.
+
+2026-10-20 — Bank origin and Android startup checkpoint
+- Bank evidence now exposes immutable booking provenance after reconciliation
+  cancellation and across overlapping statement uploads. Posted rows remain
+  locked against repeat booking and link to the existing journal transaction.
+- TypeScript, ESLint and the 122-test local suite completed without failures;
+  five PostgreSQL-dependent cases remain CI-only locally.
+- Owner confirmed the orders list opens in installed Alex CRM 1.10 on USB
+  Android Samsung SM_G986U. ADB confirmed its running process; the current
+  process crash buffer was empty. Camera, offline writes and native interaction
+  acceptance are not yet verified. Production APK and data were not changed.
+- Migration 0017 remains unapplied to staging. This checkpoint does not mark
+  either product part complete or authorize deployment to production.

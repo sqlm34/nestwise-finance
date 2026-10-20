@@ -1,12 +1,12 @@
 import {previewStatement,type BankRow} from './statement';
 import {eligibleBankRows} from './reconciliation';
 import {parseSave,type SaveReconciliation} from './saved-reconciliation';
-export type EvidenceStatus='matched'|'unmatched'|'blocked'|'mismatch'|'reserved';
-export type ReviewRow={line:number;date:string;cents:string;status:EvidenceStatus;groups:string[]};
+export type EvidenceStatus='matched'|'unmatched'|'blocked'|'mismatch'|'reserved'|'posted';
+export type ReviewRow={line:number;date:string;cents:string;status:EvidenceStatus;groups:string[];posted_transactions:string[]};
 export type EvidenceReview={hash:string;checked_at:string;copy:'primary'|'backup';canceled:number;
   groups:{id:string;valid:boolean;rows:number[];transactions:string[]}[];rows:ReviewRow[];
   totals:Record<EvidenceStatus,{count:number;credits:string;debits:string}>};
-const statuses:EvidenceStatus[]=['matched','unmatched','blocked','mismatch','reserved'];
+const statuses:EvidenceStatus[]=['matched','unmatched','blocked','mismatch','reserved','posted'];
 export function evidenceTotals(rows:ReviewRow[]):EvidenceReview['totals']{
   return Object.fromEntries(statuses.map(status=>{const selected=rows.filter(row=>row.status===status);return [status,{count:selected.length,
     credits:selected.reduce((sum,row)=>sum+(BigInt(row.cents)>0n?BigInt(row.cents):0n),0n).toString(),
@@ -20,9 +20,16 @@ export async function statementFingerprints(rows:BankRow[],digest:(text:string)=
 export function reviewEvidence(text:string,hash:string,fingerprints:Map<number,string>,input:unknown,copy:'primary'|'backup',checked_at:string):EvidenceReview{
   const preview=previewStatement(text,'chase','Archive'),eligible=eligibleBankRows(preview.rows);
   if(preview.errors.length)throw new Error('invalid_document');
-  const raw=input as {groups:unknown[];reserved:{fingerprint:string;group_id:string}[];canceled:number};
+  const raw=input as {groups:unknown[];reserved:{fingerprint:string;group_id:string}[];booked?:{fingerprint:string;id:string;transaction:string}[];canceled:number};
   if(!raw||!Array.isArray(raw.groups)||raw.groups.length>5000||!Array.isArray(raw.reserved)||raw.reserved.length>5000||!Number.isSafeInteger(raw.canceled)||raw.canceled<0)throw new Error('invalid_evidence');
   const groups:SaveReconciliation[]=raw.groups.map(parseSave),seen=new Set<string>();
+  if(raw.booked!==undefined&&(!Array.isArray(raw.booked)||raw.booked.length>5000))throw new Error('invalid_evidence');
+  const posted=new Map<string,string>();
+  for(const item of raw.booked??[]){
+    if(!item||typeof item.fingerprint!=='string'||!/^\d{4}-\d{2}-\d{2}:-?[1-9]\d{0,15}:[a-f0-9]{64}$/.test(item.fingerprint)
+      ||[item.id,item.transaction].some(id=>typeof id!=='string'||! /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id))||posted.has(item.fingerprint))throw new Error('invalid_evidence');
+    posted.set(item.fingerprint,item.transaction);
+  }
   const bankByLine=new Map(preview.rows.map(row=>[row.line,row]));
   const reservedByFingerprint=new Map<string,string[]>();
   for(const item of raw.reserved){
@@ -44,8 +51,9 @@ export function reviewEvidence(text:string,hash:string,fingerprints:Map<number,s
   const rows=preview.rows.map(row=>{
     const ids=rowGroups.get(row.line)??[];
     const reserved=reservedByFingerprint.get(fingerprints.get(row.line)??'')??[];
-    const status:EvidenceStatus=ids.length?(ids.every(id=>valid.get(id))?'matched':'mismatch'):reserved.length?'reserved':eligible.has(row.line)?'unmatched':'blocked';
-    return {line:row.line,date:row.date,cents:String(row.amountCents),status,groups:[...ids,...reserved]};
+    const status:EvidenceStatus=ids.some(id=>!valid.get(id))?'mismatch':posted.has(fingerprints.get(row.line)??'')?'posted':ids.length?'matched':reserved.length?'reserved':eligible.has(row.line)?'unmatched':'blocked';
+    const transaction=posted.get(fingerprints.get(row.line)??'');
+    return {line:row.line,date:row.date,cents:String(row.amountCents),status,groups:[...ids,...reserved],posted_transactions:transaction?[transaction]:[]};
   });
   return {hash,checked_at,copy,canceled:raw.canceled,rows,groups:groups.map(group=>({id:group.id,valid:valid.get(group.id)!,rows:group.rows.map(row=>row.line),transactions:group.transactions})),totals:evidenceTotals(rows)};
 }
@@ -57,7 +65,9 @@ export function parseEvidenceReview(value:unknown,hash:string):EvidenceReview{
   const seen=new Set<number>();
   for(const row of data.rows){
     if(!Number.isInteger(row.line)||row.line<2||row.line>5001||seen.has(row.line)||!/^\d{4}-\d\d-\d\d$/.test(row.date)
-      ||! /^-?(0|[1-9]\d{0,15})$/.test(row.cents)||!statuses.includes(row.status)||!Array.isArray(row.groups)||row.groups.some(id=>typeof id!=='string'||!uuid.test(id)))throw new Error('invalid_evidence');
+      ||! /^-?(0|[1-9]\d{0,15})$/.test(row.cents)||!statuses.includes(row.status)||!Array.isArray(row.groups)||row.groups.some(id=>typeof id!=='string'||!uuid.test(id))
+      ||!Array.isArray(row.posted_transactions)||row.posted_transactions.length>1||row.posted_transactions.some(id=>typeof id!=='string'||!uuid.test(id))
+      ||row.status==='posted'&&row.posted_transactions.length!==1)throw new Error('invalid_evidence');
     seen.add(row.line);
   }
   const ids=new Set<string>();

@@ -37,7 +37,7 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
   const bank=useMemo(()=>(file?.preview.rows??[]).filter(row=>selected.includes(row.line)),[file,selected]);
   const eligible=useMemo(()=>eligibleBankRows(file?.preview.rows??[]),[file]);
   const evidenceReady=!archiveHash||archiveEvidence?.hash===archiveHash&&archiveEvidence.revision===savedRevision&&!!archiveEvidence.data;
-  const lockedRows=archiveHash&&archiveEvidence?.hash===archiveHash?archiveEvidence.data?.rows.filter(row=>['matched','mismatch','reserved'].includes(row.status)).map(row=>row.line)??[]:[];
+  const lockedRows=archiveHash&&archiveEvidence?.hash===archiveHash?archiveEvidence.data?.rows.filter(row=>['matched','mismatch','reserved','posted'].includes(row.status)).map(row=>row.line)??[]:[];
   const lockedIds=useMemo(()=>archiveHash&&archiveEvidence?.hash===archiveHash?archiveEvidence.data?.groups.flatMap(group=>group.transactions)??[]:[],[archiveHash,archiveEvidence]);
   const usedRows=new Set([...groups.flatMap(group=>group.rows),...lockedRows]),usedIds=new Set([...groups.flatMap(group=>group.transactions),...lockedIds]);
   const suggestions=useMemo(()=>suggestGroups(bank,candidates,new Set([...groups.flatMap(group=>group.transactions),...lockedIds])),[bank,candidates,groups,lockedIds]);

@@ -448,7 +448,7 @@ test('PostgreSQL document reservations serialize at quota and survive restore wi
     const completed=hashes[results.findIndex(r=>r.status==='fulfilled')];
     await clients[0].query('SELECT nestwise.complete_document($1,$2,$3,$4)',['test-owner',workspace,periodAccount,completed]);
     assert.equal((await sql('SELECT count(*)::int n FROM nestwise.statement_archived WHERE account_id=$1',[periodAccount]))[0].n,1);
-    assert.deepEqual((await clients[0].query('SELECT nestwise.document_evidence($1,$2,$3,$4,$5) result',['test-owner',workspace,periodAccount,completed,'[]'])).rows[0].result,{groups:[],reserved:[],canceled:0});
+    assert.deepEqual((await clients[0].query('SELECT nestwise.document_evidence($1,$2,$3,$4,$5) result',['test-owner',workspace,periodAccount,completed,'[]'])).rows[0].result,{groups:[],reserved:[],booked:[],canceled:0});
   }finally{await Promise.all(clients.map(c=>c.end()));}
 });
 

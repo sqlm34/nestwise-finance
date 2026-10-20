@@ -30,6 +30,17 @@ test('another file reserves matching fingerprints without claiming the current f
   const prints=await fingerprints();const report=reviewEvidence(text,hash,prints,{groups:[],reserved:[{fingerprint:prints.get(2),group_id:randomUUID()}],canceled:3},'primary',checked);
   assert.deepEqual(report.rows.map(row=>row.status),['reserved','unmatched','unmatched']);assert.equal(report.totals.matched.count,0);
 });
+
+test('permanent bank posting stays visible after cancellation and in overlapping statements',async()=>{
+  const prints=await fingerprints(),booked=[{id:randomUUID(),transaction:randomUUID(),fingerprint:prints.get(3)}];
+  const report=reviewEvidence(text,hash,prints,{groups:[],reserved:[],booked,canceled:1},'primary',checked);
+  assert.equal(report.rows[1].status,'posted');assert.equal(report.totals.posted.debits,'100');
+  assert.equal(report.totals.matched.count,0);assert.deepEqual(parseEvidenceReview(report,hash),report);
+  const broken=group();broken.rows[1].cents='-99';
+  const mismatch=reviewEvidence(text,hash,prints,{groups:[broken],reserved:[],booked,canceled:0},'primary',checked);
+  assert.equal(mismatch.rows[1].status,'mismatch','posting evidence must not hide conflicting reconciliation evidence');
+  assert.throws(()=>reviewEvidence(text,hash,prints,{groups:[],reserved:[],booked:[...booked,...booked],canceled:0},'primary',checked));
+});
 test('duplicate and zero rows remain blocked and malformed report payloads fail closed',async()=>{
   const duplicate='Date,Description,Amount\n10/20/2026,Same,1.00\n10/20/2026,Same,1.00\n10/20/2026,Zero,0.00';
   const prints=await statementFingerprints(previewStatement(duplicate,'chase','Demo').rows,async text=>digest(text));
