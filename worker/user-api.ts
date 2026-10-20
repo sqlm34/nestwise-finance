@@ -77,8 +77,9 @@ export async function userApi(request: Request, env: UserEnv,
   const manualWrite=!!manualMatch&&request.method==='POST'&&!url.search;
   const savedMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations$/i.exec(url.pathname);
   const cancelMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliations\/([0-9a-f-]{36})\/cancel$/i.exec(url.pathname);
-  const documentMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/documents(?:\/([0-9a-f]{64})(\/(?:verify|review|book))?)?$/i.exec(url.pathname);
-  const documentRoute=!!documentMatch&&!url.search&&(request.method==='GET'&&documentMatch[4]!=='/book'||request.method==='POST'&&!!documentMatch[3]&&(!documentMatch[4]||documentMatch[4]==='/book'));
+  const documentMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/documents(?:\/([0-9a-f]{64})(\/(?:verify|review|book|period))?)?$/i.exec(url.pathname);
+  const documentRoute=!!documentMatch&&!url.search&&(request.method==='GET'&&documentMatch[4]!=='/book'||request.method==='POST'&&!!documentMatch[3]&&(!documentMatch[4]||documentMatch[4]==='/book'||documentMatch[4]==='/period'));
+  const periodsMatch=request.method==='GET'&&!url.search?/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/statement-periods$/i.exec(url.pathname):null;
   const documentWrite=documentRoute&&request.method==='POST';
   const reconciliationWrite=request.method==='POST'&&(savedMatch||cancelMatch);
   const reconciliationMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliation-candidates$/i.exec(url.pathname);
@@ -87,7 +88,7 @@ export async function userApi(request: Request, env: UserEnv,
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
+  if ((url.search&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
   if((receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
@@ -124,6 +125,7 @@ export async function userApi(request: Request, env: UserEnv,
       let payload;try{payload=parseManualOperation(await safeRequest.json());}catch{return finish(response({error:'invalid_manual_operation'},400));}
       return finish(response({id:await db.postManualOperation(subject,manualMatch[1],manualMatch[2],payload)}));
     }
+    if(periodsMatch)return finish(response(await db.readStatementPeriods(subject,periodsMatch[1],periodsMatch[2],null)));
     if(documentRoute&&documentMatch)return finish(await documentApi(request,env,db,subject,documentMatch[1],documentMatch[2],documentMatch[3]?.toLowerCase(),documentMatch[4]?.slice(1)));
     if(cancelMatch){
       let reason;try{reason=parseCancellation(await safeRequest.json());}catch{return finish(response({error:'invalid_reconciliation'},400));}
@@ -166,6 +168,8 @@ export async function userApi(request: Request, env: UserEnv,
     return finish(response({user:{id:session.user.id,name:session.user.name,email:session.user.email},
       workspaces:await db.userAccess(subject)}));
   } catch(error) {
+    if(error instanceof Error&&error.message==='statement_period_conflict')return finish(response({error:error.message},409));
+    if(error instanceof Error&&error.message==='invalid_statement_period')return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='bank_booking_conflict')return finish(response({error:error.message},409));
     if(error instanceof Error&&error.message==='invalid_bank_booking')return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='ocr_rate_limited')return finish(response({error:error.message},429));

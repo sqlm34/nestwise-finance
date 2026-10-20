@@ -5,6 +5,7 @@ import type {Database} from './database';
 import {eligibleBankRows} from '../src/domain/reconciliation';
 import {parseManualOperation} from '../src/domain/manual-operation';
 import {limitedText} from './security';
+import {parseStatementPeriod,checkStatementPeriod} from '../src/domain/statement-period';
 export type PrivateBucket={
   get(key:string):Promise<{size:number;arrayBuffer():Promise<ArrayBuffer>}|null>;
   put(key:string,bytes:Uint8Array,options:{onlyIf:{etagDoesNotMatch:string};httpMetadata:{contentType:string}}):Promise<unknown>;
@@ -33,7 +34,7 @@ export async function documentApi(request:Request,env:DocumentEnv,db:Database,su
   if(!env.STATEMENTS||!env.STATEMENTS_BACKUP)return json({error:'archive_unavailable'},503);
   if(!hash)return json(await db.readDocuments(subject,workspace,account));
   const key=`v1/${workspace.toLowerCase()}/${account.toLowerCase()}/${hash}`;
-  if(write&&mode!=='book'){
+  if(write&&mode!=='book'&&mode!=='period'){
     if(request.headers.get('content-type')?.split(';')[0]!=='text/csv')return json({error:'invalid_document'},415);
     let bytes:Uint8Array;
     try{bytes=await boundedBody(request);}catch(error){return json({error:'invalid_document'},error instanceof Error&&error.message==='document_too_large'?413:400);}
@@ -60,6 +61,22 @@ export async function documentApi(request:Request,env:DocumentEnv,db:Database,su
   const bytes=primary??backup;if(!bytes)return json({error:'archive_integrity_error'},503);
   // Check access again after storage I/O, including membership revoked mid-request.
   await db.documentAccess(subject,workspace,account,false);
+  if(mode==='period'){
+    if(!write)return json(await db.readStatementPeriods(subject,workspace,account,hash));
+    let command:{id:string;expected:number;data:unknown};
+    let data;
+    try{
+      if(request.headers.get('content-type')?.split(';')[0]!=='application/json')throw new Error();
+      command=JSON.parse(await limitedText(request,4096));
+      if(!command||Object.keys(command).sort().join(',')!=='data,expected,id'||typeof command.id!=='string'
+        ||! /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(command.id)
+        ||!Number.isInteger(command.expected)||command.expected<0||command.expected>99)throw new Error();
+      data=parseStatementPeriod(command.data);
+    }catch{return json({error:'invalid_statement_period'},400);}
+    const preview=previewStatement(new TextDecoder('utf-8',{fatal:true}).decode(bytes),'chase','Archive');
+    const checks=checkStatementPeriod(preview,data);
+    return json({id:await db.saveStatementPeriod(subject,workspace,account,hash,command.id,command.expected,data,checks)});
+  }
   if(mode==='book'){
     if(request.method!=='POST')return json({error:'not_found'},404);
     let body:Record<string,unknown>;

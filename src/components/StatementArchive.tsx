@@ -7,6 +7,7 @@ import {previewStatement,type StatementPreview} from '../domain/statement';
 import {useApp} from '../state';
 import {Button,Card,Notice,styles} from './ui';
 import {StatementEvidence} from './StatementEvidence';
+import {StatementPeriod} from './StatementPeriod';
 import {insightMoney} from '../domain/period-insights';
 
 export function StatementArchive({workspace,account,canWrite,file,onSessionExpired,onResume,onJournal,revision:evidenceRevision}:{workspace:string;account:string;canWrite:boolean;file:{hash:string;bytes:Uint8Array}|null;onSessionExpired:()=>void;onResume:(value:{hash:string;bytes:Uint8Array;preview:StatementPreview})=>void;onJournal:(id:string)=>void;revision:number}){
@@ -71,6 +72,7 @@ export function StatementArchive({workspace,account,canWrite,file,onSessionExpir
     {opened&&<View style={{gap:8}}>
       <Text accessibilityRole="header" style={styles.h2}>{ru?'Оригинал из архива':'Archived original'}</Text>
       <Text selectable style={styles.muted}>{opened.hash}</Text>
+      <StatementPeriod key={`${workspace}:${account}:${opened.hash}`} workspace={workspace} account={account} hash={opened.hash} canWrite={canWrite} onSessionExpired={onSessionExpired}/>
       {!confirmResume?<Button label={ru?'Продолжить сверку из архива':'Resume reconciliation from archive'} disabled={busy} onPress={()=>setConfirmResume(true)}/>:<>
         <Notice text={ru?'Текущий локальный файл и несохранённые черновики будут заменены. Сохранённая история останется.':'The current local file and unsaved drafts will be replaced. Saved history remains.'}/>
         <Button primary label={ru?'Открыть для сверки':'Open for reconciliation'} disabled={busy} onPress={()=>{onResume(opened);setConfirmResume(false);}}/>

@@ -59,11 +59,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0015_workspace_admin.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0016_receipt_evidence.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0017_bank_booking.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0018_statement_periods.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,17);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,18);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -73,6 +74,23 @@ before(async () => {
   await sql(`INSERT INTO nestwise.sessions VALUES ($1,$2,now()+interval '1 hour',NULL),($3,$4,now()+interval '1 hour',NULL)`, [tokenHash,user,accountantHash,accountant]);
 });
 after(async () => { if (db?.close) await db.close(); else if (db) await db.end(); });
+
+test('statement period audit survives restricted access and is included in recovery evidence',async()=>{
+  const hash='b'.repeat(64),id=randomUUID();
+  const data={from:'2026-01-01',to:'2026-01-31',opening_cents:'100',closing_cents:'200',last4:'1234',confirmed:true};
+  const checks={net_cents:'100',expected_closing_cents:'200',difference_cents:'0',outside_rows:[],ambiguous_rows:[],balanced:true};
+  await sql('SELECT nestwise.prepare_document($1,$2,$3,$4,100)',['test-owner',workspace,account,hash]);
+  await sql('SELECT nestwise.complete_document($1,$2,$3,$4)',['test-owner',workspace,account,hash]);
+  await sql('SET ROLE nestwise_api');
+  try{
+    const args=['test-owner',workspace,account,hash,id,0,JSON.stringify(data),JSON.stringify(checks)];
+    for(let i=0;i<2;i++)assert.equal((await sql('SELECT nestwise.save_statement_period($1,$2,$3,$4,$5,$6,$7,$8) id',args))[0].id,id);
+    await assert.rejects(sql('SELECT * FROM nestwise.statement_periods'),/permission denied/);
+    await assert.rejects(sql('SELECT nestwise.read_statement_periods($1,$2,$3,NULL)',['test-accountant',workspace,account]),/forbidden/);
+    assert.equal((await sql('SELECT nestwise.read_statement_periods($1,$2,$3,NULL) data',['test-owner',workspace,account]))[0].data[0].revision,1);
+  }finally{await sql('RESET ROLE');}
+  await assert.rejects(sql('DELETE FROM nestwise.statement_periods WHERE id=$1',[id]),/immutable_financial_history/);
+});
 
 test('period insights aggregate the full ledger, reconcile months, isolate accounts and keep operational meanings',async()=>{
   const {parsePeriodInsights,periodMetrics}=require('../.test-build/src/domain/period-insights.js');

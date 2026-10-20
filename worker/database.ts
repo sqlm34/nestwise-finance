@@ -1,6 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import type {JournalFilters} from '../src/domain/journal-filters';
 export type Database = {
+  saveStatementPeriod(subject:string,workspace:string,account:string,hash:string,id:string,expected:number,data:unknown,checks:unknown):Promise<string>;
+  readStatementPeriods(subject:string,workspace:string,account:string,hash:string|null):Promise<unknown>;
   postBankRow(subject:string,workspace:string,account:string,id:string,hash:string,row:unknown,operation:unknown):Promise<string>;
   claimReceiptOcr(subject:string,workspace:string,account:string,hash:string):Promise<unknown>;
   prepareReceipt(subject:string,workspace:string,account:string,hash:string,bytes:number,mime:string):Promise<unknown>;
@@ -34,6 +36,8 @@ export type Database = {
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async saveStatementPeriod(subject,workspace,account,hash,id,expected,data,checks){return (await sql`SELECT nestwise.save_statement_period(${subject},${workspace}::uuid,${account}::uuid,${hash},${id}::uuid,${expected}::integer,${JSON.stringify(data)}::jsonb,${JSON.stringify(checks)}::jsonb) result`)[0].result;},
+    async readStatementPeriods(subject,workspace,account,hash){return (await sql`SELECT nestwise.read_statement_periods(${subject},${workspace}::uuid,${account}::uuid,${hash}) result`)[0].result;},
     async postBankRow(subject,workspace,account,id,hash,row,operation){return (await sql`SELECT nestwise.post_bank_row(${subject},${workspace}::uuid,${account}::uuid,${id}::uuid,${hash},${JSON.stringify(row)}::jsonb,${JSON.stringify(operation)}::jsonb) result`)[0].result;},
     async claimReceiptOcr(subject,workspace,account,hash){return (await sql`SELECT nestwise.claim_receipt_ocr(${subject},${workspace}::uuid,${account}::uuid,${hash}) result`)[0].result;},
     async prepareReceipt(subject,workspace,account,hash,bytes,mime){return (await sql`SELECT nestwise.prepare_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash},${bytes}::integer,${mime}) result`)[0].result;},

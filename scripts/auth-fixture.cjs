@@ -3,7 +3,7 @@ const {readFileSync}=require('node:fs');
 const {randomUUID,randomBytes}=require('node:crypto');
 async function createAuthFixture() {
   const {db,pool}=await require('./auth-test-db.cjs').authTestDatabase();
-  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql','0008_event_details.sql','0009_account_period_insights.sql','0010_reconciliation_candidates.sql','0011_saved_reconciliation.sql','0012_statement_archive.sql','0013_statement_evidence.sql','0014_manual_operations.sql','0015_workspace_admin.sql','0016_receipt_evidence.sql','0017_bank_booking.sql'])
+  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql','0008_event_details.sql','0009_account_period_insights.sql','0010_reconciliation_candidates.sql','0011_saved_reconciliation.sql','0012_statement_archive.sql','0013_statement_evidence.sql','0014_manual_operations.sql','0015_workspace_admin.sql','0016_receipt_evidence.sql','0017_bank_booking.sql','0018_statement_periods.sql'])
     await db.exec(readFileSync(`db/migrations/${name}`,'utf8'));
   const {hashPassword}=await import('better-auth/crypto');
   const id=randomUUID(),workspace=randomUUID(),account=randomUUID(),localUser=randomUUID();
@@ -22,6 +22,8 @@ async function createAuthFixture() {
   const {authConfiguration,userApi}=require('../.test-build/worker/user-api.js');
   const auth=await createAuth(authConfiguration(env),pool);
   const ledger=()=>({
+    saveStatementPeriod:async(subject,workspace,account,hash,id,expected,data,checks)=>(await db.query('SELECT nestwise.save_statement_period($1,$2,$3,$4,$5,$6,$7,$8) result',[subject,workspace,account,hash,id,expected,JSON.stringify(data),JSON.stringify(checks)])).rows[0].result,
+    readStatementPeriods:async(...args)=>(await db.query('SELECT nestwise.read_statement_periods($1,$2,$3,$4) result',args)).rows[0].result,
     postBankRow:async(subject,workspace,account,id,hash,row,operation)=>(await db.query('SELECT nestwise.post_bank_row($1,$2,$3,$4,$5,$6,$7) result',[subject,workspace,account,id,hash,JSON.stringify(row),JSON.stringify(operation)])).rows[0].result,
     claimReceiptOcr:async(...args)=>(await db.query('SELECT nestwise.claim_receipt_ocr($1,$2,$3,$4) result',args)).rows[0].result,
     prepareReceipt:async(...args)=>(await db.query('SELECT nestwise.prepare_receipt($1,$2,$3,$4,$5,$6) result',args)).rows[0].result,
