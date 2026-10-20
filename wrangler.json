@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nestwise-development",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-20",
+  "workers_dev": false,
+  "vars": { "ENVIRONMENT": "development" },
+  "env": {
+    "development": { "name": "nestwise-development", "workers_dev": false, "vars": { "ENVIRONMENT": "development" } },
+    "staging": { "name": "nestwise-staging", "workers_dev": true, "vars": { "ENVIRONMENT": "staging" } },
+    "production": { "name": "nestwise-production", "workers_dev": false, "vars": { "ENVIRONMENT": "production" } }
+  }
+}

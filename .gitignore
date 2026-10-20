@@ -39,3 +39,21 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Private material and generated outputs
+.env
+.env.*
+!.env.example
+.dev.vars*
+!.dev.vars.example
+.wrangler/
+.test-build/
+dist-mobile/
+artifacts/
+.local/
+*.log
+*.sqlite*
+*.db
+credentials.json
+**/statements-private/
+**/receipts-private/

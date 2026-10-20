@@ -1,0 +1,275 @@
+{
+  "form_name": "Financial Statement",
+  "version": "2025-scan-based-labels-v1",
+  "categories": [
+    {
+      "id": "tax_00",
+      "en": "Total Gross Income",
+      "ru": "Валовая выручка",
+      "section": "income"
+    },
+    {
+      "id": "tax_01",
+      "en": "Purchases",
+      "ru": "Закупки",
+      "section": "cogs"
+    },
+    {
+      "id": "tax_02",
+      "en": "Labor (1099-NEC forms)",
+      "ru": "Работы подрядчиков (1099-NEC)",
+      "section": "cogs"
+    },
+    {
+      "id": "tax_03",
+      "en": "Other Cost",
+      "ru": "Прочая себестоимость",
+      "section": "cogs"
+    },
+    {
+      "id": "tax_04",
+      "en": "Accounting Fees",
+      "ru": "Бухгалтерские услуги",
+      "section": "expense"
+    },
+    {
+      "id": "tax_05",
+      "en": "Advertising",
+      "ru": "Реклама",
+      "section": "expense"
+    },
+    {
+      "id": "tax_06",
+      "en": "Auto and Truck Expenses",
+      "ru": "Расходы на автомобиль и грузовик",
+      "section": "expense"
+    },
+    {
+      "id": "tax_07",
+      "en": "Bank Charges",
+      "ru": "Банковские комиссии",
+      "section": "expense"
+    },
+    {
+      "id": "tax_08",
+      "en": "Business Meal",
+      "ru": "Деловое питание",
+      "section": "expense"
+    },
+    {
+      "id": "tax_09",
+      "en": "Commissions",
+      "ru": "Комиссионные",
+      "section": "expense"
+    },
+    {
+      "id": "tax_10",
+      "en": "Computer Expense",
+      "ru": "Компьютерные расходы",
+      "section": "expense"
+    },
+    {
+      "id": "tax_11",
+      "en": "Delivery and Freight",
+      "ru": "Доставка и перевозки",
+      "section": "expense"
+    },
+    {
+      "id": "tax_12",
+      "en": "Dues and Subscriptions",
+      "ru": "Членские взносы и подписки",
+      "section": "expense"
+    },
+    {
+      "id": "tax_13",
+      "en": "Gifts",
+      "ru": "Подарки",
+      "section": "expense"
+    },
+    {
+      "id": "tax_14",
+      "en": "Insurance",
+      "ru": "Страхование",
+      "section": "expense"
+    },
+    {
+      "id": "tax_15",
+      "en": "Internet",
+      "ru": "Интернет",
+      "section": "expense"
+    },
+    {
+      "id": "tax_16",
+      "en": "Janitorial",
+      "ru": "Клининговые услуги",
+      "section": "expense"
+    },
+    {
+      "id": "tax_17",
+      "en": "Laundry and Cleaning",
+      "ru": "Прачечная и уборка",
+      "section": "expense"
+    },
+    {
+      "id": "tax_18",
+      "en": "Legal and Professional Fees",
+      "ru": "Юридические и профессиональные услуги",
+      "section": "expense"
+    },
+    {
+      "id": "tax_19",
+      "en": "Licenses and Permits",
+      "ru": "Лицензии и разрешения",
+      "section": "expense"
+    },
+    {
+      "id": "tax_20",
+      "en": "Marketing & Promotion",
+      "ru": "Маркетинг и продвижение",
+      "section": "expense"
+    },
+    {
+      "id": "tax_21",
+      "en": "Miscellaneous",
+      "ru": "Прочие расходы",
+      "section": "expense"
+    },
+    {
+      "id": "tax_22",
+      "en": "Office Expenses",
+      "ru": "Офисные расходы",
+      "section": "expense"
+    },
+    {
+      "id": "tax_23",
+      "en": "Officer Compensation",
+      "ru": "Вознаграждение должностных лиц",
+      "section": "expense"
+    },
+    {
+      "id": "tax_24",
+      "en": "Outside Service",
+      "ru": "Сторонние услуги",
+      "section": "expense"
+    },
+    {
+      "id": "tax_25",
+      "en": "Parking Fees and Tolls",
+      "ru": "Парковки и платные дороги",
+      "section": "expense"
+    },
+    {
+      "id": "tax_26",
+      "en": "Postage",
+      "ru": "Почтовые расходы",
+      "section": "expense"
+    },
+    {
+      "id": "tax_27",
+      "en": "Printing",
+      "ru": "Печать",
+      "section": "expense"
+    },
+    {
+      "id": "tax_28",
+      "en": "Rent",
+      "ru": "Аренда",
+      "section": "expense"
+    },
+    {
+      "id": "tax_29",
+      "en": "Repairs and Maintenance",
+      "ru": "Ремонт и обслуживание",
+      "section": "expense"
+    },
+    {
+      "id": "tax_30",
+      "en": "Salaries and Wages",
+      "ru": "Заработная плата",
+      "section": "expense"
+    },
+    {
+      "id": "tax_31",
+      "en": "Sales Expense",
+      "ru": "Расходы на продажи",
+      "section": "expense"
+    },
+    {
+      "id": "tax_32",
+      "en": "Security",
+      "ru": "Охрана",
+      "section": "expense"
+    },
+    {
+      "id": "tax_33",
+      "en": "Supplies",
+      "ru": "Расходные материалы",
+      "section": "expense"
+    },
+    {
+      "id": "tax_34",
+      "en": "Taxes",
+      "ru": "Налоги",
+      "section": "expense"
+    },
+    {
+      "id": "tax_35",
+      "en": "Telephone",
+      "ru": "Телефонная связь",
+      "section": "expense"
+    },
+    {
+      "id": "tax_36",
+      "en": "Temporary Help",
+      "ru": "Временные сотрудники",
+      "section": "expense"
+    },
+    {
+      "id": "tax_37",
+      "en": "Tools",
+      "ru": "Инструменты",
+      "section": "expense"
+    },
+    {
+      "id": "tax_38",
+      "en": "Trade Show Expense",
+      "ru": "Выставочные расходы",
+      "section": "expense"
+    },
+    {
+      "id": "tax_39",
+      "en": "Training and Seminars",
+      "ru": "Обучение и семинары",
+      "section": "expense"
+    },
+    {
+      "id": "tax_40",
+      "en": "Travel",
+      "ru": "Командировки",
+      "section": "expense"
+    },
+    {
+      "id": "tax_41",
+      "en": "Uniforms",
+      "ru": "Униформа",
+      "section": "expense"
+    },
+    {
+      "id": "tax_42",
+      "en": "Utilities",
+      "ru": "Коммунальные услуги",
+      "section": "expense"
+    },
+    {
+      "id": "tax_43",
+      "en": "Website",
+      "ru": "Веб-сайт",
+      "section": "expense"
+    }
+  ],
+  "notes": [
+    "Never rely on translated visible label as primary key",
+    "Tax mapping requires accountant approval",
+    "Cost of Goods and business expenses must not be double-counted"
+  ]
+}

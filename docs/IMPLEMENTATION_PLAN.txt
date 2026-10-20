@@ -1,0 +1,61 @@
+NESTWISE — implementation and release plan — 2026-10-20
+
+Scope: Expo / React Native / TypeScript mobile application. Web is a local
+development preview, not a separate accountant portal. Workiz is excluded.
+Alex CRM remains the source for job-related financial facts.
+
+PHASE 1 (current)
+Recreate the provided green/white visual language using native components.
+Four separate workspace views, complete EN/RU labels, navigation, search,
+filters, category dictionary and CSV statement preview.
+Use synthetic, visibly labeled fixtures. Uploaded CSV stays in memory.
+Preview never posts to a financial ledger. No bank login or live credentials.
+Unimplemented formats return an explicit message rather than fabricated data.
+
+PHASE 2
+Separate PostgreSQL database for Nestwise, server identity, memberships,
+workspace/account authorization, immutable balanced journal.
+Design CRM outbox before editing the CRM. Add financial revision/event tables;
+emit outbox rows within the same transaction as financial mutations.
+Document missing refund, supplier credit and finalization business operations.
+Stable event identity and payload hash; unique tenant/source/event identity.
+Stage out-of-order events until gaps are filled; never discard an unseen payment.
+Financial snapshots are assertions, not a second posting of the same payments.
+HMAC with timestamp, nonce and raw-body digest; key rotation and constant-time
+verification. A durable inbox ACK means persisted receipt, not successful posting.
+Retry, DLQ, cursor-based reconciliation and backfill dry-run.
+
+PHASE 3
+Private receipt capture and storage, OCR review, real bank format adapters,
+one-to-many and many-to-one matches, evidence deduplication, explicit posting
+approval for new bank-only transactions. No invented parsing confidence.
+Validate Chase and South National adapters against redacted real samples.
+
+PHASE 4
+Versioned accountant-approved mapping, original category labels, report lineage,
+US Letter PDF generator and visual verification, frozen report snapshots.
+Finalization requires all mandatory exceptions resolved and accountant review.
+Tax classification, accounting basis, inventory recognition, tax/tip treatment,
+mixed-use allocations and annual form version remain unresolved policy inputs.
+
+PHASE 5
+Optional bank connections only on a separate explicit request.
+
+MIGRATIONS / ROLLBACK
+No CRM migrations or production writes in phase 1.
+Create new Nestwise schemas and an isolated test database first.
+Future CRM schema changes are additive, versioned and run against isolated
+copies before release; do not rewrite historical payments or delete orders.
+Outbox feature flag defaults OFF. Receiver first, producer second, limited canary
+third. Compare source totals before historical import approval.
+Rollback stops dispatch / consumption and reverts app code. Preserve inbox,
+outbox and all posted journal history. Never roll back financial facts by deletion.
+Resume through the durable cursor and idempotent event IDs.
+
+RELEASE GATES
+Translation parity, strict money parsing, malformed/duplicate file handling,
+separate workspaces, supported CSV dialects, no ledger mutation during import.
+Then real PostgreSQL authorization/concurrency tests, 10 CRM financial scenarios,
+signed-request replay tests, restore drill, Android/iOS device verification.
+Production publishing, real account connections and historical backfill are
+separate reviewed operations. Current stage is not production accounting.

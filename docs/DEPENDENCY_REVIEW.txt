@@ -1,0 +1,26 @@
+Dependency review — 2026-10-20
+
+The official Expo blank TypeScript template resolved Expo 58 / React Native 0.88.
+All Expo native packages were installed through Expo's SDK version resolver.
+Node 24.19.0 is required; the host's system Node 18 is not supported.
+Expo's current ESLint plugins require ESLint 9; ESLint 10 failed at rule loading.
+ESLint 9.39.5 is pinned for compatibility.
+
+npm audit reported 49 affected dependency nodes after EAS CLI was added:
+1 low, 18 moderate, 30 high. This includes transitive build/CLI packages and
+meta-vulnerable parent packages, not 49 independent application vulnerabilities.
+Compatible npm audit fix did not resolve these advisories.
+Do not apply npm audit fix --force: it proposes unrelated major downgrades
+(including EAS CLI) and would invalidate the tested SDK combination.
+
+Affected dependency chains include node-forge, braces, sprintf-js, tar, uuid,
+joi, minimatch, yaml and EAS/Expo build tooling. Some advisories report no
+available fix within their existing package range.
+
+This is an unresolved production release gate. The development preview does
+not accept server-side financial uploads, run a bank connector or process
+untrusted repository code with credentials. Before production, review current
+advisories, adopt supported patched versions, regenerate the lockfile, rerun
+native builds and document residual risk. Do not label this build security-audited.
+
+Raw local audit output lives in ignored artifacts/audit.json.
