@@ -1,4 +1,5 @@
 import {parseJournal,type JournalTransaction} from './journal';
+import {parseReceipt,type ReceiptData} from './receipt';
 /** Non-CRM input contract. Validation does not authorize or post a transaction. */
 export type Allocation = {category: string; cents: string};
 export type ManualOperation = {
@@ -62,12 +63,18 @@ export function parseManualOperation(value: unknown): ManualOperation {
 export function canonicalManualOperation(value: unknown): string {
   return JSON.stringify(parseManualOperation(value));
 }
-export type ManualDetail={manual:ManualOperation;transaction:JournalTransaction;actor:string;created_at:string;refunded_cents:string};
+export type ManualDetail={manual:ManualOperation;transaction:JournalTransaction;actor:string;created_at:string;refunded_cents:string;receipt:{hash:string;review_id:string;revision:number;data:ReceiptData}|null};
 export function parseManualDetail(value:unknown,expected:string):ManualDetail{
   const row=object(value),manual=parseManualOperation(row.manual);
   const transaction=parseJournal({entries:[row.transaction],limit:100}).entries[0];
   if(transaction.id!==expected||transaction.source_event_id!==manual.id||transaction.source_order_id!==`manual:${manual.id}`
     ||typeof row.created_at!=='string'||!Number.isFinite(Date.parse(row.created_at))||typeof row.refunded_cents!=='string'
     ||!/^(0|[1-9]\d{0,15})$/.test(row.refunded_cents)||BigInt(row.refunded_cents)>BigInt(manual.amount_cents))return fail();
-  return {manual,transaction,actor:identity(row.actor),created_at:row.created_at,refunded_cents:row.refunded_cents};
+  let receipt:ManualDetail['receipt']=null;
+  if(row.receipt!=null){const r=object(row.receipt);
+    if(typeof r.hash!=='string'||!/^[a-f0-9]{64}$/.test(r.hash)||!Number.isSafeInteger(r.revision)||Number(r.revision)<1)return fail();
+    const data=parseReceipt(r.data,true);if(manual.kind!=='expense'||data.total_cents!==manual.amount_cents)return fail();
+    receipt={hash:r.hash,review_id:identity(r.review_id),revision:Number(r.revision),data};
+  }
+  return {manual,transaction,actor:identity(row.actor),created_at:row.created_at,refunded_cents:row.refunded_cents,receipt};
 }

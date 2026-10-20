@@ -33,6 +33,18 @@ BEGIN
       OR (action<>'create_workspace' AND (SELECT count(*) FROM jsonb_object_keys(p_payload))<>4) THEN RAISE EXCEPTION 'invalid_workspace_command'; END IF;
   END IF;
   CASE action
+    WHEN 'add_member' THEN
+      IF target<>p_workspace OR (SELECT count(*) FROM jsonb_object_keys(p_payload))<>6
+        OR p_payload->>'role' IS NULL OR p_payload->>'role' NOT IN ('owner','member','accountant','reviewer')
+        OR jsonb_typeof(p_payload->'all_accounts') IS DISTINCT FROM 'boolean'
+        OR coalesce(length(p_payload->>'email'),0) NOT BETWEEN 3 AND 254 THEN RAISE EXCEPTION 'invalid_workspace_command'; END IF;
+      SELECT u.id INTO target FROM users u JOIN nestwise_auth."user" au ON u.subject='better-auth:'||au.id
+        WHERE lower(au.email)=lower(btrim(p_payload->>'email')) AND EXISTS(
+          SELECT 1 FROM nestwise_auth.account ac WHERE ac."userId"=au.id AND ac."providerId"='credential' AND ac.password IS NOT NULL);
+      IF target IS NULL THEN RAISE EXCEPTION 'member_unavailable'; END IF;
+      IF (SELECT count(*) FROM memberships WHERE workspace_id=p_workspace)>=200 THEN RAISE EXCEPTION 'workspace_limit'; END IF;
+      INSERT INTO memberships VALUES(p_workspace,target,p_payload->>'role',(p_payload->>'all_accounts')::boolean);
+      previous:=jsonb_build_object('member_id',target,'previous_membership',NULL);
     WHEN 'create_workspace' THEN
       IF (SELECT count(*) FROM memberships WHERE user_id=actor AND role='owner')>=20 THEN RAISE EXCEPTION 'workspace_limit'; END IF;
       INSERT INTO workspaces VALUES(target,label,p_payload->>'kind');
@@ -81,10 +93,11 @@ BEGIN
   RETURN jsonb_build_object('actor',actor,'workspace',(SELECT to_jsonb(w) FROM workspaces w WHERE id=p_workspace),
     'accounts',coalesce((SELECT jsonb_agg(to_jsonb(a) ORDER BY a.name,a.id) FROM financial_accounts a WHERE workspace_id=p_workspace),'[]'::jsonb),
     'members',coalesce((SELECT jsonb_agg(jsonb_build_object('user_id',m.user_id,'role',m.role,'all_accounts',m.all_accounts,
+      'name',(SELECT au.name FROM nestwise_auth."user" au JOIN users u ON u.subject='better-auth:'||au.id WHERE u.id=m.user_id),
       'account_ids',(SELECT coalesce(jsonb_agg(g.account_id ORDER BY g.account_id),'[]'::jsonb) FROM account_grants g WHERE g.workspace_id=p_workspace AND g.user_id=m.user_id)) ORDER BY m.user_id)
       FROM memberships m WHERE m.workspace_id=p_workspace),'[]'::jsonb),
     'audit',coalesce((SELECT jsonb_agg(to_jsonb(q) ORDER BY q.recorded_at DESC,q.id DESC) FROM
-      (SELECT id,actor,payload,before_state,recorded_at FROM workspace_admin_audit WHERE workspace_id=p_workspace ORDER BY recorded_at DESC,id DESC LIMIT 50) q),'[]'::jsonb));
+      (SELECT a.id,a.actor,a.payload,a.before_state,a.recorded_at FROM workspace_admin_audit a WHERE a.workspace_id=p_workspace ORDER BY a.recorded_at DESC,a.id DESC LIMIT 50) q),'[]'::jsonb));
 END $$;
 REVOKE ALL ON FUNCTION nestwise.workspace_command(text,uuid,jsonb),nestwise.workspace_administration(text,uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION nestwise.workspace_command(text,uuid,jsonb),nestwise.workspace_administration(text,uuid) TO nestwise_api;

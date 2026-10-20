@@ -1,8 +1,8 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {Image,Text,TextInput,View} from 'react-native';
+import {Image,Platform,Text,TextInput,View} from 'react-native';
 import {randomUUID} from 'expo-crypto';
 import {authenticatedFetch,authenticatedPost,authenticatedUpload} from '../auth/client';
-import {readReceiptFile} from '../receipt-file';
+import {captureReceipt,readReceiptFile,saveReceiptOriginal,type ReceiptFile} from '../receipt-file';
 import {parseReceipt,type ReceiptData} from '../domain/receipt';
 import {cents} from '../domain/money';
 import {parseManualOperation} from '../domain/manual-operation';
@@ -20,6 +20,7 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
   const [form,setForm]=useState(empty),[money,setMoney]=useState<Record<string,string>>({}),[items,setItems]=useState<{description:string;amount:string;key:string}[]>([]);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState(''),[paid,setPaid]=useState('');
   const [pending,setPending]=useState<{mode:'review'|'post';body:unknown}|null>(null),[ocrConfirm,setOcrConfirm]=useState(false);
+  const [upload,setUpload]=useState<ReceiptFile|null>(null);
   const alive=useRef(true),sending=useRef(false),path=`/v1/user/workspaces/${workspace}/accounts/${account}/receipts`;
   const loadKey=`${path}:${before}:${revision}:${ru}`,loading=loadedKey!==loadKey;
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
@@ -46,10 +47,18 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
   return <Card><Text accessibilityRole="header" style={styles.h2}>{ru?'Чеки и документы':'Receipts and documents'}</Text>
     <Notice text={ru?'Загрузка и распознавание не создают расход. Подтверждайте оплату только если она ещё не учтена в CRM или журнале.':'Upload and OCR do not book an expense. Confirm payment only if it is not already recorded in CRM or the journal.'}/>
     {!!error&&<Notice error text={error}/>}
-    {canWrite&&<Button label={ru?'Загрузить фото или PDF':'Upload image or PDF'} disabled={busy||!!pending} onPress={()=>void action(async()=>{const file=await readReceiptFile();if(!file)return;
-      await responseData(await authenticatedUpload(`${path}/${file.hash}/original`,file.bytes,'application/octet-stream'));
-      const values=await responseData(await authenticatedFetch(`${path}/${file.hash}`));if(alive.current){open(values[0]);setRevision(v=>v+1);}
-    })}/>}
+    {canWrite&&<>{upload?<>
+      <Notice text={`${upload.name} · ${upload.bytes.length} bytes · ${ru?'Подтвердите загрузку оригинала.':'Confirm original upload.'}`}/>
+      <Button primary label={ru?'Загрузить / повторить':'Upload / retry'} disabled={busy||!!pending} onPress={()=>void action(async()=>{
+        await responseData(await authenticatedUpload(`${path}/${upload.hash}/original`,upload.bytes,'application/octet-stream'));
+        const values=await responseData(await authenticatedFetch(`${path}/${upload.hash}`));if(alive.current){open(values[0]);setUpload(null);setBefore(null);setRevision(v=>v+1);}
+      })}/>
+      <Button label={ru?'Закрыть файл':'Dismiss file'} disabled={busy} onPress={()=>setUpload(null)}/>
+    </>:<>
+      <Button label={ru?'Выбрать фото или PDF':'Choose image or PDF'} disabled={busy||!!pending} onPress={()=>void action(async()=>{const file=await readReceiptFile();if(alive.current)setUpload(file);})}/>
+      <Button label={ru?'Сфотографировать чек':'Photograph receipt'} disabled={busy||!!pending} onPress={()=>void action(async()=>{const file=await captureReceipt();if(alive.current)setUpload(file);})}/>
+      {Platform.OS==='android'&&<Button label={ru?'Восстановить фото после перезапуска':'Recover photo after restart'} disabled={busy||!!pending} onPress={()=>void action(async()=>{const file=await captureReceipt(true);if(alive.current)setUpload(file);})}/>}
+    </>}</>}
     {!selected?<>{rows.map(row=><Button key={row.hash} label={`${row.review?.data.supplier||row.hash.slice(0,12)} · ${row.operation_id?(ru?'Учтён':'Posted'):row.archived?(ru?'На проверке':'Review'):(ru?'Загрузка не завершена':'Upload pending')}`} disabled={busy||loading} onPress={()=>open(row)}/>)}
       {loading&&<Text style={styles.muted}>{ru?'Загрузка…':'Loading…'}</Text>}
       {!!before&&<Button label={ru?'К новым чекам':'Newest receipts'} disabled={busy||loading} onPress={()=>setBefore(null)}/>}
@@ -58,6 +67,10 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
     </>:<>
       <Button label={ru?'К списку':'Back to list'} disabled={busy||!!pending} onPress={()=>setSelected(null)}/>
       <Text selectable style={styles.muted}>{selected.hash} · {selected.bytes} bytes</Text>
+      <Button label={ru?'Сохранить оригинал / открыть в приложении':'Save original / open in app'} disabled={busy||!selected.archived} onPress={()=>void action(async()=>{
+        const r=await authenticatedFetch(`${path}/${selected.hash}/original`);if(r.status===401){onSessionExpired();return;}if(!r.ok)throw new Error();
+        await saveReceiptOriginal(new Uint8Array(await r.arrayBuffer()),selected.hash);
+      })}/>
       {selected.review&&<Text style={styles.text}>{selected.review.data.supplier} · {selected.review.data.date} · {decimal(selected.review.data.total_cents)} USD · {ru?'Версия':'Version'} {selected.review.revision}</Text>}
       {selected.mime.startsWith('image/')&&<Button label={ru?'Показать оригинал':'Show original'} disabled={busy} onPress={()=>void action(async()=>{
         const r=await authenticatedFetch(`${path}/${selected.hash}/original`);if(r.status===401){onSessionExpired();return;}if(!r.ok)throw new Error();

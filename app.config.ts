@@ -5,6 +5,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const suffix = environment === 'production' ? '' : `.${environment}`;
   return {
     ...config,
+    plugins: [...(config.plugins??[]), ['expo-image-picker', {cameraPermission:'Allow Nestwise to photograph receipts.',photosPermission:false,microphonePermission:false}], 'expo-sharing'],
     name: environment === 'production' ? 'Nestwise' : `Nestwise ${environment}`,
     slug: 'nestwise-finance',
     owner: 'alexeasyrepairs-team',

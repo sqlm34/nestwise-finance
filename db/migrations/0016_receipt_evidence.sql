@@ -24,6 +24,24 @@ CREATE TRIGGER receipt_archived_immutable BEFORE UPDATE OR DELETE ON nestwise.re
 CREATE TRIGGER receipt_reviews_immutable BEFORE UPDATE OR DELETE ON nestwise.receipt_reviews FOR EACH ROW EXECUTE FUNCTION nestwise.immutable();
 CREATE TRIGGER receipt_postings_immutable BEFORE UPDATE OR DELETE ON nestwise.receipt_postings FOR EACH ROW EXECUTE FUNCTION nestwise.immutable();
 
+ALTER FUNCTION nestwise.user_journal_detail(text,uuid,uuid,uuid,integer) RENAME TO journal_detail_without_receipt;
+REVOKE ALL ON FUNCTION nestwise.journal_detail_without_receipt(text,uuid,uuid,uuid,integer) FROM nestwise_api;
+CREATE FUNCTION nestwise.user_journal_detail(p_subject text,p_workspace uuid,p_account uuid,p_transaction uuid,p_before integer DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=nestwise,pg_temp AS $$
+DECLARE detail jsonb; evidence jsonb;
+BEGIN
+  detail:=journal_detail_without_receipt(p_subject,p_workspace,p_account,p_transaction,p_before);
+  IF detail ? 'manual' THEN
+    SELECT jsonb_build_object('hash',p.hash,'review_id',p.review_id,'revision',r.revision,'data',r.data)
+      INTO evidence FROM receipt_postings p JOIN receipt_reviews r ON r.id=p.review_id
+      WHERE p.account_id=p_account AND p.operation_id=(detail->'manual'->>'id')::uuid;
+    detail:=detail||jsonb_build_object('receipt',evidence);
+  END IF;
+  RETURN detail;
+END $$;
+REVOKE ALL ON FUNCTION nestwise.user_journal_detail(text,uuid,uuid,uuid,integer) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION nestwise.user_journal_detail(text,uuid,uuid,uuid,integer) TO nestwise_api;
+
 CREATE FUNCTION nestwise.prepare_receipt(p_subject text,p_workspace uuid,p_account uuid,p_hash text,p_bytes integer,p_mime text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=nestwise,pg_temp AS $$
 DECLARE actor uuid; old receipt_originals;

@@ -170,7 +170,7 @@ export async function userApi(request: Request, env: UserEnv,
     if(error instanceof Error&&error.message==='invalid_bank_booking')return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='ocr_rate_limited')return finish(response({error:error.message},429));
     if(error instanceof Error&&['ocr_not_configured','ocr_incomplete','ocr_unavailable'].includes(error.message))return finish(response({error:error.message},503));
-    if(error instanceof Error&&['receipt_conflict','receipt_already_posted','receipt_limit'].includes(error.message))return finish(response({error:error.message},409));
+    if(error instanceof Error&&['receipt_conflict','receipt_already_posted','receipt_limit','member_unavailable'].includes(error.message))return finish(response({error:error.message},409));
     if(error instanceof Error&&error.message==='invalid_receipt')return finish(response({error:error.message},400));
     if(error instanceof Error&&['workspace_command_conflict','workspace_limit','last_workspace_owner'].includes(error.message))return finish(response({error:error.message},409));
     if(error instanceof Error&&error.message==='invalid_workspace_command')return finish(response({error:error.message},400));

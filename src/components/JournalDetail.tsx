@@ -7,6 +7,7 @@ import {journalDate,journalMoney} from '../domain/journal';
 import {parseJournalDetail,parseEventDetail,type EventDetail,type JournalDetail as Detail,type SourceEvent} from '../domain/journal-detail';
 import type {MessageKey} from '../i18n';
 import {parseManualDetail,type ManualDetail} from '../domain/manual-operation';
+import {saveReceiptOriginal} from '../receipt-file';
 const kinds:Record<SourceEvent['kind'],MessageKey>={
   'job.payment_recorded':'eventPayment','job.part_cost_recorded':'eventPart','job.customer_refund_issued':'eventRefund',
   'job.supplier_credit_received':'eventCredit','job.cost_corrected':'eventCorrection',
@@ -35,6 +36,7 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
   const {t,locale}=useApp();
   const [request,setRequest]=useState<{cursors:(number|null)[];revision:number}>({cursors:[null],revision:0});
   const [result,setResult]=useState<{request:typeof request;data:Detail|EventDetail|null;manual?:ManualDetail;error:MessageKey|null}|null>(null);
+  const [saving,setSaving]=useState(false),[saveError,setSaveError]=useState(false);
   const busy=result?.request!==request,data=busy?null:result?.data;
   useEffect(()=>{
     const controller=new AbortController();let active=true;
@@ -67,6 +69,16 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
       <Text style={styles.muted}>{locale==='ru'?'Возвращено':'Refunded'}: {journalMoney(result.manual.refunded_cents,locale,currency)}</Text>
       <Text selectable style={styles.muted}>{locale==='ru'?'Автор':'Recorded by'}: {result.manual.actor}</Text>
       <Text style={styles.muted}>{journalDate(result.manual.created_at,locale)}</Text>
+      {result.manual.receipt&&<>
+        <Text style={styles.h2}>{locale==='ru'?'Подтверждающий чек':'Receipt evidence'}</Text>
+        <Text style={styles.text}>{result.manual.receipt.data.supplier} · {result.manual.receipt.data.date} · {locale==='ru'?'Версия':'Version'} {result.manual.receipt.revision}</Text>
+        <Text selectable style={styles.muted}>{result.manual.receipt.hash}</Text>
+        <Button label={locale==='ru'?'Сохранить оригинал чека':'Save original receipt'} disabled={saving} onPress={()=>{const hash=result.manual!.receipt!.hash;setSaving(true);setSaveError(false);void (async()=>{try{
+          const r=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/receipts/${hash}/original`);
+          if(r.status===401){onSessionExpired();return;}if(!r.ok)throw new Error();await saveReceiptOriginal(new Uint8Array(await r.arrayBuffer()),hash);
+        }catch{setSaveError(true);}finally{setSaving(false);}})();}}/>
+        {saveError&&<Notice error text={locale==='ru'?'Не удалось сохранить оригинал. Повторите запрос.':'Could not save the original. Retry the request.'}/>}
+      </>}
       {result.manual.manual.reference_operation&&<Text selectable style={styles.text}>{locale==='ru'?'Исходная операция':'Original operation'}: {result.manual.manual.reference_operation}</Text>}
       {result.manual.manual.allocations.map(a=><Text key={a.category} style={styles.text}>{a.category} · {journalMoney(a.cents,locale,currency)}</Text>)}
       {result.manual.transaction.entries.map((line,index)=><Text key={index} style={styles.text}>{line.code} · {journalMoney(line.cents,locale,currency)}</Text>)}

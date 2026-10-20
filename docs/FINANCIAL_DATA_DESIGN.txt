@@ -80,3 +80,23 @@ Implementation checkpoint — 2026-10-20 (Part 1 remains IN PROGRESS)
   Do not bypass that restriction. Existing staging still serves the old version.
 - No push or Part 1 PR yet. No new staging migrations, OCR calls, production or
   store actions. Local checkpoints do not mean the delivery is complete.
+
+Subsequent local checkpoint — 2026-10-20
+- Existing activated users can be added by owners, with an idempotent audit and
+  no account access by default. Inactive/unknown users and role-overwrite attempts
+  fail closed. Fixed an ambiguous actor column found by administration tests.
+- Receipts support explicit camera capture, Android pending-result recovery,
+  retained upload bytes for retry, private original download/native share, and
+  SHA-256 verification before export. Journal details retain the exact reviewed
+  receipt version used to book an expense. Camera/audio permissions are scoped;
+  microphone and photo-library permissions are disabled.
+- CRM offline capture-to-event converter, owner sync/retry controls and read-only
+  historical preview are implemented. Thirteen targeted CRM tests plus a separate
+  two-database signed delivery/lost-ACK test passed. Worker dry-run passed.
+- Nestwise full suite: 121 tests, 116 pass, five real-PostgreSQL checks skipped.
+  TS/ESLint and web/Android/iOS JS exports passed; receipt provenance tests passed
+  after the subsequent provenance addition. Native exports are not signed builds.
+- All new migrations remain local. Existing staging is unchanged. Browser/native
+  acceptance, remaining CRM event producers, bank PDF/partial workflows and all
+  Part 2 acceptance items remain outstanding. Local preview approval remains
+  blocked; do not bypass. No new PR yet under the two-delivery agreement.

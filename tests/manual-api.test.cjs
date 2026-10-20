@@ -12,6 +12,18 @@ before(async()=>{
   cookie=login.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ');
 });
 after(async()=>{await fixture?.db.close();});
+test('workspace administration uses live owner access, rejects forged origins and returns audited changes',async()=>{
+  const path=`/v1/user/workspaces/${fixture.workspace}/administration`;
+  assert.equal((await fixture.fetch(req(path,undefined,{}))).status,401);
+  const payload={id:randomUUID(),action:'rename_account',target:fixture.account,name:'Reviewed synthetic account'};
+  assert.equal((await fixture.fetch(req(path,payload,{cookie,origin:'https://untrusted.test'}))).status,403);
+  assert.equal((await fixture.fetch(req(path,payload))).status,200);
+  const response=await fixture.fetch(req(path));assert.equal(response.status,200,await response.clone().text());
+  const admin=await response.json();assert.equal(admin.accounts[0].name,payload.name);assert.equal(admin.audit[0].id,payload.id);assert.equal(admin.members[0].name,'Demo owner');
+  await fixture.db.query("UPDATE nestwise.memberships SET role='reviewer' WHERE workspace_id=$1",[fixture.workspace]);
+  assert.equal((await fixture.fetch(req(path))).status,404);assert.equal((await fixture.fetch(req(path,{...payload,id:randomUUID()}))).status,404);
+  await fixture.db.query("UPDATE nestwise.memberships SET role='owner' WHERE workspace_id=$1",[fixture.workspace]);
+});
 test('authenticated manual operation flows through journal detail and bank reconciliation without duplicate posting',async()=>{
   const op={id:randomUUID(),kind:'income',paid_on:'2026-10-20',amount_cents:'1000',note:'Synthetic',destination_account:null,reference_operation:null,allocations:[{category:'other_income',cents:'1000'}]};
   for(let i=0;i<2;i++){const r=await fixture.fetch(req(base()+'/operations',op));assert.equal(r.status,200,await r.clone().text());}

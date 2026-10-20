@@ -10,6 +10,10 @@ Use paid_on/paid_at for report periods, never upload or job-update timestamps.
 Unpaid accrued source facts remain available as evidence but must not silently
 enter the cash-basis income/expense report. This choice does not approve category
 tax treatment, deductibility, inventory policy or a specific annual tax form.
+Owner reply on 2026-10-20: remaining accountant decisions are not yet known.
+Keep parts/inventory timing, mixed-use allocation and tax mappings unresolved.
+Do not ask the same policy question again without new information; expose the
+unresolved items in review and prevent a misleading finalized tax report.
 
 PART 1 — complete financial data lifecycle (previous remaining blocks 1–6)
 [ ] Workspace, account, membership and account-grant management with live ACL,

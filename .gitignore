@@ -50,6 +50,7 @@ yarn-error.*
 .test-build/
 dist-mobile/
 dist-part1/
+dist-mobile-part1/
 artifacts/
 .local/
 *.log

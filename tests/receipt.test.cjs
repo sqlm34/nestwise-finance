@@ -35,6 +35,11 @@ test('receipt review versions reject stale changes and explicit posting is atomi
  const op=(await fixture.db.query('SELECT payload FROM nestwise.manual_operations WHERE id=$1',[post.operation])).rows[0].payload;
  assert.equal(op.paid_on,'2026-10-20','printed receipt date must not silently become the payment date');
  assert.equal(op.amount_cents,'1050');
+ const journal=(await fixture.db.query('SELECT id FROM nestwise.journal_transactions WHERE manual_id=$1',[post.operation])).rows[0].id;
+ const detail=await (await fixture.fetch(request(`/v1/user/workspaces/${fixture.workspace}/accounts/${fixture.account}/journal/${journal}`))).json();
+ const parsed=require('../.test-build/src/domain/manual-operation.js').parseManualDetail(detail,journal);
+ assert.equal(parsed.receipt.hash,hash);assert.equal(parsed.receipt.review_id,review.id);assert.equal(parsed.receipt.data.total_cents,'1050');
+ assert.throws(()=>require('../.test-build/src/domain/manual-operation.js').parseManualDetail({...detail,receipt:{...detail.receipt,data:{...data(),total_cents:'999'}}},journal));
  await assert.rejects(fixture.db.query('DELETE FROM nestwise.receipt_reviews'),/immutable/);
 });
 test('OCR requires explicit per-document consent, stays disabled without configuration and uses durable quotas',async()=>{
