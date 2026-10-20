@@ -1,4 +1,9 @@
 export const en = {
+  inviteTitle:'Activate an invitation',inviteCode:'Invitation code',invitePassword:'New password (12–128 characters)',
+  inviteRepeat:'Repeat password',inviteSubmit:'Set password',
+  inviteHint:'Enter your private invitation code and choose your own password. Codes expire after 24 hours and work once.',
+  inviteInvalid:'The invitation is invalid, expired, already used, or temporarily limited. Ask your administrator for help.',
+  inviteMismatch:'Passwords do not match.',inviteSuccess:'Password set. You can now sign in with',
   authAccount:'Account',authSignIn:'Sign in',authSignOut:'Sign out',authEmail:'Email',authPassword:'Password',
   authHint:'Access is available to invited users. Your workspaces are assigned by an administrator.',
   authNotConfigured:'Sign-in is not connected in this build. The demo remains available.',
@@ -66,6 +71,11 @@ export const en = {
 } as const;
 export type MessageKey = keyof typeof en;
 export const ru: Record<MessageKey, string> = {
+  inviteTitle:'Активировать приглашение',inviteCode:'Код приглашения',invitePassword:'Новый пароль (12–128 символов)',
+  inviteRepeat:'Повторите пароль',inviteSubmit:'Установить пароль',
+  inviteHint:'Введите личный код приглашения и придумайте пароль. Код действует 24 часа и используется один раз.',
+  inviteInvalid:'Приглашение неверно, истекло, уже использовано или временно ограничено. Обратитесь к администратору.',
+  inviteMismatch:'Пароли не совпадают.',inviteSuccess:'Пароль установлен. Теперь можно войти с почтой',
   authAccount:'Аккаунт',authSignIn:'Войти',authSignOut:'Выйти',authEmail:'Электронная почта',authPassword:'Пароль',
   authHint:'Вход доступен приглашённым пользователям. Доступ к пространствам назначает администратор.',
   authNotConfigured:'В этой сборке вход ещё не подключён. Демонстрация остаётся доступной.',

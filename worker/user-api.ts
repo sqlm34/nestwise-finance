@@ -1,6 +1,7 @@
 import { connectAuth, type AuthService, type AuthConfig } from './auth';
 import { database } from './database';
 import { limitedText } from './security';
+import { acceptInvitation, invitations } from './invitations';
 
 export type UserEnv = {
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
@@ -28,7 +29,7 @@ export function authConfiguration(env: UserEnv): AuthConfig | null {
 }
 export async function userApi(request: Request, env: UserEnv,
   connect: (config: AuthConfig, url: string) => Promise<AuthService> = connectAuth,
-  ledger = database): Promise<Response> {
+  ledger = database, invitationStore = invitations): Promise<Response> {
   const config = authConfiguration(env);
   if (!config) return response({ error: 'not_found' }, 404);
   const url = new URL(request.url), origin = request.headers.get('origin');
@@ -53,8 +54,9 @@ export async function userApi(request: Request, env: UserEnv,
     return preflight;
   }
   const authPaths = new Map([['/api/auth/sign-in/email','POST'],['/api/auth/sign-out','POST'],['/api/auth/get-session','GET']]);
+  const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
-  if (url.search || !(authPaths.get(url.pathname) === request.method ||
+  if (url.search || !(invitationRoute || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch))) return finish(response({error:'not_found'},404));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
@@ -67,6 +69,13 @@ export async function userApi(request: Request, env: UserEnv,
   }
   let service: AuthService | undefined;
   try {
+    if(invitationRoute) {
+      let body:unknown;
+      try {body=await safeRequest.json();} catch {return finish(response({error:'invalid_invitation'},400));}
+      const ip=request.headers.get(config.development?'x-test-ip':'cf-connecting-ip') || 'unknown';
+      const email=await acceptInvitation(body,ip,config.secret,invitationStore(env.AUTH_DATABASE_URL!));
+      return finish(email?response({email}):response({error:'invalid_invitation'},400));
+    }
     service=await connect(config,env.AUTH_DATABASE_URL!);
     if(authPaths.has(url.pathname)) return finish(await service.auth.handler(safeRequest));
     const session=await service.auth.api.getSession({headers:request.headers});

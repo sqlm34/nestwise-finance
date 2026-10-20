@@ -61,4 +61,11 @@ async function retire(client,identity) {
     await client.query('COMMIT');
   } catch(error){await client.query('ROLLBACK');throw error;}
 }
-module.exports={provision,verify,retire};
+async function activateInvitation(invitation,password) {
+  const request=()=>fetch(`${origin}/v1/invitations/accept`,{method:'POST',redirect:'error',
+    headers:{origin,'Content-Type':'application/json'},body:JSON.stringify({token:invitation.token,password})});
+  assert.equal((await request()).status,200,'Cloud invitation activation must succeed');
+  assert.equal((await request()).status,400,'Cloud invitation cannot be replayed');
+  return {activated:true,replayRejected:true};
+}
+module.exports={provision,verify,retire,activateInvitation};

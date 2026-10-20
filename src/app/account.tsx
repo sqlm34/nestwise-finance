@@ -70,6 +70,7 @@ export default function Account() {
           <Text style={styles.text}>{t('authPassword')}</Text>
           <TextInput accessibilityLabel={t('authPassword')} style={styles.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" editable={!busy} onSubmitEditing={()=>{if(apiURL&&email&&password&&!busy)void signIn();}}/>
           <Button label={t('authSignIn')} primary disabled={busy||!apiURL||!email||!password} onPress={()=>void signIn()}/>
+          <Button label={t('inviteTitle')} disabled={busy} onPress={()=>router.push('/activate')}/>
         </>}
       </Card>
       {access&&<Card><Text style={styles.h2}>{t('authSpaces')}</Text>

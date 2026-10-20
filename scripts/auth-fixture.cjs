@@ -3,7 +3,7 @@ const {readFileSync}=require('node:fs');
 const {randomUUID,randomBytes}=require('node:crypto');
 async function createAuthFixture() {
   const {db,pool}=await require('./auth-test-db.cjs').authTestDatabase();
-  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql'])
+  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql'])
     await db.exec(readFileSync(`db/migrations/${name}`,'utf8'));
   const {hashPassword}=await import('better-auth/crypto');
   const id=randomUUID(),workspace=randomUUID(),account=randomUUID(),localUser=randomUUID();
@@ -25,7 +25,11 @@ async function createAuthFixture() {
     userAccess:async subject=>(await db.query('SELECT nestwise.user_access($1) result',[subject])).rows[0].result,
     userJournal:async(...args)=>(await db.query('SELECT nestwise.user_journal($1,$2,$3) result',args)).rows[0].result,
   });
+  const invitationStore=()=>({
+    check:async(...args)=>(await db.query('SELECT nestwise_auth.check_invitation($1,$2) valid',args)).rows[0].valid,
+    accept:async(...args)=>(await db.query('SELECT nestwise_auth.accept_invitation($1,$2) email',args)).rows[0].email,
+  });
   return {db,auth,env,id,workspace,account,email,password,
-    fetch:(request,override=env)=>userApi(request,override,async()=>({auth,close:async()=>{}}),ledger)};
+    fetch:(request,override=env)=>userApi(request,override,async()=>({auth,close:async()=>{}}),ledger,invitationStore)};
 }
 module.exports={createAuthFixture};

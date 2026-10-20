@@ -49,7 +49,7 @@ before(async () => {
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,3);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,4);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -202,4 +202,23 @@ test('authenticated subjects receive only assigned workspaces and accounts',asyn
     await assert.rejects(sql('SELECT nestwise.user_journal($1,$2,$3)',['test-owner',otherWorkspace,otherAccount]),/forbidden/);
     await assert.rejects(sql('SELECT * FROM nestwise_auth.account'),/permission denied|does not exist/);
   } finally {await sql('RESET ROLE');}
+});
+test('PostgreSQL invitations are single-use under concurrent restricted-role activation', {skip:!process.env.TEST_DATABASE_URL},async()=>{
+  const {issueInvitation}=require('../scripts/issue-invitation.cjs');
+  const invitation=await issueInvitation(db,{email:`${randomUUID()}@nestwise.test`,name:'CI invited user',workspace});
+  const hash=createHash('sha256').update(invitation.token).digest('hex');
+  const {hashPassword}=await import('better-auth/crypto');
+  const passwordHash=await hashPassword('Synthetic CI activation 42!');
+  const {Client}=require('pg');
+  const clients=[new Client({connectionString:process.env.TEST_DATABASE_URL}),new Client({connectionString:process.env.TEST_DATABASE_URL})];
+  await Promise.all(clients.map(c=>c.connect()));
+  try {
+    await Promise.all(clients.map(c=>c.query('SET ROLE nestwise_auth_api')));
+    const results=await Promise.allSettled(clients.map(c=>c.query('SELECT nestwise_auth.accept_invitation($1,$2)',[hash,passwordHash])));
+    assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+    assert.match(results.find(r=>r.status==='rejected').reason.message,/invalid_invitation/);
+    await assert.rejects(clients[0].query('SELECT * FROM nestwise_auth.invitations'),/permission denied/);
+    const access=(await sql('SELECT nestwise.user_access($1) result',[`better-auth:${invitation.user}`]))[0].result;
+    assert.equal(access[0].role,'member');assert.deepEqual(access[0].accounts,[]);
+  } finally {await Promise.all(clients.map(c=>c.end()));}
 });

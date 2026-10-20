@@ -19,7 +19,7 @@ export function createWorker(connect: (url: string) => Database = database) {
       if (url.pathname === '/health' && request.method === 'GET') {
         return json({ service: 'nestwise', environment: env.ENVIRONMENT, status: 'ok', financialIngestion: enabled(env) });
       }
-      if (url.pathname.startsWith('/api/auth/') || url.pathname === '/v1/session' || url.pathname.startsWith('/v1/user/')) {
+      if (url.pathname.startsWith('/api/auth/') || url.pathname === '/v1/session' || url.pathname.startsWith('/v1/user/') || url.pathname.startsWith('/v1/invitations/')) {
         return userApi(request, env);
       }
       if (!enabled(env)) return json({ error: 'not_found' }, 404);
