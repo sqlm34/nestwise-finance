@@ -464,6 +464,15 @@ test('manual and workspace evidence is retained for full database recovery verif
   await sql('SELECT nestwise.review_receipt($1,$2,$3,$4,$5,$6,$7)',['test-owner',workspace,account,receiptHash,reviewId,0,JSON.stringify(receipt)]);
   await sql('SELECT nestwise.post_receipt($1,$2,$3,$4,$5,$6,$7)',['test-owner',workspace,account,receiptHash,reviewId,operationId,'2026-10-20']);
   assert.equal((await sql('SELECT count(*)::int n FROM nestwise.receipt_postings WHERE operation_id=$1',[operationId]))[0].n,1);
+  const bankHash='8'.repeat(64),bankId=randomUUID();
+  await sql('SELECT nestwise.prepare_document($1,$2,$3,$4,$5)',['test-owner',workspace,account,bankHash,64]);
+  await sql('SELECT nestwise.complete_document($1,$2,$3,$4)',['test-owner',workspace,account,bankHash]);
+  const bankRow={line:2,date:'2026-10-20',cents:'-123',text_hash:'7'.repeat(64)};
+  const bankOperation={...payload,id:bankId,note:'Synthetic bank recovery proof'};
+  await sql('SELECT nestwise.post_bank_row($1,$2,$3,$4,$5,$6,$7)',['test-owner',workspace,account,bankId,bankHash,JSON.stringify(bankRow),JSON.stringify(bankOperation)]);
+  await sql('SELECT nestwise.cancel_reconciliation($1,$2,$3,$4,$5)',['test-owner',workspace,account,bankId,'recheck']);
+  assert.equal((await sql('SELECT count(*)::int n FROM nestwise.bank_bookings WHERE id=$1',[bankId]))[0].n,1);
+  assert.equal((await sql('SELECT count(*)::int n FROM nestwise.reconciliation_claims WHERE group_id=$1',[bankId]))[0].n,0);
 });
 
 test('PostgreSQL serializes concurrent refunds and opposite transfers under the restricted role',{skip:!process.env.TEST_DATABASE_URL},async()=>{

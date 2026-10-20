@@ -17,6 +17,18 @@ async function verifyRestore(source,restored,runtime=restored) {
   assert.deepEqual(await fingerprint(restored),expected);
   const migrations='SELECT version,sha256,applied_at FROM public.nestwise_schema_migrations ORDER BY version';
   assert.deepEqual((await restored.query(migrations)).rows,(await source.query(migrations)).rows);
+  // A canceled matching decision must not erase the permanent bank posting origin.
+  const bankProof=expected.bank_bookings?.count?(await restored.query(`SELECT b.*,u.subject FROM nestwise.bank_bookings b
+    JOIN nestwise.users u ON u.id=b.actor JOIN nestwise.reconciliation_cancellations c ON c.group_id=b.reconciliation_id LIMIT 1`)).rows[0]:null;
+  if(bankProof){
+    await runtime.query('BEGIN');
+    try{
+      if(runtime===restored)await runtime.query('SET LOCAL ROLE nestwise_api');
+      const retry=(await runtime.query('SELECT nestwise.post_bank_row($1,$2,$3,$4,$5,$6,$7) id',
+        [bankProof.subject,bankProof.workspace_id,bankProof.account_id,bankProof.id,bankProof.file_hash,bankProof.row_data,bankProof.operation_data])).rows[0];
+      assert.equal(retry.id,bankProof.id);
+    }finally{await runtime.query('ROLLBACK');}
+  }
   // Every permission probe is rolled back even if a broken control permits it.
   async function rejected(query,pattern,role) {
     const client=role?runtime:restored;
