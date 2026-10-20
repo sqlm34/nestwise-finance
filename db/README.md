@@ -26,6 +26,10 @@ tokens with short expiry; users cannot choose their membership or role.
 
 ## Verification
 
+The isolated Neon staging project and restricted Worker secret are now
+provisioned. See `docs/STAGING_DATABASE_STATUS.txt` for identifiers, verified
+results, and activation/recovery work still outstanding.
+
 - `npm test`: local PGlite (actual PostgreSQL engine compiled to WASM) applies
   the same SQL migration. Multi-connection concurrency is skipped locally.
 - GitHub CI supplies isolated PostgreSQL 17, runs the complete suite including

@@ -1,0 +1,60 @@
+Nestwise staging database — verified 2026-10-20
+
+Resources (identifiers only; no credentials)
+- Neon project: nestwise-staging / mute-pond-14683538
+- Branch: staging / br-snowy-morning-b5ppnq58
+- Database: nestwise_staging
+- Engine: PostgreSQL 17, AWS Ohio
+- Cloudflare Worker: nestwise-staging
+- Runtime secret: NESTWISE_DATABASE_URL
+- Migration owner: nestwise_staging_owner
+- Runtime login: nestwise_worker, inherits nestwise_api
+- Migration 0001_ledger.sql SHA-256:
+  bf06b760596d12647874c3c34e721946a3868f2062bb9b814010e2523e704b6b
+
+Provisioning
+The owner connection was used in memory to run scripts/migrate.cjs against
+the new database. The migration's guard rejected any database outside the
+Nestwise namespace and any database containing public.jobs.
+The runtime login was created with a cryptographically random password and:
+NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS INHERIT,
+CONNECTION LIMIT 10. It inherits only nestwise_api.
+PUBLIC database privileges were revoked, CONNECT granted to nestwise_worker,
+and PUBLIC CREATE on schema public revoked. The runtime owns no schema.
+Only its connection was stored as a Cloudflare encrypted Secret. Owner and
+runtime passwords were not saved in source, local files, or GitHub.
+
+Verification
+scripts/staging-smoke.cjs ran against actual Neon PostgreSQL, using separate
+owner and runtime connections. Four synthetic deliveries (refund revision 3,
+payment revision 1, parts revision 2, repeated refund) produced exactly three
+journal transactions. Totals in cents:
+clearing -9500; parts_cost 9500; receipts -35000; refunds 35000.
+The runtime cannot read/insert journal tables directly or create schemas.
+An inaccessible workspace is rejected. The test session was revoked and
+the synthetic source connection disabled after the test. Financial evidence
+remains, clearly marked SYNTHETIC; no real customer records were imported.
+The Neon HTTPS serverless driver also authenticated as nestwise_worker and
+successfully invoked process_pending().
+
+Repeat the smoke test only deliberately. Each invocation preserves another
+synthetic workspace and its immutable financial evidence. Set credentials
+through secure environment injection, never command arguments:
+NESTWISE_MIGRATION_URL, NESTWISE_RUNTIME_URL,
+NESTWISE_SMOKE_CONFIRM=synthetic-staging-only
+then run node scripts/staging-smoke.cjs.
+The CLI requires both URLs to use the same host and nestwise_staging database.
+Its output contains only synthetic identifiers and test results.
+
+Current limits
+Cloudflare has the runtime secret, but financial ingestion remains OFF.
+No CRM_SERVICE_KEYS, live sender, public login, mobile session integration,
+or scheduled catch-up was activated. The Worker end-to-end HTTP-to-database
+flow still needs a subsequent synthetic activation test.
+CI backup/restore is verified on disposable PostgreSQL 17. Neon displays a
+one-day history retention; an actual cloud recovery drill has NOT yet run.
+Do that before enabling any financial ingestion, and configure retention
+and private backup storage before real data is introduced.
+The Neon organization already uses Launch billing. No plan upgrade was made.
+The created project uses its existing plan; usage may be billable.
+CRM projects, production application, and app stores were not modified.
