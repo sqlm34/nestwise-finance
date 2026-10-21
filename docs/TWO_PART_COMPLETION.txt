@@ -135,3 +135,16 @@ screens or passing unit tests. Native JS export is not a signed device build.
   not live integration acceptance. CRM migrations and capture/dispatch remain
   disabled. Supplier/customer refunds without source evidence, historical
   approval and browser acceptance of source-review controls remain open.
+
+2026-10-20 — Local CRM browser acceptance
+- CRM 7502cd9 adds a reproducible loopback-only synthetic UI fixture using the
+  real NestwiseSync component, admin handler and disposable migrated database.
+- Built-in browser verified cost correction, lifecycle confirmation and delivery
+  retry with a simulated 503 after each database commit. Repeating each command
+  created exactly one corresponding audit entry and no duplicate source event.
+  Historical preview imported nothing and exposed unmaterialized source data.
+- CI 39525576272 passed, including fixture bundle/seeding, PostgreSQL concurrency,
+  backup/restore and signed receiver verification. Local UI acceptance is now
+  complete for these scenarios; live cloud auth/deployment acceptance remains open.
+- Existing CRM wrangler.preview.json targets the alex-crm-api Worker and must not
+  be used as an isolated test deployment. No CRM cloud resource was modified.
