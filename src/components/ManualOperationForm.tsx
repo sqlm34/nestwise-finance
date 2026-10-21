@@ -47,7 +47,7 @@ export function ManualOperationForm({user,workspace,account,accounts,onSaved,onS
   }
   async function discard(){
     if(!draft||sending.current)return;sending.current=true;setBusy(true);
-    try{await operationDraftStore.change(scope,{type:'discard',operation:draft});if(alive.current){install(null);setError('');if(record?.phase==='confirmed'){setAmount('');setNote('');setSplits([]);}}}
+    try{await operationDraftStore.change(scope,{type:'discard',operation:draft});if(alive.current){install(null);setError('');if(record?.phase==='confirmed'){setAmount('');setNote('');setSplits([]);setReference('');setDestination('');}}}
     catch{if(alive.current)setStorageFailed(true);}finally{sending.current=false;if(alive.current)setBusy(false);}
   }
   async function save(){
@@ -71,7 +71,7 @@ export function ManualOperationForm({user,workspace,account,accounts,onSaved,onS
         if(result.id!==operation.id)throw new Error('unexpected_response');
       });
       if(alive.current){install(value);setSaved(draft.id);}
-    }catch{if(alive.current){setError(ru?'Подтверждение не получено. Черновик сохранён: восстановите связь и доступ, затем повторите ту же операцию. Не вводите её заново.':'Confirmation was not received. The draft is retained: restore connection and access, then retry this same operation. Do not enter it again.');
+    }catch(error){if(alive.current){setError(error instanceof DraftRejected?'':ru?'Подтверждение не получено. Черновик сохранён: восстановите связь и доступ, затем повторите ту же операцию. Не вводите её заново.':'Confirmation was not received. The draft is retained: restore connection and access, then retry this same operation. Do not enter it again.');
       try{const latest=await operationDraftStore.read(scope);if(alive.current)install(latest);}catch{if(alive.current)setStorageFailed(true);}
     }}finally{clearTimeout(timeout);sending.current=false;if(alive.current)setBusy(false);}
   }
@@ -91,7 +91,7 @@ export function ManualOperationForm({user,workspace,account,accounts,onSaved,onS
       {record?.phase==='rejected'&&<Notice error text={ru?'Сервер отклонил операцию: проверьте исходный платёж, сумму возврата и дату. Можно вернуться к редактированию.':'Server rejected the operation: check the original payment, refund amount and date. You can return to editing.'}/>}
       {retryOnly&&<Notice text={ru?'Ожидает подтверждения. Данные и номер операции заблокированы для безопасного повтора.':'Awaiting confirmation. Data and operation ID are locked for safe retry.'}/>}
       {record?.phase==='confirmed'?<><Notice text={ru?'Сервер подтвердил запись. Повторная отправка не нужна.':'Server confirmed this record. No resubmission is needed.'}/><Button primary label={ru?'Открыть журнал':'Open journal'} onPress={onSaved}/><Button label={ru?'Начать следующую операцию':'Start next operation'} disabled={busy} onPress={()=>void discard()}/></>:<>
-      <Button primary label={retryOnly?(ru?'Повторить ту же операцию':'Retry same operation'):(ru?'Подтвердить и сохранить':'Confirm and save')} disabled={busy||offline} onPress={()=>void save()}/>
+      <Button primary label={retryOnly?(ru?'Повторить ту же операцию':'Retry same operation'):(ru?'Подтвердить и сохранить':'Confirm and save')} disabled={busy||offline||record?.phase==='rejected'} onPress={()=>void save()}/>
       <Button label={ru?'Вернуться к редактированию':'Back to editing'} disabled={busy||retryOnly} onPress={()=>void discard()}/></>}
     </>:<>
       <View style={styles.row}>{(Object.keys(labels) as ManualOperation['kind'][]).map(k=><Button key={k} label={labels[k][ru?1:0]} selected={kind===k} onPress={()=>setKind(k)}/>)}</View>
