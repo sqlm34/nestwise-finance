@@ -1,5 +1,14 @@
 NESTWISE — implementation and release plan — 2026-10-20
 
+CURRENT SCOPE UPDATE — 2026-10-21
+This original phase plan is historical. TWO_PART_COMPLETION.txt records completed
+stages and owner decisions. STATEMENT_HANDOFF_AND_PARTS.md defines the current
+cash Statement workflow: owner categorization and handoff, no accountant approval
+gate. OCR remains manual at the owner's request. Workiz remains excluded.
+Phone installation/acceptance is deferred while the owner is away. Production,
+store release and signed iOS are not complete. See DEPENDENCY_REVIEW.txt for the
+remaining upstream build-tool advisories and enforced Worker bundle boundary.
+
 Scope: Expo / React Native / TypeScript mobile application. Web is a local
 development preview, not a separate accountant portal. Workiz is excluded.
 Alex CRM remains the source for job-related financial facts.

@@ -40,3 +40,25 @@ Raw local audit output lives in ignored artifacts/audit.json.
   reviewed patched dependency paths and build/runtime exposure analysis.
 - Current raw audit: ignored .local/audit-runtime.json. No audit-fix mutation
   was applied. Removing the EAS CLI did not change the runtime package versions.
+
+2026-10-21 — PR21 exposure review
+- Fresh npm audit --omit=dev: 27 affected nodes, 8 moderate / 19 high,
+  zero critical. The three leaf advisories remain braces, node-forge, uuid.
+- npm explain: braces 3.0.3 is reached through micromatch; node-forge 1.4.0
+  through Expo CLI/code-signing tools; uuid 7.0.3 through xcode tooling.
+- GitHub advisories GHSA-vfj7-8cjw-p6xm and GHSA-86w9-cpqp-85rv currently
+  list no patched release. GHSA-w5hq-g745-h8pq fixes uuid in 11.1.1+;
+  xcode's declared range is ^7.0.3, so a blind override is not a compatible fix.
+- Wrangler dry-run metadata: all 635 Worker inputs exclude braces, node-forge
+  and uuid. worker:check now enforces this boundary in CI. This directly checks
+  the request-handling bundle, not merely package.json dependency labels.
+- Do not expose development servers or use untrusted source/glob/build inputs.
+  No OTA signing workflow is enabled. This narrows exposure; it does not mark
+  npm audit clean or prove every native artifact free of vulnerable tooling.
+- Upstream advisory fixes / supported Expo tooling updates and final signed
+  artifact review remain production release requirements. No unsafe major
+  downgrade or fabricated audit exemption was applied.
+Sources:
+https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+https://github.com/advisories/GHSA-86w9-cpqp-85rv
+https://github.com/advisories/GHSA-w5hq-g745-h8pq

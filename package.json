@@ -52,7 +52,7 @@
     "test": "tsc -p tsconfig.test.json && node --test tests/*.test.cjs",
     "build:web": "expo export --platform web",
     "build:mobile": "expo export --platform android --platform ios --output-dir dist-mobile",
-    "worker:check": "wrangler deploy --dry-run --env staging",
+    "worker:check": "wrangler deploy --dry-run --env staging --outdir .local/worker-audit --metafile .local/worker-audit/meta.json && node scripts/verify-worker-bundle.cjs",
     "worker:staging": "wrangler deploy --env staging",
     "db:migrate": "node scripts/migrate.cjs",
     "demo:ledger": "tsc -p tsconfig.test.json && node scripts/ledger-demo.cjs",
