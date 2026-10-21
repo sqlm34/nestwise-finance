@@ -20,3 +20,11 @@ Definitive server validation errors (`invalid_manual_operation`, `manual_refund_
 Android acceptance on 2026-10-21: owner reported launch crash after installing 1.0.1 (2). Device crash log identifies TypeError: Cannot convert BigInt to number in insightMoney / AccountInsights. Installation success was not runtime acceptance. Replaced Intl BigInt formatting in both overview and journal with exact decimal-string grouping; added regression coverage for missing Intl BigInt support, both locales, negative/sub-dollar and PostgreSQL bigint-limit values. Replacement APK and device acceptance remain required. Temporary build monitor remains paused at owner request.
 
 Owner reconnected the Android device on 2026-10-21. Build 4b139e30 (1.0.2 / code 3) succeeded, but predates Statement v2 and the parts register. Prepare 1.0.3 / code 4 from PR21 for acceptance against the current staging API. It includes the BigInt startup fix and the complete Statement/parts block. Verify the established signing certificate and update without uninstalling or clearing data. Device acceptance remains pending until launch, authenticated reports, prepared draft recovery, receipt camera and PDF sharing are checked.
+
+1.0.3 installation evidence, 2026-10-21:
+- EAS build `9749c2f1-ff44-4a5b-9b56-657024b4bd1f`, commit `5232a85e473662fdf2b8f40bb2e3b0294720b60e`, succeeded. Build time 13m28s; total 13m34s.
+- GitHub run `39687897178`: all jobs successful, 159/159 tests and PostgreSQL backup/restore passed.
+- APK signature verified; certificate SHA256 `18512e460f8eff93b69ce565a2c6c3d097b7f779080198b4ae4f589478072266` matches the established signer.
+- APK SHA256 `096d87a94969abc865c80ca4f04e71de597d1833fb7ea54c814fb2a158354c40`; package `com.aksenov.nestwise.staging`, version 1.0.3, code 4.
+- `adb install -r` succeeded on the connected Samsung SM-G986U; installed-package metadata independently confirms version/code. No uninstall or data clearing.
+- Build monitor paused after installation. Owner launch and native acceptance are still pending; successful installation is not proof of crash-free runtime, camera or PDF behavior.
