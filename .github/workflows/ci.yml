@@ -6,7 +6,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.ref }}
+  # Native builds outlive ordinary checks; new feature pushes must not cancel them.
+  group: ci-v2-${{ github.ref }}-${{ github.sha == vars.EAS_INTERNAL_BUILD_SHA && 'android' || 'checks' }}
   cancel-in-progress: true
 jobs:
   checks:

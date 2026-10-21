@@ -209,6 +209,47 @@ paths:
         '401': {description: Missing or expired session}
         '404': {description: Unknown or inaccessible account}
         '503': {description: Temporarily unavailable; do not substitute zero totals}
+  /v1/user/workspaces/{workspace}/accounts/{account}/cash-insights:
+    get:
+      description: >
+        Authenticated operational journal summary, not a bank balance or tax report.
+        Aggregates dated paid transactions by paid_at, inclusive UTC days, maximum
+        366 days. Compares the immediately preceding equal-length period. Includes
+        zero-filled partial/calendar months and account-wide unresolved event counts.
+        Undated transactions are counted by event date as review exceptions and excluded
+        from all monetary totals. transaction_count includes these exceptions; payment-date
+        journal drilldown excludes them. All amounts and counts are decimal strings.
+        Access rechecked per request. No tax-policy approval is implied.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: from, required: true, schema: {type: string, format: date}}
+        - {in: query, name: to, required: true, schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: Live single-query calculation; Cache-Control no-store; not a frozen snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [basis, currency, generated_at, current, previous, months, attention]
+                properties:
+                  basis: {const: cash}
+                  currency: {const: USD}
+                  generated_at: {type: string, format: date-time}
+                  current: {$ref: '#/components/schemas/PeriodSummary'}
+                  previous: {$ref: '#/components/schemas/PeriodSummary'}
+                  months: {type: array, minItems: 1, maxItems: 13, items: {$ref: '#/components/schemas/PeriodSummary'}}
+                  attention:
+                    type: object
+                    required: [waiting, needs_review]
+                    properties:
+                      waiting: {type: string, pattern: '^[0-9]+$'}
+                      needs_review: {type: string, pattern: '^[0-9]+$'}
+        '400': {description: Invalid, missing or duplicate dates; reversed or excessive period}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible account}
+        '503': {description: Temporarily unavailable; do not substitute zero totals}
   /v1/user/workspaces/{workspace}/accounts/{account}/events/{event}:
     get:
       description: >
@@ -325,16 +366,18 @@ paths:
     get:
       description: >
         Live Better Auth session required. Searches the entire authorized account history.
-        Inclusive UTC event dates; literal case-insensitive ID search; code filters retain
-        every line of each balanced transaction. Keyset pagination sorts by occurred_at
-        then UUID. Refresh to include late arrivals; this is not a frozen report.
+        Inclusive UTC dates; basis=event uses occurred_at (default), basis=paid uses
+        paid_at and excludes undated transactions. Literal case-insensitive ID search;
+        code filters retain every line of each balanced transaction. Keyset pagination
+        sorts by the selected date basis then UUID. Refresh to include late arrivals; this is not a frozen report.
       parameters:
         - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
         - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
         - {in: query, name: q, schema: {type: string, maxLength: 128}, description: Literal substring of order, event or journal ID}
         - {in: query, name: from, schema: {type: string, format: date}}
         - {in: query, name: to, schema: {type: string, format: date}}
-        - {in: query, name: code, schema: {enum: [all, clearing, receipts, refunds, parts_cost, parts_payable, fees], default: all}}
+        - {in: query, name: code, schema: {enum: [all, clearing, receipts, refunds, parts_cost, parts_payable, fees, expenses, transfers], default: all}}
+        - {in: query, name: basis, schema: {enum: [event, paid], default: event}}
         - {in: query, name: order, schema: {enum: [newest, oldest], default: newest}}
         - {in: query, name: cursor, schema: {type: string, format: uuid}, description: next_cursor from previous response; keep the same filters}
       responses:
