@@ -112,3 +112,12 @@ screens or passing unit tests. Native JS export is not a signed device build.
 - Replacement APK build requested by GitHub Actions run 39521202007. Device
   acceptance remains pending until the signed replacement is installed and the
   owner confirms login. Do not mark native acceptance complete from these tests.
+
+2026-10-20 — Android login acceptance
+- Signed EAS build 962198d7-8e82-449d-ad06-74cd1c139644 (13244e5) succeeded;
+  Expo Doctor passed 20/20 checks. APK signature v2 verified and update installed
+  successfully over Nestwise staging on the owner's connected Android.
+- APK SHA-256: 10a6ccbd29a5f46a9e997816251c9597721b79630ab19d4e7c1e4531b10409f2.
+- Owner confirmed successful entry in the application. The login blocker is
+  closed. Camera, offline writes and remaining end-to-end mobile scenarios are
+  separate pending acceptance items; this does not mark the full app complete.
