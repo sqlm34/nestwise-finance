@@ -12,16 +12,20 @@ jobs:
   internal-build:
     if: vars.EAS_ENABLED == 'true'
     environment: staging
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: node scripts/release-preflight.cjs
+      - run: node scripts/dependency-audit.cjs
       - run: npm run typecheck && npm run lint && npm test
+      - run: npm run build:mobile -- --source-maps
+      - run: node scripts/verify-mobile-bundle.cjs
       - name: Build internal APK or iOS Simulator app
         run: npx --yes eas-cli@25.2.0 build --profile staging --platform "$BUILD_PLATFORM" --non-interactive
         env:

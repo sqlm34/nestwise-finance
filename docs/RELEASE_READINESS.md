@@ -19,7 +19,7 @@ Camera preview/shutter was not directly observed; the local selected image was o
 
 ## Remaining release work
 
-1. Integrate the existing PR stack with required checks intact. All 21 PRs were open at inspection; none is claimed merged.
+1. Completed: PR21 integrated the entire stack into main 1025903. PR1 was marked merged automatically; superseded PR2–20 were closed after ancestry verification. Branches and protection were retained. Main CI 39693011239 passed all 165 tests and deployed staging; STAGING_DEPLOY_BRANCH now points to main.
 2. Complete dependency remediation or an explicit reviewed residual-risk decision for upstream build-tool advisories. Worker bundle exclusion is tested but is not a clean dependency audit.
 3. Provision/review production isolation, secrets, actual backup and restore, domain/auth configuration and monitoring as a separate approved release. Existing production guards stay in place. Rehearse the candidate on staging first.
 4. If signed iPhone distribution is in scope, obtain Apple signing access and perform real-device QA. The owner has no Apple Developer account; no installable iOS build is claimed.
@@ -51,3 +51,5 @@ Before a schema change, verify a fresh backup and restore into a separate databa
 Statement v2 API is not compatible with an unmodified v1 report parser. Rollback must retain compatible report_input behavior or use a separately restored environment; saved v1/v2 snapshots and history must survive. Disable CRM dispatch/ingestion before any data cutover, preserve stable event IDs and reconcile cursors. Do not delete financial facts to make a rollback pass.
 
 Database dumps do not contain R2 originals. Verify both object copies and their hashes against restored metadata. Two buckets in one Cloudflare account are not independent off-provider disaster recovery. An actual production backup/recovery plan is still required.
+
+Toolchain follow-up: see TOOLCHAIN_VERIFICATION.md for pinned Node 24 Actions, live audit regression detection and Android/iOS JavaScript source-map exposure checks. These checks are not acceptance of the remaining production dependency risks.
