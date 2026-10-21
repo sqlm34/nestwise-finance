@@ -6,7 +6,7 @@ States: prepared → pending → confirmed. Persist pending before network I/O. 
 
 Drafts are device-local, not backup or cross-device synchronization. Clearing browser/app data or uninstalling can remove them. A pending command rejected because access or source conditions changed remains locked: restore access and inspect the journal before resolving with support; do not create a replacement payment. Recovery notices on overview, journal and settings lead to the saved operation. Authenticated API waits are bounded; a timeout does not establish whether a write committed.
 
-Web PDF opens a separate printable document and requires an explicit Print / Save PDF click. The accounting screen no longer invokes a hidden blocking print dialog. Printable HTML and CSV downloads are available from immutable snapshots. Native export uses Expo Print then system sharing. Only the generated temporary export is removed after sharing. No report is finalized by export.
+Web PDF displays a dedicated printable document in the current tab and requires an explicit Print / Save PDF click. The accounting screen no longer invokes a hidden blocking print dialog or relies on popup windows. An explicit Back button reloads the authenticated app route. Printable HTML and CSV downloads are available from immutable snapshots. Native export uses Expo Print then system sharing. Only the generated temporary export is removed after sharing. No report is finalized by export.
 
 Acceptance required for this block:
 - CI: types, lint, complete tests, actual PostgreSQL concurrency and restore, web/mobile exports, Worker dry-run.
