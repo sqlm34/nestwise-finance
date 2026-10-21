@@ -87,3 +87,10 @@ screens or passing unit tests. Native JS export is not a signed device build.
   production release still needs reviewed environment configuration, isolated
   databases/storage, a verified backup, signed build QA, operational acceptance
   and the owner's final release approval. Do not remove gates just to claim ready.
+
+2026-10-20 — Owner decision: manual receipt review for this release
+- Automated OCR is explicitly deferred by the owner. Current acceptance uses
+  saved original images/PDFs, manual item/amount review and explicit payment.
+- Receipt UI no longer offers an unconfigured OCR action. The existing disabled
+  server adapter remains dormant; no document is sent to an OCR provider.
+- This decision removes OCR-provider setup from current release prerequisites.

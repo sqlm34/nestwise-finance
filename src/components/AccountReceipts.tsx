@@ -19,7 +19,7 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
   const [before,setBefore]=useState<string|null>(null),[loadedKey,setLoadedKey]=useState('');
   const [form,setForm]=useState(empty),[money,setMoney]=useState<Record<string,string>>({}),[items,setItems]=useState<{description:string;amount:string;key:string}[]>([]);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState(''),[paid,setPaid]=useState('');
-  const [pending,setPending]=useState<{mode:'review'|'post';body:unknown}|null>(null),[ocrConfirm,setOcrConfirm]=useState(false);
+  const [pending,setPending]=useState<{mode:'review'|'post';body:unknown}|null>(null);
   const [upload,setUpload]=useState<ReceiptFile|null>(null);
   const alive=useRef(true),sending=useRef(false),path=`/v1/user/workspaces/${workspace}/accounts/${account}/receipts`;
   const loadKey=`${path}:${before}:${revision}:${ru}`,loading=loadedKey!==loadKey;
@@ -31,7 +31,7 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
     return()=>{active=false;controller.abort();};
   },[path,before,revision,onSessionExpired,ru,loadKey]);
   function fill(data:ReceiptData){setForm(data);setMoney(Object.fromEntries(moneyFields.map(k=>[k,decimal(data[k])])));setItems(data.items.map(i=>({key:randomUUID(),description:i.description,amount:decimal(i.cents)})));}
-  function open(row:Receipt){setSelected(row);fill(row.review?.data||empty());setPending(null);setError('');setPreview('');setPaid('');setOcrConfirm(false);}
+  function open(row:Receipt){setSelected(row);fill(row.review?.data||empty());setPending(null);setError('');setPreview('');setPaid('');}
   async function action(task:()=>Promise<void>){if(sending.current)return;sending.current=true;setBusy(true);setError('');try{await task();}catch{if(alive.current)setError(ru?'Действие не подтверждено. Повторите запрос с теми же данными.':'Action is not confirmed. Retry the same request.');}finally{sending.current=false;if(alive.current)setBusy(false);}}
   async function responseData(response:Response){if(response.status===401){onSessionExpired();throw new Error();}if(!response.ok){const v=await response.json();if(response.status>=400&&response.status<500&&alive.current)setPending(null);if(v.error==='ocr_not_configured')throw new Error('ocr_not_configured');throw new Error();}return response.json();}
   function currentData(){const amount=(s:string|undefined)=>s?.trim()?cents(s).toString():null;
@@ -45,7 +45,7 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
     const values=await responseData(await authenticatedFetch(`${path}/${selected.hash}`));if(!alive.current)return;open(values[0]);setRevision(v=>v+1);
   });}
   return <Card><Text accessibilityRole="header" style={styles.h2}>{ru?'Чеки и документы':'Receipts and documents'}</Text>
-    <Notice text={ru?'Загрузка и распознавание не создают расход. Подтверждайте оплату только если она ещё не учтена в CRM или журнале.':'Upload and OCR do not book an expense. Confirm payment only if it is not already recorded in CRM or the journal.'}/>
+    <Notice text={ru?'Загрузка и сохранение проверенных данных не создают расход. Подтверждайте оплату только если она ещё не учтена в CRM или журнале.':'Uploading and saving reviewed details do not book an expense. Confirm payment only if it is not already recorded in CRM or the journal.'}/>
     {!!error&&<Notice error text={error}/>}
     {canWrite&&<>{upload?<>
       <Notice text={`${upload.name} · ${upload.bytes.length} bytes · ${ru?'Подтвердите загрузку оригинала.':'Confirm original upload.'}`}/>
@@ -83,9 +83,7 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
           <Button primary label={ru?'Подтвердить':'Confirm'} disabled={busy} onPress={()=>void save()}/>
           <Button label={ru?'Отмена':'Cancel'} disabled={busy||!!error} onPress={()=>setPending(null)}/>
         </>:<>
-          <Button label={ru?'Распознать с OpenAI':'Extract with OpenAI'} disabled={busy} onPress={()=>setOcrConfirm(true)}/>
-          {ocrConfirm&&<><Notice text={ru?'Этот файл будет отправлен OpenAI для распознавания. Результат нужно проверить.':'This file will be sent to OpenAI for extraction. Review the result before saving.'}/>
-            <Button label={ru?'Отправить этот файл':'Send this file'} disabled={busy} onPress={()=>void action(async()=>{try{const v=await responseData(await authenticatedPost(`${path}/${selected.hash}/ocr`,{consent:true}));if(alive.current){fill(parseReceipt(v.data));setOcrConfirm(false);}}catch(e){if(e instanceof Error&&e.message==='ocr_not_configured'){setError(ru?'Распознавание ещё не подключено. Данные можно заполнить вручную.':'OCR is not configured yet. Enter the review manually.');return;}throw e;}})}/></>}
+          <Notice text={ru?'Сверьте данные с оригиналом и заполните поля вручную. Пустая сумма означает «неизвестно»; если сбора нет, укажите 0.':'Check the original and enter its details manually. An empty amount means unknown; enter 0 when a charge does not apply.'}/>
           <TextInput accessibilityLabel={ru?'Продавец':'Supplier'} placeholder={ru?'Продавец':'Supplier'} style={styles.input} value={form.supplier} onChangeText={supplier=>setForm(f=>({...f,supplier}))}/>
           <TextInput accessibilityLabel={ru?'Дата чека YYYY-MM-DD':'Receipt date YYYY-MM-DD'} placeholder="YYYY-MM-DD" style={styles.input} value={form.date} onChangeText={date=>setForm(f=>({...f,date}))}/>
           {items.map((item,i)=><View key={item.key} style={{gap:6}}><TextInput accessibilityLabel={`${ru?'Позиция':'Item'} ${i+1}`} style={styles.input} value={item.description} onChangeText={description=>setItems(v=>v.map(x=>x.key===item.key?{...x,description}:x))}/>
