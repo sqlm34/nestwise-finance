@@ -34,7 +34,9 @@
         "ENVIRONMENT": "staging",
         "AUTH_ENABLED": "true",
         "AUTH_BASE_URL": "https://nestwise-staging.alexeasyrepair.workers.dev",
-        "AUTH_WEB_ORIGIN": "https://nestwise-staging.alexeasyrepair.workers.dev"
+        "AUTH_WEB_ORIGIN": "https://nestwise-staging.alexeasyrepair.workers.dev",
+        "NESTWISE_OCR_ENABLED": "true",
+        "NESTWISE_OCR_MODEL": "gpt-6-luna"
       },
       "r2_buckets": [
         {
