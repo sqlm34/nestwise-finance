@@ -1,3 +1,4 @@
+import {fetchWithDeadline} from '../domain/request-deadline';
 import { createAuthClient } from 'better-auth/react';
 import { expoClient } from '@better-auth/expo/client';
 import * as SecureStore from 'expo-secure-store';
@@ -25,19 +26,19 @@ export async function authenticatedFetch(path: string, signal?: AbortSignal) {
   if(!apiURL) throw new Error('unconfigured');
   // Native cookies live in SecureStore; web cookies remain HttpOnly.
   const cookie=Platform.OS==='web'?'':await authClient.getCookie();
-  return fetch(`${apiURL}${path}`,{
+  return fetchWithDeadline(`${apiURL}${path}`,{
     credentials:'include',signal,headers:cookie?{Cookie:cookie}:{},
   });
 }
 export async function authenticatedPost(path:string,body:unknown,signal?:AbortSignal){
   if(!apiURL)throw new Error('unconfigured');
   const cookie=Platform.OS==='web'?'':await authClient.getCookie();
-  return fetch(`${apiURL}${path}`,{method:'POST',credentials:'include',signal,
+  return fetchWithDeadline(`${apiURL}${path}`,{method:'POST',credentials:'include',signal,
     headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie,'Expo-Origin':`${typeof scheme==='string'?scheme:'nestwise-development'}://`}:{})},body:JSON.stringify(body)});
 }
 
 export async function authenticatedUpload(path:string,bytes:Uint8Array,contentType='text/csv'){
   if(!apiURL)throw new Error('unconfigured');
   const cookie=Platform.OS==='web'?'':await authClient.getCookie();
-  return fetch(apiURL+path,{method:'POST',credentials:'include',headers:{'Content-Type':contentType,...(cookie?{Cookie:cookie,'Expo-Origin':`${typeof scheme==='string'?scheme:'nestwise-development'}://`}:{})},body:Uint8Array.from(bytes)});
+  return fetchWithDeadline(apiURL+path,{method:'POST',credentials:'include',headers:{'Content-Type':contentType,...(cookie?{Cookie:cookie,'Expo-Origin':`${typeof scheme==='string'?scheme:'nestwise-development'}://`}:{})},body:Uint8Array.from(bytes)});
 }

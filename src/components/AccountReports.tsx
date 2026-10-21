@@ -1,5 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {ActivityIndicator,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Platform,Text,TextInput,View} from 'react-native';
 import {randomUUID} from 'expo-crypto';
 import {authenticatedFetch,authenticatedPost} from '../auth/client';
 import {useApp} from '../state';
@@ -43,7 +43,7 @@ export function AccountReports({workspace,account,canWrite,onSessionExpired,pers
   }catch{if(alive.current)setError('send');}finally{lock.current=false;if(alive.current)setSending(false);}
  }
  function propose(){if(!edit)return;try{const allocations=splits.map(s=>({category:s.category,cents:cents(s.amount).toString()}));if(allocations.length)validateAllocations(edit,allocations);setPending({path:'/mappings',body:{id:randomUUID(),transaction:edit.transaction_id,line:edit.line,expected_revision:edit.mapping_revision,allocations},summary:allocations.length?allocations.map(a=>`${reportCategories.find(c=>c.id===a.category)?.[locale]}: ${reportMoney(a.cents)}`).join('; '):tr('Clear the proposal; keep its history.','Снять предложение, сохранив историю.')});setError('');}catch{setError('allocation');}}
- async function output(format:'pdf'|'csv'){if(!report||lock.current)return;lock.current=true;setSending(true);try{await exportReport(report,format);}catch{if(alive.current)setError('export');}finally{lock.current=false;if(alive.current)setSending(false);}}
+ async function output(format:'pdf'|'csv'|'html'){if(!report||lock.current)return;lock.current=true;setSending(true);try{await exportReport(report,format);}catch{if(alive.current)setError('export');}finally{lock.current=false;if(alive.current)setSending(false);}}
  if(detail)return <JournalDetail workspace={detail.source_workspace} account={detail.source_account} name={report?.data.account_name??''} currency={report?.data.currency??'USD'} transaction={detail.transaction_id} onSessionExpired={onSessionExpired} onClose={()=>setDetail(null)} onOpen={id=>setDetail({...detail,transaction_id:id})}/>;
  const totals=report?reportTotals(report):null;
  return <>
@@ -54,7 +54,7 @@ export function AccountReports({workspace,account,canWrite,onSessionExpired,pers
  <TextInput accessibilityLabel={tr('Report from date','Начало отчёта')} value={period.from} onChangeText={from=>setPeriod(p=>({...p,from}))} style={styles.input} editable={!pending&&!sending}/>
  <TextInput accessibilityLabel={tr('Report to date','Конец отчёта')} value={period.to} onChangeText={to=>setPeriod(p=>({...p,to}))} style={styles.input} editable={!pending&&!sending}/>
  <Button label={tr('Calculate / refresh preview','Рассчитать / обновить черновик')} disabled={invalid||sending} onPress={refresh}/>
- {error&&<Notice error text={error==='allocation'?tr('Allocations must exactly equal the line amount, with no duplicate category.','Распределение должно точно совпадать с суммой строки; категории не повторяются.'):error==='conflict'?tr('Data changed or snapshot limit reached. Refresh before saving again.','Данные изменились или достигнут лимит снимков. Обновите отчёт перед сохранением.'):tr('Operation not confirmed. Retry the same command or refresh.','Операция не подтверждена. Повторите ту же команду или обновите данные.')}/>}
+ {error&&<Notice error text={error==='allocation'?tr('Allocations must exactly equal the line amount, with no duplicate category.','Распределение должно точно совпадать с суммой строки; категории не повторяются.'):error==='export'?tr('Export could not open. Allow the print window, or save the HTML copy and print it from your browser. On mobile, check that sharing is available. The saved snapshot is unchanged.','Не удалось открыть экспорт. Разрешите окно печати или сохраните HTML-копию и распечатайте её из браузера. На телефоне проверьте доступность отправки файлов. Снимок отчёта сохранён.'):error==='conflict'?tr('Data changed or snapshot limit reached. Refresh before saving again.','Данные изменились или достигнут лимит снимков. Обновите отчёт перед сохранением.'):tr('Operation not confirmed. Retry the same command or refresh.','Операция не подтверждена. Повторите ту же команду или обновите данные.')}/>}
  {loading&&<ActivityIndicator/>}
  {report&&totals&&<><Text selectable style={styles.muted}>{report.id?tr('Saved snapshot','Сохранённый снимок'):tr('Live preview','Текущий черновик')}: {report.id??report.data.from+' — '+report.data.to}
 SHA-256: {report.hash}</Text>
@@ -62,7 +62,7 @@ SHA-256: {report.hash}</Text>
  <Notice text={`${tr('Unmapped lines','Строки без категории')}: ${totals.unmapped}; ${tr('unreconciled transactions','операции без сверки')}: ${totals.unreconciled}; ${tr('undated / waiting / review','без даты / ожидают / проверка')}: ${report.data.exceptions.missing_paid_date} / ${report.data.exceptions.waiting} / ${report.data.exceptions.needs_review}`}/>
  <Text style={styles.text}>{tr('Unmapped income / costs','Нераспределённые доходы / затраты')}: {reportMoney(totals.unmappedIncome)} / {reportMoney(totals.unmappedExpense)}</Text>
  {!report.id&&canWrite&&<Button label={tr('Review snapshot saving','Подготовить сохранение снимка')} disabled={!!pending||sending} onPress={()=>setPending({path:'/snapshots',body:{id:randomUUID(),from:report.data.from,to:report.data.to,hash:report.hash},summary:tr('Freeze exactly these inputs for accountant review. This does not finalize or approve taxes.','Зафиксировать эти данные для проверки бухгалтером. Это не финализация и не налоговое одобрение.')})}/>}
- {report.id&&<View style={styles.row}><Button label={tr('Print / PDF','Печать / PDF')} disabled={sending} onPress={()=>void output('pdf')}/><Button label={tr('Export lineage CSV','Выгрузить детализацию CSV')} disabled={sending} onPress={()=>void output('csv')}/></View>}
+ {report.id&&<View style={styles.row}><Button label={tr('Print / PDF','Печать / PDF')} disabled={sending} onPress={()=>void output('pdf')}/><Button label={tr('Export lineage CSV','Выгрузить детализацию CSV')} disabled={sending} onPress={()=>void output('csv')}/>{Platform.OS==='web'&&<Button label={tr('Save printable HTML','Сохранить HTML для печати')} disabled={sending} onPress={()=>void output('html')}/>}</View>}
  </>}
  </Card>
  {pending&&<Card><Text style={styles.h2}>{tr('Confirm proposed change','Подтвердить предложение')}</Text><Text style={styles.text}>{pending.summary}</Text><Button primary label={tr('Confirm / retry same command','Подтвердить / повторить ту же команду')} disabled={sending} onPress={()=>void send()}/><Button label={tr('Refresh to check server state','Обновить и проверить состояние сервера')} disabled={sending} onPress={refresh}/></Card>}

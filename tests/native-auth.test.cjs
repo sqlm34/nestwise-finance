@@ -28,6 +28,7 @@ test('native client retains server-prefixed cookie and authenticates the next ac
     const loadClient=()=>vm.runInNewContext(source,{exports,process:{env:{EXPO_PUBLIC_API_URL:'http://localhost:8083'}},__DEV__:true,URL,
       fetch:(url,options)=>fixture.fetch(new Request(url,options)),
       require(name){
+        if(name==='../domain/request-deadline')return {fetchWithDeadline:(url,options)=>require('../.test-build/src/domain/request-deadline.js').fetchWithDeadline(url,options,30000,(u,o)=>fixture.fetch(new Request(u,o)))};
         if(name==='better-auth/react')return {createAuthClient(options){plugin=options.plugins[0];return plugin.getActions(null,{notify(){},atoms:{}});}};
         if(name==='@better-auth/expo/client')return expo;
         if(name==='expo-secure-store')return storage;

@@ -207,3 +207,14 @@ screens or passing unit tests. Native JS export is not a signed device build.
   are immutable and stay Accountant Review while policies remain unapproved.
 - PDF/CSV export uses a saved snapshot. Migration 0020 is additive; recovery
   procedure and scope are documented in ACCOUNTANT_REPORTS.md.
+
+2026-10-21 — First large release block, implementation ready for acceptance
+- Durable prepared manual drafts, immutable pending retries and confirmed-command
+  recovery are scoped to device, API, identity, workspace and account.
+- Overview/journal/settings surface local recovery notices. Network waits are
+  bounded without automatically replaying financial commands.
+- Web print moved out of the main accounting screen; printable HTML fallback
+  accompanies frozen snapshot CSV. Android version 1.0.1 / code 2 is prepared.
+- Local suite: 149 tests, 143 pass, 6 PostgreSQL-only checks deferred to CI.
+- Cloud/browser and signed Android acceptance are still pending; this checkpoint
+  does not mark either large release block complete.

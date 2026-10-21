@@ -47,3 +47,16 @@ test('manual route rejects unauthenticated, foreign origin, unknown fields and c
   assert.equal((await fixture.fetch(req(base()+'/operations',{...op,note:'Changed'}))).status,409);
   assert.equal((await fixture.fetch(req(base()+'/operations?unexpected=1',op))).status,404);
 });
+test('persistent client retry after actual committed API response loss creates one journal entry',async()=>{
+ const {submitDraft,transitionDraft,parseDraft}=require('../.test-build/src/domain/operation-draft.js');
+ const scope={origin:'http://localhost:8083',user:fixture.id,workspace:fixture.workspace,account:fixture.account};let disk=null;
+ const store={read:async s=>parseDraft(disk,s),change:async(s,a)=>{disk=transitionDraft(disk,s,a);return parseDraft(disk,s);}};
+ const op={id:randomUUID(),kind:'expense',paid_on:'2026-10-21',amount_cents:'123',note:'Synthetic durable retry',destination_account:null,reference_operation:null,allocations:[{category:'supplies',cents:'123'}]};
+ await store.change(scope,{type:'prepare',operation:op});
+ const send=async value=>{const response=await fixture.fetch(req(base()+'/operations',value));assert.equal(response.status,200);assert.equal((await response.json()).id,op.id);};
+ await assert.rejects(submitDraft(store,scope,op,async()=>{},async value=>{await send(value);throw Error('connection lost after commit');}));
+ const restored=await store.read(scope);assert.equal(restored.phase,'pending');
+ await submitDraft(store,scope,restored.operation,async()=>{},send);
+ assert.equal((await fixture.db.query('SELECT count(*)::int n FROM nestwise.journal_transactions WHERE manual_id=$1',[op.id])).rows[0].n,1);
+ assert.equal((await store.read(scope)).phase,'confirmed');
+});
