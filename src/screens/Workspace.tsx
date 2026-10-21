@@ -25,6 +25,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   const [expired,setExpired]=useState(false);
   const [administration,setAdministration]=useState<string|null|undefined>(undefined);
   const section=initialSection;
+  const sectionTitle={insights:t('insightsTitle'),journal:t('journalTitle'),events:t('crm'),reconciliation:t('reconciliationTitle'),operations:locale==='ru'?'Новая операция':'New operation',receipts:locale==='ru'?'Чеки':'Receipts',mapping:t('mapping'),settings:t('settings')}[section];
   const setSection=(next:LiveSection)=>router.replace(routes[next] as '/');
   const [selectionError,setSelectionError]=useState(false);
   const [chooseAccount,setChooseAccount]=useState(false);
@@ -34,7 +35,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   const installAccess=useCallback((value:Access|null)=>{accessRef.current=value;setAccess(value);},[]);
   const sessionExpired=useCallback(()=>{requestVersion.current++;installAccess(null);setSelected(null);setExpired(true);setBusy(false);},[installAccess]);
   const selectAccount=(value:Selection)=>{
-    setSelected(value);setChooseAccount(false);setSelectionError(false);
+    setSelected(value);setAdministration(undefined);setChooseAccount(false);setSelectionError(false);
     const current=accessRef.current;if(!current)return;
     void AsyncStorage.setItem(selectionKey(current.user.id),JSON.stringify({workspace:value.workspace,account:value.account})).catch(()=>setSelectionError(true));
   };
@@ -86,7 +87,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   return <SafeAreaView style={{flex:1,backgroundColor:colors.bg}}>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:24,gap:20,maxWidth:1100,width:'100%',alignSelf:'center'}}>
       <View style={styles.between}><Text style={styles.title}>nestwise</Text><Button label={locale==='ru'?'EN':'RU'} onPress={()=>setLocale(locale==='ru'?'en':'ru')}/></View>
-      <Card><Text accessibilityRole="header" style={styles.title}>{access?t('authAccount'):t('authSignIn')}</Text>
+      <Card><Text accessibilityRole="header" style={styles.title}>{access?sectionTitle:t('authSignIn')}</Text>
         {!access&&<Text style={styles.muted}>{t('authHint')}</Text>}
         {!apiURL&&<Notice text={t('authNotConfigured')}/>}
         {!!error&&<Notice error text={error==='authUnavailable'?t('authUnavailable'):error}/>}
