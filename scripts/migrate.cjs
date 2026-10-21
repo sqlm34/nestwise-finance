@@ -22,7 +22,17 @@ async function migrate(client, directory = 'db/migrations') {
         // Earlier Windows-applied migrations may record CRLF bytes. Accept only
         // that exact line-ending variant; never rewrite historical hashes.
         const legacy=createHash('sha256').update(source.replace(/\n/g,'\r\n')).digest('hex');
-        if (applied.get(version)!==hash && applied.get(version)!==legacy) throw new Error('Previously applied migration changed');
+        if (applied.get(version)!==hash && applied.get(version)!==legacy) {
+          // One historical staging bundle recorded a different checksum for 0014.
+          // Its retained SQL matches this exact canonical source; also verify the
+          // deployed function that changed during that release. Preserve history.
+          const attested=version==='0014_manual_operations.sql'
+            && hash==='980cef4bcaca0803089a5b9cfd89ed65be05942723fda337a5676e2b5975850d'
+            && applied.get(version)==='37cc3c0bb2c28aba824cf178d5f10313c799f1996bef8d404cb6177c38893a51';
+          if(!attested)throw new Error('Previously applied migration changed');
+          const proof=await client.query("SELECT md5(replace(prosrc,E'\\r\\n',E'\\n')) AS body_hash FROM pg_proc WHERE oid=to_regprocedure('nestwise.post_manual_operation(text,uuid,uuid,jsonb)')");
+          if(proof.rows[0]?.body_hash!=='e8304e817442209977754299625c6bbd')throw new Error('Historical migration function differs');
+        }
         continue;
       }
       await client.query(source);
