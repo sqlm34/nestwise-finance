@@ -1,112 +1,54 @@
 # Nestwise Finance
 
-Expo / React Native / TypeScript application for family, personal and business finances.
+Expo / React Native / TypeScript application for personal, family and business finances. The current delivery is an authenticated **staging application**, with a verified Android 1.0.3 build. It is not a production release. Workiz is excluded.
 
-**Phase 2A development preview. This is not a live accounting system.**
-All transaction fixtures are synthetic. Alex CRM, banking and OCR are not connected.
-Uploaded CSV files are parsed locally, kept in memory, and never posted to a ledger.
-Workiz is excluded from this project.
+## Available in staging
 
-## Run
+- English/Russian interface; authenticated workspaces, account grants and audit history.
+- Immutable journal, manual income/expenses, allocations, linked refunds and transfers; scoped drafts and explicit idempotent retries.
+- CSV statement archive with private original/backup storage, evidence search, reconciliation and duplicate-protected bank-only booking.
+- Receipt originals and manual review; native camera capture. Automatic OCR is deferred by owner choice.
+- Business-only categorized cash Financial Statement, immutable snapshots and PDF/CSV handoff. No accountant approval workflow is required. Personal purchases enter only through explicit business portions.
+- Existing parts register: known cost, unknown purchase dates, existing-payment search/linkage, job consumption and returns without creating a second cash expense.
+- CRM receiver and separately developed Alex-CRM producer tested with synthetic canary data. The channel is currently disabled; no production or historical import is implied.
 
-Use Node **24.19.0** (`.nvmrc`) and npm.
+For evidence and remaining release requirements see [release readiness](docs/RELEASE_READINESS.md), [native acceptance](docs/RELIABLE_MOBILE_ACCEPTANCE.md) and [Statement/parts behavior](docs/STATEMENT_HANDOFF_AND_PARTS.md). Earlier dated status files are historical checkpoints, not the current feature inventory.
 
-```sh
-npm ci
-npm run web
+## Development and checks
+
+Use Node **24.19.0** from `.nvmrc`. Linux CI installs dependencies with `npm ci`, then runs types, lint, tests, web/mobile JS exports, Worker dry-run and real PostgreSQL concurrency/restore checks.
+
+In this Windows workspace (spaces, Cyrillic and `&` in its path), use PowerShell:
+
+```powershell
+& '.\scripts\check-windows.ps1'
 ```
 
-The same React Native source targets Android, iOS and web. The web build is a
-development preview, not the later accountant portal.
+The launcher selects the supported bundled Node and invokes JavaScript tools directly. Do not use generated `.cmd` wrappers for these checks. See [AGENTS.md](AGENTS.md). Other CLI tasks should likewise invoke their JavaScript entry point under the selected Node.
 
 ```sh
-npm run typecheck
-npm run lint
+# Linux / a supported shell environment
+npm ci
+npm run web
 npm test
 npm run build:web
 npm run build:mobile
 npm run worker:check
+node scripts/release-preflight.cjs
 ```
 
-Native JavaScript export is not an APK/IPA or proof of behavior on a real device.
+The preflight is offline: it checks environment separation and records commit, dirty-tree state, version and normalized migration hashes in `.local/release-evidence.json`. CI retains that file as `release-evidence`. It does not connect to databases, inspect secret values or authorize production. Native JS export is not a signed APK/IPA or device acceptance.
 
-## Implemented
+## Bank input and documents
 
-- Four independent local workspace views.
-- Full English/Russian interface and device-local language preference.
-- Overview, searchable/filterable/sortable transactions and transaction details.
-- CSV selection, exact integer-cent parsing, SHA-256 file identity, preview,
-  sign checks, invalid-row diagnostics and possible duplicate detection.
-- Original 44 accountant category IDs and English labels, with Russian labels.
-- Explicitly disconnected CRM page and unimplemented reconciliation disclosure.
-- Staging-only Worker health probe; all financial endpoints return 404.
+CSV accepts `Date,Description,Amount`, `Date,Description,Debit,Credit`, and recognized Chase-style columns. Dates are ISO `YYYY-MM-DD` or US `M/D/YYYY`; currency is USD. Original archive limits and review rules are documented in [statement archive](docs/STATEMENT_ARCHIVE_STATUS.txt). Unsupported scanned bank PDFs, OFX/QFX and unverified bank layouts are not supported adapters; representative redacted samples are still needed. Equal amounts never establish a match automatically.
 
-CSV columns: `Date,Description,Amount` (signed amount), or
-`Date,Description,Debit,Credit`. Chase checking-style
-`Details,Posting Date,Description,Amount` is also recognized.
-Dates must be ISO `YYYY-MM-DD` or US `M/D/YYYY`; currency is USD.
-Maximum 2 MB / 5,000 rows. Identical rows are flagged, never silently removed.
-South National currently uses the explicit generic column layout. Real bank
-fixtures are still required before claiming a verified bank-specific adapter.
+## Delivery
 
-PDF/OCR/OFX/QFX, bank balances, durable file storage, ledger posting,
-mobile login, automatic matching, the CRM sender, cloud database provisioning
-and accountant report generation are **not yet implemented**.
+The repository is public by owner decision. Never commit credentials, real financial data, receipts or customer information. Features use branches and PRs. The existing 21-PR stack is consolidated through PR21 after verifying ancestry; see the release runbook before merging or changing deployment targets.
 
-## Server foundation (phase 2A)
+Staging deploys only from the selected branch after CI and uses GitHub environment secrets. EAS builds only explicitly selected revisions or manual authorized jobs. There is no automated production/store submission. Production has no public route and remains disabled. Physical iOS distribution still needs Apple signing access; the simulator export is not an installable iPhone release.
 
-The new receiver validates HMAC-signed CRM events and commits a durable inbox
-and balanced immutable journal. Sessions, workspace membership and account
-grants protect the read API. Refunds, supplier credits, fee refunds, corrections,
-out-of-order delivery and idempotency are covered by database tests.
-The deployed receiver remains disabled and production is explicitly refused.
+Database changes use versioned migrations and separate restore drills. Current Statement v2 rollback needs compatible API code; do not blindly deploy an old v1 app against the current database. CRM changes belong only in Alex-CRM's repository.
 
-See [CRM API contract and ERD](docs/CRM_CONTRACT.md),
-[OpenAPI](docs/openapi.yaml), and [migration/restore runbook](db/README.md).
-`npm run demo:ledger` opens a synthetic, in-memory PostgreSQL demonstration
-at `http://127.0.0.1:8082`. It is a verification tool, not the user-facing app.
-CI runs PostgreSQL 17 concurrency tests and a dump/restore verification.
-
-## Version control and CI
-
-Public repository by owner decision on 2026-10-20. No live financial data,
-credentials, receipts or customer information may be committed.
-Features use `feature/*` branches and Pull Requests into protected `main`.
-The required `checks` job runs types, lint, tests, web/native JS exports and
-Worker dry-run. Actions are pinned to commit SHAs.
-
-The staging job requires `STAGING_ENABLED=true` and the staging environment
-secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. It runs only after
-successful checks on trusted push events, never on fork PR events.
-Use a scoped Cloudflare service token; do not copy a developer OAuth session
-into GitHub secrets.
-
-EAS has separate development, staging and production profiles and application
-identifiers. Staging creates an Android APK and an iOS Simulator build.
-Physical iOS installation requires a later signing/device-provisioning setup.
-The manual EAS workflow requires `EAS_ENABLED=true`, `EAS_PROJECT_ID`, and
-the `EXPO_TOKEN` staging secret. There is no automated store submission or
-production deployment workflow.
-
-## Architecture and next stages
-
-See [implementation and rollback plan](docs/IMPLEMENTATION_PLAN.txt),
-[release status](docs/PHASE_1_STATUS.txt), and
-[dependency review](docs/DEPENDENCY_REVIEW.txt).
-
-Nestwise will have its own database. CRM modifications belong only in the
-Alex-CRM repository. No production CRM code or data was changed for this phase.
-Database migration files will be versioned, tested in isolation, and accompanied
-by restore procedures before any schema is deployed.
-
-## Reference material
-
-`reference/design.html` is the supplied design concept, not the application.
-`reference/financial-statement.pdf` is the supplied blank reconstructed form,
-not a generated financial report. Its labels are preserved in
-`src/data/accountant-categories.json`.
-
-Framework setup references:
-[Expo SDK 58](https://docs.expo.dev/versions/v58.0.0/),
-[EAS profiles](https://docs.expo.dev/build/eas-json/),
-[Cloudflare GitHub Actions](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/).
+[API contract](docs/CRM_CONTRACT.md) · [OpenAPI](docs/openapi.yaml) · [Database recovery](db/README.md) · [Dependency review](docs/DEPENDENCY_REVIEW.txt)

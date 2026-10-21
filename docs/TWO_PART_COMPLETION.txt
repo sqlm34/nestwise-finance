@@ -253,3 +253,10 @@ screens or passing unit tests. Native JS export is not a signed device build.
   immutable snapshots/evidence, permission/concurrency/restore and release audit.
 - Do not call the overall project production-complete while physical-device,
   signed iPhone, representative bank PDF or production environment gates remain.
+
+2026-10-21 — Current release inventory
+- See RELEASE_READINESS.md for the consolidated current status. Earlier unchecked
+  phase lists above are historical, not a count of missing implemented features.
+- Android 1.0.3 native acceptance is recorded in RELIABLE_MOBILE_ACCEPTANCE.md.
+- Statement/parts are implemented; integration of the 21-PR chain and production
+  prerequisites remain explicit. No production deployment or store submission.

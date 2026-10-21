@@ -33,6 +33,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - name: Verify release configuration and record migration hashes
+        run: node scripts/release-preflight.cjs
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -55,6 +57,12 @@ jobs:
           name: web-preview
           path: dist
           retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-evidence
+          path: .local/release-evidence.json
+          include-hidden-files: true
+          retention-days: 30
   staging:
     needs: checks
     # Feature pushes always run checks. Deploy only the explicitly selected branch
