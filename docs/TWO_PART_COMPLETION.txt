@@ -148,3 +148,23 @@ screens or passing unit tests. Native JS export is not a signed device build.
   complete for these scenarios; live cloud auth/deployment acceptance remains open.
 - Existing CRM wrangler.preview.json targets the alex-crm-api Worker and must not
   be used as an isolated test deployment. No CRM cloud resource was modified.
+
+2026-10-20 — Separate CRM cloud staging provisioning
+- Owner explicitly approved the new isolated database and its scoped credential.
+  Created alex_crm_nestwise_staging and alex_crm_nestwise_worker in the existing
+  Neon staging project. The role cannot CONNECT to nestwise_staging and has no
+  superuser, CREATEDB, CREATEROLE, BYPASSRLS or inherited-role permissions.
+- Separate Worker alex-crm-nestwise-staging has only DATABASE_URL as an encrypted
+  secret, no public/preview URL, routes, schedules or storage bindings. Dispatch
+  and external integrations are OFF. The live CRM Worker was not changed.
+- CRM 766476f generates atomic, guarded bootstrap SQL from actual source files
+  and the real auth handler. Cloud verification: 11 migration hashes recorded,
+  capture false, zero events, correct table owners, temporary SET grants removed.
+- CI 39527604758 passed, including fresh-schema auth tests and unsafe-config
+  rejection. Private Cloudflare HTTP tester reached the actual auth handler and
+  database; anonymous access returns the expected 401. Public activation, app
+  owner acceptance and real cross-service delivery remain separate gates.
+- Private cloud auth acceptance also passed: synthetic owner 200, technician
+  403, expired session 401. The temporary session was explicitly expired and
+  removed from the browser tester; zero active test sessions and zero events
+  verified. This does not establish delivery or public/mobile CRM acceptance.
