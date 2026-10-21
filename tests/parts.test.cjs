@@ -71,3 +71,20 @@ test('parts writes enforce web/native origin and retain account scope',async()=>
  for(const headers of [{cookie,'Content-Type':'application/json'},{cookie,'Content-Type':'application/json',origin:'https://evil.invalid'}])assert.equal((await f.fetch(new Request('http://localhost:8787'+root()+'/parts',{method:'POST',headers,body:JSON.stringify(c)}))).status,403);
  const other=randomUUID();assert.equal((await f.fetch(req(`/v1/user/workspaces/${other}/accounts/${f.account}/parts`))).status,404);
 });
+
+test('personally paid stock requires an explicit business share and current source access',async()=>{
+ const subject=`better-auth:${f.id}`,personal=randomUUID(),account=randomUUID(),stock=randomUUID(),operation=randomUUID();
+ await f.db.query("INSERT INTO nestwise.workspaces VALUES($1,'Synthetic personal stock','personal')",[personal]);
+ await f.db.query("INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES($1,$2,'Personal card')",[account,personal]);
+ await f.db.query("INSERT INTO nestwise.memberships SELECT $1,id,'owner',true FROM nestwise.users WHERE subject=$2",[personal,subject]);
+ await f.db.query('SELECT nestwise.post_manual_operation($1,$2,$3,$4)',[subject,personal,account,JSON.stringify({id:operation,kind:'expense',paid_on:'2025-01-10',amount_cents:'10000',note:'Synthetic old stock',destination_account:null,reference_operation:null,allocations:[{category:'supplies',cents:'10000'}]})]);
+ const transaction=(await f.db.query('SELECT id FROM nestwise.journal_transactions WHERE manual_id=$1',[operation])).rows[0].id;
+ assert.equal((await post({id:randomUUID(),lot:stock,expected_revision:0,kind:'create',name:'Personally paid part',quantity:1,unit_cents:'6000',paid_on:null,note:''})).status,200);
+ const evidence={id:randomUUID(),lot:stock,expected_revision:1,kind:'evidence',transaction,paid_on:'2025-01-10',note:''};
+ assert.equal((await post(evidence)).status,400);
+ assert.equal((await f.fetch(req(root()+'/reports/owner-expenses',{id:randomUUID(),transaction,business_cents:'6000'}))).status,200);
+ assert.equal((await post(evidence)).status,200);
+ await f.db.query('DELETE FROM nestwise.memberships WHERE workspace_id=$1',[personal]);
+ assert.equal((await post({...evidence,id:randomUUID(),expected_revision:2})).status,404);
+ assert.equal((await f.db.query('SELECT count(*)::int n FROM nestwise.journal_transactions WHERE manual_id=$1',[operation])).rows[0].n,1);
+});

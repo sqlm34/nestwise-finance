@@ -456,6 +456,57 @@ paths:
         '401': {description: Missing or expired session}
         '404': {description: Unknown or inaccessible transaction}
         '503': {description: Temporarily unavailable}
+  /v1/user/workspaces/{workspace}/accounts/{account}/parts:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+    get:
+      description: Business account stock evidence, including archived lots and immutable usage history. Never posts cash. Live session and account membership required.
+      responses:
+        '200': {description: Array of at most 1000 lots with revision and state; exact unit cents are strings and unknown paid_on is null}
+        '401': {description: Missing or expired session}
+        '404': {description: Inaccessible business account}
+    post:
+      description: >
+        Append create, evidence, consume, return or archive command. Owner/accountant
+        write access and trusted Origin required. UUID id is an exact-retry key;
+        UUID lot and expected_revision prevent stale updates. Strict command shapes
+        are defined by src/domain/parts.ts. Consumption never creates an expense.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, lot, kind, expected_revision]
+              properties:
+                id: {type: string, format: uuid}
+                lot: {type: string, format: uuid}
+                kind: {enum: [create, evidence, consume, return, archive]}
+                expected_revision: {type: integer, minimum: 0, maximum: 999}
+      responses:
+        '200': {description: Command id; exact retry returns the same result}
+        '400': {description: Invalid command or impossible stock movement}
+        '401': {description: Missing or expired session}
+        '403': {description: Untrusted request origin}
+        '404': {description: Inaccessible account or source payment}
+        '409': {description: Stale revision, allocation exceeds payment, or explicit register limit}
+  /v1/user/workspaces/{workspace}/accounts/{account}/purchase-candidates:
+    get:
+      description: Search existing paid expense journals accessible to the session. Search alone does not establish business attribution or create a posting.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: query, schema: {type: string, maxLength: 120}, description: Literal merchant/note substring}
+        - {in: query, name: from, schema: {type: string, format: date}}
+        - {in: query, name: to, schema: {type: string, format: date}}
+        - {in: query, name: min, schema: {type: string, pattern: '^(0|[1-9][0-9]{0,15})$'}, description: Minimum cents, at most 9007199254740991}
+      responses:
+        '200': {description: At most 100 source payments including actual payment date, refund cents and bank provenance when available}
+        '400': {description: Invalid or duplicate search parameter}
+        '401': {description: Missing or expired session}
+        '404': {description: Inaccessible source account}
+        '409': {description: Too many matches; narrow the search rather than receive truncated results}
 components:
   securitySchemes:
     session: {type: http, scheme: bearer}
