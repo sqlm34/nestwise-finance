@@ -121,3 +121,17 @@ screens or passing unit tests. Native JS export is not a signed device build.
 - Owner confirmed successful entry in the application. The login blocker is
   closed. Camera, offline writes and remaining end-to-end mobile scenarios are
   separate pending acceptance items; this does not mark the full app complete.
+
+2026-10-20 — CRM correction and lifecycle integration checkpoint
+- CRM companion 7285bed adds audited owner-reviewed paid-cost correction chains
+  and finalize/reopen/empty-void assertions. Corrections retain original payment
+  dates and append only deltas; statuses create no monetary transactions.
+- CI 39524483856 passed against PostgreSQL 17: concurrent approvals, immutable
+  audit backup/restore and signed two-database receiver delivery all succeeded.
+  Separate higher/lower/zero corrections, repeated commands and delivery retries
+  retain correct totals. Paid cancellation, changed originals and mixed payment
+  edits remain blocked.
+- This closes implementation/test coverage for these supported source paths,
+  not live integration acceptance. CRM migrations and capture/dispatch remain
+  disabled. Supplier/customer refunds without source evidence, historical
+  approval and browser acceptance of source-review controls remain open.
