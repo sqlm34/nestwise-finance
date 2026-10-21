@@ -17,10 +17,26 @@ Affected dependency chains include node-forge, braces, sprintf-js, tar, uuid,
 joi, minimatch, yaml and EAS/Expo build tooling. Some advisories report no
 available fix within their existing package range.
 
-This is an unresolved production release gate. The development preview does
-not accept server-side financial uploads, run a bank connector or process
-untrusted repository code with credentials. Before production, review current
+This is an unresolved production release gate. The application now accepts
+authenticated receipt and statement uploads in isolated staging; the earlier
+preview-only threat model is no longer sufficient. Before production, review current
 advisories, adopt supported patched versions, regenerate the lockfile, rerun
 native builds and document residual risk. Do not label this build security-audited.
 
 Raw local audit output lives in ignored artifacts/audit.json.
+
+2026-10-20 follow-up (native authentication build 13244e5)
+- Removed the project-local EAS CLI dev dependency; CI uses the explicitly
+  pinned eas-cli@25.2.0 through npx. The application lockfile remains version 2.
+  All retained package versions match the previous lockfile; 359 package nodes
+  were removed. This is tooling isolation, not a complete security remediation.
+- npm audit --omit=dev reports 27 affected nodes (8 moderate, 19 high), no
+  critical findings. Expo lists its build tooling under production dependencies,
+  so this count alone does not establish reachability in the deployed Worker or
+  mobile bundle. Independent leaf advisories are braces, node-forge and uuid;
+  parent packages account for the remaining transitive findings.
+- Suggested automatic fixes include downgrading Expo to 44 and React Native
+  to 0.72. Do not apply these incompatible downgrades. Production still needs
+  reviewed patched dependency paths and build/runtime exposure analysis.
+- Current raw audit: ignored .local/audit-runtime.json. No audit-fix mutation
+  was applied. Removing the EAS CLI did not change the runtime package versions.

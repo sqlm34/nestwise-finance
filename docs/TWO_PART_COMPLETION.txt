@@ -94,3 +94,21 @@ screens or passing unit tests. Native JS export is not a signed device build.
 - Receipt UI no longer offers an unconfigured OCR action. The existing disabled
   server adapter remains dormant; no document is sent to an OCR provider.
 - This decision removes OCR-provider setup from current release prerequisites.
+
+2026-10-20 — Cash-basis browser and native authentication checkpoint
+- Staging 4980771 / migration 0019: owner authenticated in the browser. On the
+  synthetic clearing account, October cash totals are receipts 100 USD, refunds
+  10 USD, expenses 6 USD, internal transfer 20 USD and clearing movement 64 USD.
+  The receipts drilldown returns exactly the original 100 USD posting with its
+  payment date and source operation ID. No actual financial records were added.
+- Manual receipt review is visible; OCR action is absent. The existing synthetic
+  receipt remains unposted, and posting is disabled without a payment date.
+- Installed Android build 86a57a3 opened Overview but failed account login.
+  Root cause: Expo auth client filtered out the server's nestwise cookie prefix.
+  Fix 13244e5 sets the matching prefix while retaining SecureStore persistence.
+- Real auth-plugin/server regression covers login, fresh-client cookie restore,
+  native authenticated reads and writes, idempotent retry, sign-out and rejected
+  writes after sign-out. It uses a local synthetic database only.
+- Replacement APK build requested by GitHub Actions run 39521202007. Device
+  acceptance remains pending until the signed replacement is installed and the
+  owner confirms login. Do not mark native acceptance complete from these tests.
