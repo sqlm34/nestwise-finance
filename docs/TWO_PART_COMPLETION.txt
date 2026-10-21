@@ -168,3 +168,24 @@ screens or passing unit tests. Native JS export is not a signed device build.
   403, expired session 401. The temporary session was explicitly expired and
   removed from the browser tester; zero active test sessions and zero events
   verified. This does not establish delivery or public/mobile CRM acceptance.
+
+2026-10-21 — CRM cloud canary and live application navigation
+- CRM PR94 / a5684c4: actual private Worker service-binding delivery succeeded.
+  Two synthetic payments (100 USD on Oct 19, 250 USD on Oct 20) produced exactly
+  two receiver events and two balanced journal transactions. Replay after an
+  artificial lost ACK did not duplicate money. General and integration CI passed.
+- Canary is CLOSED: capture/dispatch false, receiver connection disabled,
+  ingestion false, one-hour key revoked on both Workers, session expired,
+  no public CRM URL, route, cron or retained receiver service binding.
+- Main app routes now render authenticated financial components rather than
+  sample totals: cash overview, journal, CRM events, bank evidence/reconciliation,
+  manual operations and receipts. Explicit /demo retains the visual sample.
+- Account selection is scoped to authenticated identity and revalidated against
+  current server access on route focus. Invalid/revoked choices are not replaced
+  with another account. Unfocused views clear protected state; stale requests
+  cannot restore it. No financial data is cached in the selection preference.
+- Mapping remains an unapproved reference dictionary. Accountant policy,
+  frozen report generation, native camera/offline scenarios, bank PDF samples,
+  signed iOS release and production readiness are still outstanding.
+- This navigation change requires no new database migration. Cloud database
+  baseline remains 0019; it does not enable integration or production.

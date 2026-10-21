@@ -4,7 +4,7 @@ const origin='https://nestwise-staging.alexeasyrepair.workers.dev';
   const health=await fetch(`${origin}/health`);
   assert.equal(health.status,200);
   assert.deepEqual(await health.json(),{service:'nestwise',environment:'staging',status:'ok',financialIngestion:false});
-  for(const path of ['/','/account','/activate']) {
+  for(const path of ['/','/account','/activate','/transactions','/bank','/reconcile','/crm','/receipts','/operations','/mapping','/settings','/demo']) {
     const page=await fetch(origin+path,{headers:{accept:'text/html','sec-fetch-mode':'navigate'}});
     assert.equal(page.status,200);assert.match(page.headers.get('content-type'),/text\/html/);
     assert.match(await page.text(),/_expo\/static\/js\/web/);

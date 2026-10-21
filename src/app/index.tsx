@@ -1,1 +1,1 @@
-export { default } from '../screens/Overview';
+export {default} from '../screens/Workspace';
