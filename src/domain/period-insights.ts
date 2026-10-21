@@ -1,3 +1,4 @@
+import {exactUsd} from './exact-money';
 import {journalCodes,type JournalCode} from './journal';
 export type Period={from:string;to:string};
 export type PeriodSummary=Period & {transaction_count:string;missing_paid_date:string;totals:Record<JournalCode,string>};
@@ -61,6 +62,6 @@ export function periodMetrics(period:PeriodSummary):Record<Metric,bigint>{
   return {receipts,refunds,net_receipts:receipts-refunds,parts_cost:parts,fees,recorded_difference:receipts-refunds-parts-fees-BigInt(t.expenses),expenses:BigInt(t.expenses),transfers:BigInt(t.transfers),clearing:BigInt(t.clearing),parts_payable:-BigInt(t.parts_payable)};
 }
 export function insightMoney(cents:bigint,locale:'en'|'ru'):string{
-  const absolute=cents<0n?-cents:cents;
-  return `${cents<0n?'−':''}${new Intl.NumberFormat(locale==='ru'?'ru-RU':'en-US',{maximumFractionDigits:0}).format(absolute/100n)}${locale==='ru'?',':'.'}${(absolute%100n).toString().padStart(2,'0')} USD`;
+  return exactUsd(cents,locale);
 }
+

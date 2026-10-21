@@ -16,3 +16,5 @@ Acceptance required for this block:
 No database migration, production change, CRM activation, tax approval or store publication is part of this block.
 
 Definitive server validation errors (`invalid_manual_operation`, `manual_refund_exceeded`) retain a rejected draft that can be corrected. Generic 4xx/5xx, malformed replies, changed identity or lost access never establish absence of a prior posting and do not unlock a pending command.
+
+Android acceptance on 2026-10-21: owner reported launch crash after installing 1.0.1 (2). Device crash log identifies TypeError: Cannot convert BigInt to number in insightMoney / AccountInsights. Installation success was not runtime acceptance. Replaced Intl BigInt formatting in both overview and journal with exact decimal-string grouping; added regression coverage for missing Intl BigInt support, both locales, negative/sub-dollar and PostgreSQL bigint-limit values. Replacement APK and device acceptance remain required. Temporary build monitor remains paused at owner request.

@@ -1,3 +1,4 @@
+import {exactUsd} from './exact-money';
 export const journalCodes=['clearing','receipts','refunds','parts_cost','parts_payable','fees','expenses','transfers'] as const;
 export type JournalCode=typeof journalCodes[number];
 export type JournalTransaction={
@@ -50,9 +51,7 @@ export function parseJournal(value:unknown):JournalPage {
 // PostgreSQL bigint cents can exceed Number precision; never convert to floating point.
 export function journalMoney(cents:string,locale:'en'|'ru',currency:string):string {
   if(!integer.test(cents)||cents.length>20||currency!=='USD')throw new Error('invalid_journal');
-  const value=BigInt(cents),absolute=value<0n?-value:value;
-  const whole=new Intl.NumberFormat(locale==='ru'?'ru-RU':'en-US',{maximumFractionDigits:0}).format(absolute/100n);
-  return `${value<0n?'−':''}${whole}${locale==='ru'?',':'.'}${(absolute%100n).toString().padStart(2,'0')} ${currency}`;
+  return exactUsd(BigInt(cents),locale);
 }
 export function journalDate(value:string,locale:'en'|'ru'):string {
   timestamp(value);
@@ -60,3 +59,4 @@ export function journalDate(value:string,locale:'en'|'ru'):string {
     year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'UTC',hour12:false,
   }).format(new Date(value))+' UTC';
 }
+
