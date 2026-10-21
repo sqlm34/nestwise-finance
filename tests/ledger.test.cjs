@@ -62,6 +62,7 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0018_statement_periods.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0019_cash_basis_reads.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0020_accountant_reports.sql','utf8'));
+    for(const name of ['0021_parts_register.sql','0022_statement_handoff.sql','0023_purchase_search.sql'])await db.exec(readFileSync('db/migrations/'+name,'utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
@@ -555,5 +556,19 @@ test('PostgreSQL report proposals serialize concurrent revisions and snapshots s
   const snapshots=await Promise.all(clients.map(c=>c.query('SELECT nestwise.save_report_snapshot($1,$2,$3,$4,$5,$6,$7) result',args)));
   assert.deepEqual(snapshots[0].rows,snapshots[1].rows);
   await assert.rejects(clients[0].query('SELECT * FROM nestwise.report_snapshots'),/permission denied/);
+ }finally{await Promise.all(clients.map(c=>c.end()));}
+});
+
+test('PostgreSQL serializes competing stock usage without negative inventory or cash postings',{skip:!process.env.TEST_DATABASE_URL},async()=>{
+ const {Client}=require('pg'),clients=[new Client({connectionString:process.env.TEST_DATABASE_URL}),new Client({connectionString:process.env.TEST_DATABASE_URL})];
+ const lot=randomUUID(),create={id:randomUUID(),lot,expected_revision:0,kind:'create',name:'Synthetic concurrency part',quantity:1,unit_cents:'123',paid_on:null,note:''};
+ await sql('SELECT nestwise.parts_command($1,$2,$3,$4)',['test-owner',workspace,account,JSON.stringify(create)]);
+ const before=(await sql('SELECT count(*)::int n FROM nestwise.journal_transactions'))[0].n;
+ await Promise.all(clients.map(c=>c.connect()));try{
+  await Promise.all(clients.map(c=>c.query('SET ROLE nestwise_api')));
+  const outcomes=await Promise.allSettled(clients.map((c,i)=>c.query('SELECT nestwise.parts_command($1,$2,$3,$4)',['test-owner',workspace,account,JSON.stringify({id:randomUUID(),lot,expected_revision:1,kind:'consume',quantity:1,job:'CONCURRENT-'+i,used_on:'2026-10-21'})])));
+  assert.equal(outcomes.filter(x=>x.status==='fulfilled').length,1);assert.match(outcomes.find(x=>x.status==='rejected').reason.message,/parts_conflict/);
+  assert.equal((await sql('SELECT state FROM nestwise.parts_current WHERE lot_id=$1',[lot]))[0].state.used,1);
+  assert.equal((await sql('SELECT count(*)::int n FROM nestwise.journal_transactions'))[0].n,before);
  }finally{await Promise.all(clients.map(c=>c.end()));}
 });

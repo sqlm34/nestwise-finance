@@ -218,3 +218,38 @@ screens or passing unit tests. Native JS export is not a signed device build.
 - Local suite: 149 tests, 143 pass, 6 PostgreSQL-only checks deferred to CI.
 - Cloud/browser and signed Android acceptance are still pending; this checkpoint
   does not mark either large release block complete.
+
+2026-10-21 — Owner clarification: Statement handoff, not accountant approval
+- The product prepares categorized income/expenses and a Financial Statement for
+  the owner to hand to the accountant. An in-app accountant approval workflow is
+  NOT a release requirement. Earlier requirements for mandatory accountant policy
+  approval/finalization are superseded for this handoff document.
+- Keep factual exceptions (missing dates, uncategorized lines, duplicate risks)
+  visible; do not represent category assignment as approval of a tax deduction.
+- Personally paid business parts remain explicitly attributable to business.
+- Parts purchased earlier and later used on a job require distinct purchase/payment
+  and job-consumption facts. With the confirmed cash basis, consuming existing
+  stock must not create a second cash expense. Late entry retains actual payment
+  date/account; availability of historical purchase evidence is being clarified.
+- Implement this clarified reporting/source scope in the second large block;
+  complete the already queued Android acceptance for the first block first.
+- Owner follow-up: historical part cost is usually known, purchase date sometimes
+  unknown. Preserve known cost and an explicit unknown payment-date state; do not
+  substitute usage/entry dates or invent a period. Keep undated purchase evidence
+  separately visible for later owner completion, while job cost/consumption can
+  reference the known historical cost without a duplicate cash posting.
+- Owner clarification: recover historical part purchase evidence from uploaded
+  bank statements, including personal accounts. Offer candidates by amount,
+  merchant and period for explicit confirmation; equal amounts alone are not
+  proof. Support a payment covering several parts, preserve booking/payment date
+  distinctions, and link existing evidence/postings instead of booking twice.
+
+2026-10-21 — Owner continues all available work while away
+- Phone disconnected for about four hours; do not install Android. Temporary
+  Android monitoring is PAUSED. Continue implementation and cloud/web checks.
+- Second block branch feature/statement-stock-completion is stacked on PR20.
+- Scope: Statement handoff without accountant approval, old stock with unknown
+  paid dates, job consumption without cash duplication, existing purchase search,
+  immutable snapshots/evidence, permission/concurrency/restore and release audit.
+- Do not call the overall project production-complete while physical-device,
+  signed iPhone, representative bank PDF or production environment gates remain.

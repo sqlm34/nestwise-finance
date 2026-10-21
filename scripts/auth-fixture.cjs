@@ -3,7 +3,7 @@ const {readFileSync}=require('node:fs');
 const {randomUUID,randomBytes}=require('node:crypto');
 async function createAuthFixture() {
   const {db,pool}=await require('./auth-test-db.cjs').authTestDatabase();
-  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql','0008_event_details.sql','0009_account_period_insights.sql','0010_reconciliation_candidates.sql','0011_saved_reconciliation.sql','0012_statement_archive.sql','0013_statement_evidence.sql','0014_manual_operations.sql','0015_workspace_admin.sql','0016_receipt_evidence.sql','0017_bank_booking.sql','0018_statement_periods.sql','0019_cash_basis_reads.sql','0020_accountant_reports.sql'])
+  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql','0008_event_details.sql','0009_account_period_insights.sql','0010_reconciliation_candidates.sql','0011_saved_reconciliation.sql','0012_statement_archive.sql','0013_statement_evidence.sql','0014_manual_operations.sql','0015_workspace_admin.sql','0016_receipt_evidence.sql','0017_bank_booking.sql','0018_statement_periods.sql','0019_cash_basis_reads.sql','0020_accountant_reports.sql','0021_parts_register.sql','0022_statement_handoff.sql','0023_purchase_search.sql'])
     await db.exec(readFileSync(`db/migrations/${name}`,'utf8'));
   const {hashPassword}=await import('better-auth/crypto');
   const id=randomUUID(),workspace=randomUUID(),account=randomUUID(),localUser=randomUUID();
@@ -22,6 +22,9 @@ async function createAuthFixture() {
   const {authConfiguration,userApi}=require('../.test-build/worker/user-api.js');
   const auth=await createAuth(authConfiguration(env),pool);
   const ledger=()=>({
+    purchaseCandidates:async(...args)=>(await db.query('SELECT nestwise.purchase_candidates($1,$2,$3,$4,$5,$6,$7) result',args)).rows[0].result,
+    readParts:async(...args)=>(await db.query('SELECT nestwise.read_parts($1,$2,$3) result',args)).rows[0].result,
+    partsCommand:async(subject,workspace,account,data)=>(await db.query('SELECT nestwise.parts_command($1,$2,$3,$4) result',[subject,workspace,account,JSON.stringify(data)])).rows[0].result,
     cancelOwnerExpense:async(subject,workspace,account,data)=>(await db.query('SELECT nestwise.cancel_owner_expense($1,$2,$3,$4) result',[subject,workspace,account,JSON.stringify(data)])).rows[0].result,
     ownerExpense:async(subject,workspace,account,data,settle)=>(await db.query(settle?'SELECT nestwise.settle_owner_expense($1,$2,$3,$4) result':'SELECT nestwise.link_owner_expense($1,$2,$3,$4) result',[subject,workspace,account,JSON.stringify(data)])).rows[0].result,
     reportInput:async(...args)=>(await db.query('SELECT nestwise.report_input($1,$2,$3,$4,$5) result',args)).rows[0].result,

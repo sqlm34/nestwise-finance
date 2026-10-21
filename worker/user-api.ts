@@ -1,3 +1,4 @@
+import {parsePartsCommand} from '../src/domain/parts';
 import { connectAuth, type AuthService, type AuthConfig } from './auth';
 import {documentApi,type DocumentEnv} from './documents';
 import { database } from './database';
@@ -63,6 +64,9 @@ export async function userApi(request: Request, env: UserEnv,
     preflight.headers.set('Access-Control-Allow-Headers','Content-Type, Expo-Origin');
     return preflight;
   }
+  const purchaseMatch=request.method==='GET'?/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/purchase-candidates$/i.exec(url.pathname):null;
+  const partsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/parts$/i.exec(url.pathname);
+  const partsRoute=!!partsMatch&&!url.search&&['GET','POST'].includes(request.method);
   const reportMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reports(?:\/(mappings|snapshots|owner-expenses|reimbursements|cancellations)(?:\/([0-9a-f-]{36}))?)?$/i.exec(url.pathname);
   const reportRoute=!!reportMatch&&(request.method==='GET'&&(!reportMatch[3]||reportMatch[3]==='snapshots')||request.method==='POST'&&!!reportMatch[3]&&!reportMatch[4]);
   const reportWrite=reportRoute&&request.method==='POST';
@@ -91,9 +95,9 @@ export async function userApi(request: Request, env: UserEnv,
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&(!reportRoute||reportWrite||!!reportMatch?.[3])&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(reportRoute || periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
+  if ((url.search&&!purchaseMatch&&(!reportRoute||reportWrite||!!reportMatch?.[3])&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(purchaseMatch || partsRoute || reportRoute || periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
-  if((reportWrite||receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
+  if((partsRoute&&request.method==='POST'||reportWrite||receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
   if (request.method==='POST'&&!documentWrite&&!receiptUpload) {
@@ -119,6 +123,16 @@ export async function userApi(request: Request, env: UserEnv,
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
     if(receiptRoute&&receiptMatch)return finish(await receiptApi(receiptUpload?request:safeRequest,env,db,subject,receiptMatch[1],receiptMatch[2],receiptMatch[3]?.toLowerCase(),receiptMatch[4]));
+    if(purchaseMatch){
+      const q=url.searchParams;const query=q.get('query')??'',from=q.get('from'),to=q.get('to'),min=q.get('min')??'0';
+      if([...q.keys()].some(k=>!['query','from','to','min'].includes(k)||q.getAll(k).length!==1)||query.length>120||!/^(0|[1-9][0-9]{0,15})$/.test(min)||BigInt(min)>9007199254740991n||[from,to].some(v=>v!==null&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v))||new Date(v).toISOString().slice(0,10)!==v))||from&&to&&from>to)return finish(response({error:'invalid_parts'},400));
+      return finish(response(await db.purchaseCandidates(subject,purchaseMatch[1],purchaseMatch[2],query,from,to,min)));
+    }
+    if(partsRoute&&partsMatch){
+      if(request.method==='GET')return finish(response(await db.readParts(subject,partsMatch[1],partsMatch[2])));
+      let data;try{data=parsePartsCommand(await safeRequest.json());}catch{return finish(response({error:'invalid_parts'},400));}
+      return finish(response({id:await db.partsCommand(subject,partsMatch[1],partsMatch[2],data)}));
+    }
     if(reportRoute&&reportMatch){
       const workspace=reportMatch[1],account=reportMatch[2];
       if(request.method==='GET'){
@@ -191,8 +205,8 @@ export async function userApi(request: Request, env: UserEnv,
     return finish(response({user:{id:session.user.id,name:session.user.name,email:session.user.email},
       workspaces:await db.userAccess(subject)}));
   } catch(error) {
-    if(error instanceof Error&&['report_conflict','report_limit'].includes(error.message))return finish(response({error:error.message},409));
-    if(error instanceof Error&&['invalid_report','report_too_large'].includes(error.message))return finish(response({error:error.message},400));
+    if(error instanceof Error&&['report_conflict','report_limit','parts_conflict','parts_limit','parts_overallocated','parts_search_limit'].includes(error.message))return finish(response({error:error.message},409));
+    if(error instanceof Error&&['invalid_report','report_too_large','invalid_parts'].includes(error.message))return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='statement_period_conflict')return finish(response({error:error.message},409));
     if(error instanceof Error&&error.message==='invalid_statement_period')return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='bank_booking_conflict')return finish(response({error:error.message},409));

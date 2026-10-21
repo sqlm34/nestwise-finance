@@ -88,7 +88,7 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
     return()=>{active=false;controller.abort();};
   },[workspace,account,archiveHash,savedRevision,onSessionExpired]);
   if(detail)return <JournalDetail key={detail} workspace={workspace} account={account} name={name} transaction={detail} currency="USD" onSessionExpired={onSessionExpired} onClose={()=>setDetail(null)} onOpen={setDetail} backLabel="reconciliationBack"/>;
-  const visible=rows.filter(row=>`${row.date} ${row.description}`.toLowerCase().includes(search.toLowerCase()));
+  const visible=rows.filter(row=>`${row.date} ${row.description} ${insightMoney(BigInt(row.amountCents),locale)}`.toLowerCase().includes(search.toLowerCase()));
   const maxPage=Math.max(0,Math.ceil(visible.length/25)-1),currentPage=Math.min(page,maxPage);
   return <>
     <Card>
