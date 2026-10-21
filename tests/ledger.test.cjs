@@ -517,7 +517,7 @@ test('cash summary and paged drilldown use payment dates, exclude accruals and e
   await send(money('cash-later',1,'job.payment_recorded',2000,{occurred_at:'2026-11-20T12:00:00Z',paid_at:'2026-09-30T23:59:59Z'}));
   await send(money('cash-unpaid',1,'job.part_cost_recorded',5000,{occurred_at:'2026-09-15T12:00:00Z',paid_at:null,settlement:'accrued'}));
   for(let i=0;i<105;i++)await send(money(`cash-page-${i}`,1,'job.payment_recorded',100,{occurred_at:'2026-10-20T12:00:00Z',paid_at:'2026-09-15T12:00:00Z'}));
-  await sql("SET timezone='America/Indianapolis'");
+  await sql("SET timezone='America/Indiana/Indianapolis'");
   const period={from:'2026-09-01',to:'2026-09-30'};
   const read=async(subject='test-owner')=>(await sql('SELECT nestwise.user_cash_insights($1,$2,$3,$4,$5) result',[subject,workspace,cashAccount,period.from,period.to]))[0].result;
   const raw=await read();assert.equal(raw.basis,'cash');const report=parsePeriodInsights(raw,period),metrics=periodMetrics(report.current);
