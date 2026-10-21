@@ -1,0 +1,50 @@
+const {test,before,after}=require('node:test');const assert=require('node:assert/strict');
+const {randomUUID,createHash}=require('node:crypto');
+const {parseStatementPeriod,checkStatementPeriod,statementContinuity}=require('../.test-build/src/domain/statement-period.js');
+const {previewStatement}=require('../.test-build/src/domain/statement.js');
+const data={from:'2026-10-01',to:'2026-10-31',opening_cents:'10000',closing_cents:'9700',last4:'1234',confirmed:true};
+const csv='Date,Description,Amount\n10/20/2026,Synthetic fee,-3.00\n',hash=createHash('sha256').update(csv).digest('hex');
+test('statement balance checks use integer cents and preserve ambiguity and date errors',()=>{
+ const preview=previewStatement(csv,'chase','Test');assert.equal(checkStatementPeriod(preview,parseStatementPeriod(data)).balanced,true);
+ assert.equal(checkStatementPeriod(preview,{...data,closing_cents:'9699'}).difference_cents,'-1');
+ assert.deepEqual(checkStatementPeriod(preview,{...data,to:'2026-10-19'}).outside_rows,[2]);
+ const duplicate=previewStatement(csv+'10/20/2026,Synthetic fee,-3.00\n','chase','Test');
+ assert.equal(checkStatementPeriod(duplicate,{...data,closing_cents:'9400'}).balanced,false);
+ for(const patch of [{last4:'12345'},{from:'2026-02-30'},{confirmed:false},{opening_cents:'1e4'},{closing_cents:'-0'},{to:'2026-09-30'}])assert.throws(()=>parseStatementPeriod({...data,...patch}));
+});
+test('continuity distinguishes gaps, overlap, account mismatch and balance discontinuity',()=>{
+ const row=(hash,from,to,extra={})=>({hash,revision:1,data:{...data,from,to,...extra}});
+ const first=row('a','2026-01-01','2026-01-31');
+ assert.equal(statementContinuity([first,row('b','2026-03-01','2026-03-31')])[0].kind,'gap');
+ assert.equal(statementContinuity([first,row('b','2026-01-15','2026-02-15')])[0].kind,'overlap');
+ assert.equal(statementContinuity([first,row('b','2026-02-01','2026-02-28')])[0].kind,'balance');
+ assert.equal(statementContinuity([first,row('b','2026-02-01','2026-02-28',{last4:'9876'})])[0].kind,'account');
+ assert.deepEqual(statementContinuity([first,row('b','2026-02-01','2026-02-28',{opening_cents:'9700'})]),[]);
+ assert.deepEqual(statementContinuity([first,{...first,revision:2,data:{...first.data,to:'2026-02-28'}},row('b','2026-03-01','2026-03-31',{opening_cents:'9700'})]),[]);
+});
+let fixture,cookie;
+const root=()=>`/v1/user/workspaces/${fixture.workspace}/accounts/${fixture.account}`;
+const request=(path,body,type='application/json')=>new Request('http://localhost:8083'+path,{method:body===undefined?'GET':'POST',headers:{cookie,origin:'http://localhost:8081','Content-Type':type},body:body===undefined?undefined:type==='text/csv'?body:JSON.stringify(body)});
+const bucket=()=>{const objects=new Map();return {async put(key,bytes){if(!objects.has(key))objects.set(key,Uint8Array.from(bytes));},async get(key){const b=objects.get(key);return b?{size:b.length,arrayBuffer:async()=>Uint8Array.from(b).buffer}:null;}};};
+before(async()=>{fixture=await require('../scripts/auth-fixture.cjs').createAuthFixture();fixture.env.STATEMENTS=bucket();fixture.env.STATEMENTS_BACKUP=bucket();
+ const login=await fixture.fetch(request('/api/auth/sign-in/email',{email:fixture.email,password:fixture.password}));cookie=login.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ');
+ assert.equal((await fixture.fetch(request(root()+`/documents/${hash}`,csv,'text/csv'))).status,200);
+});
+after(async()=>{await fixture?.db.close();});
+test('period evidence is versioned, retry safe, ACL scoped and creates no money',async()=>{
+ const path=root()+`/documents/${hash}/period`,command={id:randomUUID(),expected:0,data};
+ for(let i=0;i<2;i++){const r=await fixture.fetch(request(path,command));assert.equal(r.status,200,await r.clone().text());}
+ assert.equal((await fixture.fetch(request(path,{...command,id:randomUUID()}))).status,409);
+ assert.equal((await fixture.fetch(request(path,{...command,data:{...data,last4:'9876'}}))).status,409);
+ assert.equal((await fixture.fetch(request(path,{...command,checks:{balanced:true}}))).status,400);
+ const second={id:randomUUID(),expected:1,data:{...data,closing_cents:'9600'}};
+ assert.equal((await fixture.fetch(request(path,second))).status,200);
+ const history=await (await fixture.fetch(request(path))).json();assert.equal(history.length,2);
+ assert.equal(history[0].revision,2);assert.equal(history[0].check.difference_cents,'-100');assert.equal(history[0].check.balanced,false);
+ const latest=await (await fixture.fetch(request(root()+'/statement-periods'))).json();assert.equal(latest.length,1);assert.equal(latest[0].revision,2);
+ assert.equal((await fixture.db.query('SELECT count(*)::int n FROM nestwise.journal_transactions')).rows[0].n,0);
+ await assert.rejects(fixture.db.query('UPDATE nestwise.statement_periods SET revision=99 WHERE id=$1',[command.id]),/immutable/i);
+ assert.equal((await fixture.fetch(request(path.replace(fixture.account,randomUUID())))).status,404);
+ await fixture.db.query('DELETE FROM nestwise.memberships WHERE workspace_id=$1',[fixture.workspace]);
+ assert.equal((await fixture.fetch(request(path))).status,404);assert.equal((await fixture.fetch(request(path,second))).status,404);
+});

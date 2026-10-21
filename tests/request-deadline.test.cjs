@@ -1,0 +1,5 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');
+const {fetchWithDeadline}=require('../.test-build/src/domain/request-deadline.js');
+function stalled(counter){return async(_url,init)=>{counter.calls++;return new Promise((_,reject)=>{if(init.signal.aborted)reject(Error('aborted'));else init.signal.addEventListener('abort',()=>reject(Error('aborted')),{once:true});});};}
+test('network deadline ends stalled request once without replaying a write',async()=>{const counter={calls:0};await assert.rejects(fetchWithDeadline('https://test.invalid',{method:'POST',body:'command'},10,stalled(counter)),/aborted/);assert.equal(counter.calls,1);});
+test('navigation cancellation propagates and successful responses retain status',async()=>{const c=new AbortController();c.abort();await assert.rejects(fetchWithDeadline('https://test.invalid',{signal:c.signal},100,stalled({calls:0})));const response=await fetchWithDeadline('https://test.invalid',{},100,async()=>new Response('rejected',{status:409}));assert.equal(response.status,409);});

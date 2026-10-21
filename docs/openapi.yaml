@@ -1,0 +1,569 @@
+openapi: 3.1.0
+info:
+  title: Nestwise receiver and journal
+  version: 0.3.0
+  description: Nonproduction phase 2A; disabled until separately provisioned. See CRM_CONTRACT.md.
+paths:
+  /v1/user/workspaces/{workspace}/accounts/{account}/documents/{hash}/review:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: hash, required: true, schema: {type: string, minLength: 64, maxLength: 64}}
+    get:
+      description: >
+        Live account ACL and verified original required. Compare active saved assertions against original row dates,
+        exact cents and normalized description hashes. Every row in a group must agree. Canceled decisions release rows.
+        Return matched/unmatched/blocked/mismatch/reserved statuses, exact credit/debit subtotals, active group journal
+        references and canceled count. Other-file fingerprint reservations are distinct from matched rows.
+        Read-only working review; never accountant approval or a final report.
+      responses:
+        '200': {description: hash, checked_at, copy, canceled, groups, rows and totals; no-store}
+        '401': {description: Missing session}
+        '404': {description: Original not archived or account inaccessible}
+        '503': {description: Original integrity or evidence verification unavailable}
+  /v1/user/workspaces/{workspace}/accounts/{account}/documents:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+    get:
+      description: Live account ACL; complete list capped at 100 records, including pending uploads and linked reconciliation counts.
+      responses:
+        '200': {description: Array of hash/bytes/created_at/uploaded_by/archived/linked_groups; no-store}
+        '401': {description: Session expired}
+        '404': {description: Account inaccessible}
+        '503': {description: Storage not configured}
+  /v1/user/workspaces/{workspace}/accounts/{account}/documents/{hash}:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: hash, required: true, schema: {type: string, minLength: 64, maxLength: 64}}
+    post:
+      description: Owner/accountant upload of original UTF-8 CSV bytes, max 2000000; SHA-256 must match path. Both private copies verified before completion. Same-file retry is safe. No ledger posting.
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: {type: string}
+      responses:
+        '200': {description: hash and archived true}
+        '400': {description: Invalid CSV or checksum}
+        '401': {description: Missing session}
+        '403': {description: Missing or untrusted origin}
+        '404': {description: Account write access unavailable}
+        '409': {description: Account quota reached}
+        '413': {description: Body exceeds 2000000 bytes}
+        '415': {description: Expected text/csv}
+        '503': {description: Partial upload or integrity failure; refresh and retry same file}
+    get:
+      description: Authenticated attachment; verify bytes by hash and size, fall back to verified backup. Never serve corrupted content. No public links.
+      responses:
+        '200': {description: Exact original bytes; no-store and nosniff}
+        '401': {description: Session expired}
+        '404': {description: Original not archived or account inaccessible}
+        '503': {description: Neither copy passes integrity verification}
+  /v1/user/workspaces/{workspace}/accounts/{account}/documents/{hash}/verify:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: hash, required: true, schema: {type: string, minLength: 64, maxLength: 64}}
+    get:
+      description: Live account ACL; compute SHA-256 of both stored copies without returning private content.
+      responses:
+        '200': {description: hash and primary/backup integrity booleans; at least one verified copy}
+        '401': {description: Session expired}
+        '404': {description: Original not archived or account inaccessible}
+        '503': {description: Neither copy verified}
+  /v1/user/workspaces/{workspace}/accounts/{account}/reconciliations:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+    get:
+      description: Scoped immutable decision history, newest first, including cancellations; no original bank documents
+      parameters:
+        - {in: query, name: cursor, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Up to 50 groups, can_write boolean and nullable next_cursor; no-store}
+        '400': {description: Invalid cursor or filters}
+        '401': {description: Missing or expired session}
+        '404': {description: Account is unknown or inaccessible}
+    post:
+      description: >
+        Explicit user assertion, owners/accountants only. Body id (UUID idempotency key),
+        file_hash (SHA-256), rows (1-20 objects with line/date/cents/text_hash), transactions
+        (1-20 journal UUIDs). Rejects extra fields, duplicate rows, invalid dates/amounts,
+        non-cash journals and active reservations. Same request retries are idempotent.
+        Does not store original CSV or create any income/expense.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, file_hash, rows, transactions]
+              properties:
+                id: {type: string, format: uuid}
+                file_hash: {type: string, pattern: '^[0-9a-f]{64}$'}
+                rows: {type: array, minItems: 1, maxItems: 20, items: {type: object}}
+                transactions: {type: array, minItems: 1, maxItems: 20, items: {type: string, format: uuid}}
+      responses:
+        '200': {description: Durable assertion ID; retry does not resurrect canceled decisions}
+        '400': {description: Invalid body}
+        '401': {description: Missing or expired session}
+        '403': {description: Missing or untrusted origin}
+        '404': {description: Account write permission unavailable}
+        '409': {description: Reservation/idempotency conflict or amount/date mismatch}
+        '413': {description: Body exceeds 16 KiB}
+        '503': {description: Uncertain result; retry same idempotency ID or inspect history}
+  /v1/user/workspaces/{workspace}/accounts/{account}/reconciliations/{group}/cancel:
+    post:
+      description: Retains assertion and first cancellation actor/time/reason; releases active reservations; idempotent
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: group, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: {enum: [mistake, duplicate, recheck]}
+      responses:
+        '200': {description: Canceled assertion ID}
+        '400': {description: Invalid reason}
+        '401': {description: Missing or expired session}
+        '404': {description: Group or account write permission unavailable}
+  /v1/user/workspaces/{workspace}/accounts/{account}/reconciliation-candidates:
+    get:
+      description: >
+        Authenticated read-only cash journal candidates, ordered by paid_at and id.
+        Inclusive UTC paid-date range, maximum 366 days. Excludes cost corrections,
+        accruals, missing payment dates and unresolved events. Bank files/decisions
+        remain on the device. Access is rechecked for every page; not a frozen snapshot.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: from, required: true, schema: {type: string, format: date}}
+        - {in: query, name: to, required: true, schema: {type: string, format: date}}
+        - {in: query, name: cursor, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Up to 100 balanced journal transactions with source kind; Cache-Control no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, limit, next_cursor]
+                properties:
+                  entries:
+                    type: array
+                    maxItems: 100
+                    items:
+                      type: object
+                      description: Journal transaction shape plus kind; amounts are signed integer cent strings
+                      required: [id, occurred_at, paid_at, posted_at, source_event_id, source_order_id, entries, kind]
+                  limit: {const: 100}
+                  next_cursor: {type: [string, 'null'], format: uuid}
+        '400': {description: Invalid dates, unknown/duplicate filters or inaccessible cursor}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible account}
+        '503': {description: Temporarily unavailable; do not infer no matches}
+  /v1/user/workspaces/{workspace}/accounts/{account}/insights:
+    get:
+      description: >
+        Authenticated operational journal summary, not a bank balance or tax report.
+        Aggregates all posted transactions by occurred_at, inclusive UTC days, maximum
+        366 days. Compares the immediately preceding equal-length period. Includes
+        zero-filled partial/calendar months and account-wide unresolved event counts.
+        All amounts and counts are decimal strings. Access rechecked per request.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: from, required: true, schema: {type: string, format: date}}
+        - {in: query, name: to, required: true, schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: Live single-query calculation; Cache-Control no-store; not a frozen snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [currency, generated_at, current, previous, months, attention]
+                properties:
+                  currency: {const: USD}
+                  generated_at: {type: string, format: date-time}
+                  current: {$ref: '#/components/schemas/PeriodSummary'}
+                  previous: {$ref: '#/components/schemas/PeriodSummary'}
+                  months: {type: array, minItems: 1, maxItems: 13, items: {$ref: '#/components/schemas/PeriodSummary'}}
+                  attention:
+                    type: object
+                    required: [waiting, needs_review]
+                    properties:
+                      waiting: {type: string, pattern: '^[0-9]+$'}
+                      needs_review: {type: string, pattern: '^[0-9]+$'}
+        '400': {description: Invalid, missing or duplicate dates; reversed or excessive period}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible account}
+        '503': {description: Temporarily unavailable; do not substitute zero totals}
+  /v1/user/workspaces/{workspace}/accounts/{account}/cash-insights:
+    get:
+      description: >
+        Authenticated operational journal summary, not a bank balance or tax report.
+        Aggregates dated paid transactions by paid_at, inclusive UTC days, maximum
+        366 days. Compares the immediately preceding equal-length period. Includes
+        zero-filled partial/calendar months and account-wide unresolved event counts.
+        Undated transactions are counted by event date as review exceptions and excluded
+        from all monetary totals. transaction_count includes these exceptions; payment-date
+        journal drilldown excludes them. All amounts and counts are decimal strings.
+        Access rechecked per request. No tax-policy approval is implied.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: from, required: true, schema: {type: string, format: date}}
+        - {in: query, name: to, required: true, schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: Live single-query calculation; Cache-Control no-store; not a frozen snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [basis, currency, generated_at, current, previous, months, attention]
+                properties:
+                  basis: {const: cash}
+                  currency: {const: USD}
+                  generated_at: {type: string, format: date-time}
+                  current: {$ref: '#/components/schemas/PeriodSummary'}
+                  previous: {$ref: '#/components/schemas/PeriodSummary'}
+                  months: {type: array, minItems: 1, maxItems: 13, items: {$ref: '#/components/schemas/PeriodSummary'}}
+                  attention:
+                    type: object
+                    required: [waiting, needs_review]
+                    properties:
+                      waiting: {type: string, pattern: '^[0-9]+$'}
+                      needs_review: {type: string, pattern: '^[0-9]+$'}
+        '400': {description: Invalid, missing or duplicate dates; reversed or excessive period}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible account}
+        '503': {description: Temporarily unavailable; do not substitute zero totals}
+  /v1/user/workspaces/{workspace}/accounts/{account}/events/{event}:
+    get:
+      description: >
+        Authenticated provenance for any received event, including waiting or review
+        events without a journal transaction. Use the account event row cursor as the
+        event identifier. History and reference are restricted to the same account,
+        connection and order. Ownership is checked again on every request.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: event, required: true, schema: {type: string, format: uuid}, description: Internal cursor from an authorized account event row}
+        - {in: query, name: before, schema: {type: integer, minimum: 1, maximum: 2147483646}}
+      responses:
+        '200':
+          description: Same provenance fields as journal detail, plus event_cursor; transaction is null when no posting exists. History max 100, audit max 50 with audit_truncated. No-store.
+        '400': {description: Invalid or duplicate cursor parameter}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible event}
+        '503': {description: Temporarily unavailable}
+  /v1/user/workspaces/{workspace}/accounts/{account}/events:
+    get:
+      description: >
+        Live Better Auth session and account access required on every page. Read-only
+        incoming events, including orders without postings. Sorted by received_at and
+        internal UUID descending. Counts cover the search across every status, not the
+        current page. Status is live; refresh after processing. No payload or raw errors.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: status, schema: {enum: [attention, all, waiting, needs_review, posted, asserted], default: attention}}
+        - {in: query, name: q, schema: {type: string, maxLength: 128}, description: Literal case-insensitive order or event ID substring}
+        - {in: query, name: cursor, schema: {type: string, format: uuid}, description: next_cursor from previous page with the same filters}
+      responses:
+        '200':
+          description: Up to 100 source event summaries, safe guidance and search-wide counts; Cache-Control no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events, counts, next_cursor]
+                properties:
+                  next_cursor: {type: [string, 'null'], format: uuid}
+                  counts:
+                    type: object
+                    required: [waiting, needs_review, posted, asserted]
+                    additionalProperties: {type: string, pattern: '^[0-9]+$'}
+                  events:
+                    type: array
+                    maxItems: 100
+                    items:
+                      allOf:
+                        - {$ref: '#/components/schemas/SourceEvent'}
+                        - type: object
+                          required: [cursor, guidance]
+                          properties:
+                            cursor: {type: string, format: uuid}
+                            guidance: {enum: [none, earlier_revision, excess_refund, snapshot_mismatch, reference, review]}
+        '400': {description: Invalid filter or unavailable account-scoped cursor}
+        '401': {description: Missing or expired session}
+        '404': {description: Account unavailable or access revoked}
+        '503': {description: Database unavailable}
+  /health:
+    get:
+      responses:
+        '200':
+          description: Configuration state, not database readiness
+  /v1/crm/events:
+    post:
+      description: Exact-byte HMAC-SHA256 authentication specified in CRM_CONTRACT.md. No browser CORS.
+      parameters:
+        - {in: header, name: X-NW-Connection, required: true, schema: {type: string}}
+        - {in: header, name: X-NW-Key-Id, required: true, schema: {type: string}}
+        - {in: header, name: X-NW-Timestamp, required: true, schema: {type: string, pattern: '^[0-9]{10}$'}}
+        - {in: header, name: X-NW-Nonce, required: true, schema: {type: string, format: uuid}}
+        - {in: header, name: X-NW-Signature, required: true, schema: {type: string, pattern: '^[0-9a-f]{64}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+      responses:
+        '202':
+          description: Durable receipt; status may still be waiting or needs_review
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted, duplicate, event_id, status]
+                properties:
+                  accepted: {const: true}
+                  duplicate: {type: boolean}
+                  event_id: {type: string, format: uuid}
+                  status: {enum: [waiting, posted, asserted, needs_review]}
+        '400': {description: Invalid contract}
+        '401': {description: Invalid identity, signature or request time}
+        '404': {description: Disabled or unavailable route}
+        '409': {description: Replay or event/fact/revision conflict}
+        '413': {description: More than 16 KiB}
+        '415': {description: Content type must be application/json}
+        '503': {description: Persistence failed; no ACK; retry with a fresh nonce}
+  /v1/workspaces/{workspace}/accounts/{account}/journal:
+    get:
+      security: [{session: []}]
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200': {description: Latest 100 transactions; cents represented as decimal strings}
+        '401': {description: Missing, expired or revoked session}
+        '404': {description: Disabled route or account not accessible}
+        '503': {description: Database unavailable}
+  /v1/user/workspaces/{workspace}/accounts/{account}/journal:
+    get:
+      description: >
+        Live Better Auth session required. Searches the entire authorized account history.
+        Inclusive UTC dates; basis=event uses occurred_at (default), basis=paid uses
+        paid_at and excludes undated transactions. Literal case-insensitive ID search;
+        code filters retain every line of each balanced transaction. Keyset pagination
+        sorts by the selected date basis then UUID. Refresh to include late arrivals; this is not a frozen report.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: q, schema: {type: string, maxLength: 128}, description: Literal substring of order, event or journal ID}
+        - {in: query, name: from, schema: {type: string, format: date}}
+        - {in: query, name: to, schema: {type: string, format: date}}
+        - {in: query, name: code, schema: {enum: [all, clearing, receipts, refunds, parts_cost, parts_payable, fees, expenses, transfers], default: all}}
+        - {in: query, name: basis, schema: {enum: [event, paid], default: event}}
+        - {in: query, name: order, schema: {enum: [newest, oldest], default: newest}}
+        - {in: query, name: cursor, schema: {type: string, format: uuid}, description: next_cursor from previous response; keep the same filters}
+      responses:
+        '200':
+          description: Up to 100 complete balanced transactions; no-store. Authorizations rechecked on every page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries, limit, next_cursor]
+                properties:
+                  limit: {const: 100}
+                  next_cursor: {type: [string, 'null'], format: uuid}
+                  entries:
+                    type: array
+                    maxItems: 100
+                    items:
+                      type: object
+                      required: [id, occurred_at, paid_at, posted_at, source_event_id, source_order_id, entries]
+                      properties:
+                        id: {type: string, format: uuid}
+                        occurred_at: {type: string, format: date-time}
+                        paid_at: {type: [string, 'null'], format: date-time}
+                        posted_at: {type: string, format: date-time}
+                        source_event_id: {type: string, format: uuid}
+                        source_order_id: {type: string, maxLength: 128}
+                        entries:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              code: {type: string}
+                              cents: {type: string, pattern: '^-?[0-9]+$'}
+        '400': {description: Invalid or duplicate filters, invalid cursor; restart from first page}
+        '401': {description: Missing, expired or revoked Better Auth session}
+        '404': {description: Account not accessible; no cross-account disclosure}
+        '503': {description: Database unavailable; retry without assuming history is empty}
+  /v1/user/workspaces/{workspace}/accounts/{account}/journal/{transaction}:
+    get:
+      description: >
+        Live Better Auth session required; ownership checked on every request.
+        Shows transaction provenance and same-source order history without raw payloads
+        or internal error messages. Historical order assertions are not finalized tax reports.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: transaction, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: before, schema: {type: integer, minimum: 1, maximum: 2147483646}, description: next_revision from the preceding history page}
+      responses:
+        '200':
+          description: Read-only provenance; no-store. Cents are decimal strings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [transaction, source, reference, history, next_revision, audit, audit_truncated]
+                properties:
+                  transaction: {type: object, description: The complete balanced journal transaction, same shape as the journal page entry}
+                  source: {$ref: '#/components/schemas/SourceEvent'}
+                  reference:
+                    anyOf:
+                      - {$ref: '#/components/schemas/SourceEvent'}
+                      - {type: 'null'}
+                  history: {type: array, maxItems: 100, items: {$ref: '#/components/schemas/SourceEvent'}}
+                  next_revision: {type: [integer, 'null']}
+                  audit:
+                    type: array
+                    maxItems: 50
+                    items:
+                      type: object
+                      properties:
+                        action: {enum: [applied, needs_review]}
+                        recorded_at: {type: string, format: date-time}
+                  audit_truncated: {type: boolean}
+        '400': {description: Invalid or duplicate query parameter}
+        '401': {description: Missing or expired session}
+        '404': {description: Unknown or inaccessible transaction}
+        '503': {description: Temporarily unavailable}
+  /v1/user/workspaces/{workspace}/accounts/{account}/parts:
+    parameters:
+      - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+    get:
+      description: Business account stock evidence, including archived lots and immutable usage history. Never posts cash. Live session and account membership required.
+      responses:
+        '200': {description: Array of at most 1000 lots with revision and state; exact unit cents are strings and unknown paid_on is null}
+        '401': {description: Missing or expired session}
+        '404': {description: Inaccessible business account}
+    post:
+      description: >
+        Append create, evidence, consume, return or archive command. Owner/accountant
+        write access and trusted Origin required. UUID id is an exact-retry key;
+        UUID lot and expected_revision prevent stale updates. Strict command shapes
+        are defined by src/domain/parts.ts. Consumption never creates an expense.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, lot, kind, expected_revision]
+              properties:
+                id: {type: string, format: uuid}
+                lot: {type: string, format: uuid}
+                kind: {enum: [create, evidence, consume, return, archive]}
+                expected_revision: {type: integer, minimum: 0, maximum: 999}
+      responses:
+        '200': {description: Command id; exact retry returns the same result}
+        '400': {description: Invalid command or impossible stock movement}
+        '401': {description: Missing or expired session}
+        '403': {description: Untrusted request origin}
+        '404': {description: Inaccessible account or source payment}
+        '409': {description: Stale revision, allocation exceeds payment, or explicit register limit}
+  /v1/user/workspaces/{workspace}/accounts/{account}/purchase-candidates:
+    get:
+      description: Search existing paid expense journals accessible to the session. Search alone does not establish business attribution or create a posting.
+      parameters:
+        - {in: path, name: workspace, required: true, schema: {type: string, format: uuid}}
+        - {in: path, name: account, required: true, schema: {type: string, format: uuid}}
+        - {in: query, name: query, schema: {type: string, maxLength: 120}, description: Literal merchant/note substring}
+        - {in: query, name: from, schema: {type: string, format: date}}
+        - {in: query, name: to, schema: {type: string, format: date}}
+        - {in: query, name: min, schema: {type: string, pattern: '^(0|[1-9][0-9]{0,15})$'}, description: Minimum cents, at most 9007199254740991}
+      responses:
+        '200': {description: At most 100 source payments including actual payment date, refund cents and bank provenance when available}
+        '400': {description: Invalid or duplicate search parameter}
+        '401': {description: Missing or expired session}
+        '404': {description: Inaccessible source account}
+        '409': {description: Too many matches; narrow the search rather than receive truncated results}
+components:
+  securitySchemes:
+    session: {type: http, scheme: bearer}
+  schemas:
+    PeriodSummary:
+      type: object
+      required: [from, to, transaction_count, missing_paid_date, totals]
+      properties:
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        transaction_count: {type: string, pattern: '^[0-9]+$'}
+        missing_paid_date: {type: string, pattern: '^[0-9]+$'}
+        totals:
+          type: object
+          required: [clearing, receipts, refunds, parts_cost, parts_payable, fees]
+          description: Signed debit-positive journal sums in cents, sum across codes is zero
+          additionalProperties: {type: string, pattern: '^-?[0-9]+$'}
+    SourceEvent:
+      type: object
+      required: [id, order_id, revision, kind, status, occurred_at, paid_at, received_at, posted_at, journal_id, reference_id]
+      properties:
+        id: {type: string, format: uuid}
+        order_id: {type: string, maxLength: 128}
+        revision: {type: integer, minimum: 1}
+        kind: {type: string, description: Financial event kind defined by the CRM contract}
+        status: {enum: [waiting, posted, asserted, needs_review]}
+        occurred_at: {type: string, format: date-time}
+        paid_at: {type: [string, 'null'], format: date-time}
+        received_at: {type: string, format: date-time}
+        posted_at: {type: [string, 'null'], format: date-time}
+        journal_id: {type: [string, 'null'], format: uuid}
+        reference_id: {type: [string, 'null'], format: uuid}
+    Event:
+      type: object
+      additionalProperties: false
+      required: [schema_version, source_event_id, source_order_id, source_fact_id, order_revision, type, currency, occurred_at, paid_at]
+      description: Type-specific required/prohibited fields are detailed in CRM_CONTRACT.md and enforced by contract.ts.
+      properties:
+        schema_version: {const: 1}
+        source_event_id: {type: string, format: uuid}
+        source_order_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        source_fact_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        order_revision: {type: integer, minimum: 1, maximum: 2147483646}
+        type:
+          enum: [job.payment_recorded, job.part_cost_recorded, job.customer_refund_issued, job.supplier_credit_received, job.cost_corrected, job.processor_fee_recorded, job.processor_fee_refunded, job.financials_finalized, job.reopened, job.voided]
+        currency: {const: USD}
+        occurred_at: {type: string, format: date-time}
+        paid_at: {type: [string, 'null'], format: date-time}
+        amount_cents: {type: integer, minimum: 0, maximum: 9007199254740991}
+        reference_event_id: {type: string, format: uuid}
+        settlement: {enum: [paid, accrued]}
+        totals:
+          type: object
+          additionalProperties: false
+          required: [payments_cents, refunds_cents, parts_net_cents, fees_net_cents]
+          properties:
+            payments_cents: {type: integer, minimum: 0, maximum: 9007199254740991}
+            refunds_cents: {type: integer, minimum: 0, maximum: 9007199254740991}
+            parts_net_cents: {type: integer, minimum: 0, maximum: 9007199254740991}
+            fees_net_cents: {type: integer, minimum: 0, maximum: 9007199254740991}

@@ -1,0 +1,39 @@
+Phase 1 status — 2026-10-20
+
+Implemented: native-component UI, EN/RU, four workspace views, transaction
+search/filter/sort/details, real CSV file preview, exact cents, file hash,
+duplicate and malformed-row warnings, original accountant category dictionary.
+
+Verified locally:
+- TypeScript and ESLint.
+- 14 automated parser, money, locale, taxonomy, fixture and Worker tests.
+- Expo JavaScript export for web, Android and iOS.
+- Browser: upload a real synthetic CSV file; 3 accepted rows, 1 invalid date,
+  1 possible duplicate. Credits $600.00, debits $90.00. No ledger mutation.
+- Browser: switching to Family hides Aksenov LLC's imported preview.
+- Browser: 390px mobile navigation, English language, transaction search and details.
+- Separate staging Worker deployed; GET /health returns environment=staging
+  and financialIngestion=false. There are no ingestion routes or database bindings.
+
+Not yet verified / not complete:
+- Physical Android/iOS behavior: not tested. EAS staging builds submitted:
+  Android APK: 0d1e1f00-c3ac-4d35-a505-f5b6cfe53741
+  iOS simulator: 38b0629f-9b79-4af7-8892-5d30edc997ae
+  Android is in the free-tier queue (~33 minutes at submission); no completed
+  native artifact is claimed until EAS reports success.
+- Cloudflare CI enabled using an account-owned token restricted to
+  nestwise-staging (Individual Workers Editor), expires 2027-01-18.
+  First automated deployment is pending verification.
+- Expo project linked. A dedicated Developer robot was explicitly approved by
+  the owner; its token is encrypted in GitHub's staging EXPO_TOKEN secret.
+  EAS_ENABLED and EAS_PROJECT_ID are configured. GitHub CI successfully
+  authenticated as the robot and resolved the linked Expo project.
+  Manual EAS workflow becomes available after this PR is merged into main.
+- Full bank-specific contracts, missing statement periods, opening/closing
+  balance checks, OFX/QFX/PDF/OCR, durable evidence storage.
+- Server authentication, account authorization and financial journal.
+- Exact report generator and report finalization.
+- npm dependency advisories remain; see DEPENDENCY_REVIEW.txt.
+
+Production CRM, financial accounts, and production databases were not changed.
+Do not treat phase 1 as complete delivery of the full master specification.

@@ -1,0 +1,48 @@
+Nestwise staging authentication — 2026-10-20
+
+Deployment
+https://nestwise-staging.alexeasyrepair.workers.dev/account
+Expo web assets and the API share one HTTPS origin. Cloudflare Static Assets
+uses SPA fallback for application routes and Worker-first handling for /api/*,
+/v1/* and /health. API navigation errors remain JSON errors, never successful HTML.
+CI builds the staging web bundle before deployment and verifies these boundaries.
+
+Database and secrets
+Project: nestwise-staging (mute-pond-14683538).
+Branch: staging (br-snowy-morning-b5ppnq58), database nestwise_staging.
+Pre-migration snapshot: staging at 2026-10-20 18:05:52 UTC (manual).
+Applied migrations: 0001_ledger.sql, 0002_auth.sql, 0003_user_access.sql.
+nestwise_auth_worker has LOGIN and inherits nestwise_auth_api; no financial schema
+usage, DDL, superuser, database/role creation, replication or RLS bypass privileges.
+Connection limit is 10. AUTH_DATABASE_URL and random AUTH_SECRET are stored only
+as Cloudflare Worker secrets, never client variables, GitHub source or local files.
+
+Verified on the deployed Worker and actual Neon database
+- Unauthenticated session requests return 401.
+- Login sets Secure, HttpOnly cookies and returns the assigned workspace/account.
+- The protected journal endpoint works; a foreign workspace returns 404.
+- Logout revokes the session; reusing its previous cookie returns 401.
+- Public signup is unavailable and untrusted browser origins receive 403.
+- The account screen works in the built-in browser: login, journal read, refresh
+  retaining the session, and logout.
+- Financial ingestion stays disabled.
+
+Test identity lifecycle
+scripts/auth-staging-proof.cjs provisions a random proof-UUID@nestwise.test user
+with a random password and an empty synthetic workspace/account. No customer
+records, transactions or email messages are involved. The proof identity is
+retired after browser verification: its credential password becomes NULL and all
+of its sessions are removed. Its synthetic workspace remains as audit evidence.
+This is not the user's real account or an invitation mechanism.
+
+Recovery and follow-up
+To disable auth, deploy staging with AUTH_ENABLED=false. Keep additive schemas.
+For database recovery restore the named snapshot into a separate branch first.
+Compare financial/auth fingerprints and revoke restored sessions before reopening
+access. The snapshot is retained; no source database cutover was performed.
+Next: implement controlled account invitation and password setup/recovery, then
+verify native SecureStore behavior using a new development build.
+Production and existing Alex CRM are unchanged; store publication is not performed.
+
+Routing reference:
+https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/

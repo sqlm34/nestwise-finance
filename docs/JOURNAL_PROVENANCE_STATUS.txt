@@ -1,0 +1,28 @@
+Transaction provenance — 2026-10-20
+
+Authenticated transaction details show balanced journal lines, source kind and
+revision, occurred/paid/received/posted dates, referenced original event,
+immutable event audit and the same connection/order's paginated event history.
+History includes waiting, needs_review and assertion-only events without falsely
+displaying them as monetary postings. Order finalization is not tax finalization.
+Metadata is explicitly projected. Raw payload, payload hash, internal errors,
+connection identity, credentials and customer contact information are not exposed.
+Every detail/history request rechecks workspace/account grants and transaction
+ownership. Unknown and inaccessible transactions both return 404.
+
+History: newest revision first, 100 per page; before cursor. Audit: latest 50 with
+an explicit truncation flag. This is live read-only history, not a frozen report.
+Client validates relationships, balanced amounts, status/journal consistency and
+cursor shape; stale requests abort on close, account switch or event navigation.
+
+Migration 0006 is additive (private metadata view + runtime-executable function).
+Snapshot staging before migration, deploy matching API/UI after tests. Rollback
+redeploys previous application code and leaves additive DB objects intact.
+Never delete journal/audit records as an application rollback.
+
+Optional staging DEMO workspace is explicitly labeled and separate from the
+owner's initial empty account. Its fixed synthetic order demonstrates payment,
+parts, correction, customer refund, supplier credit, a confirmed snapshot, an
+excess-refund review and a missing-revision wait. The source connection is disabled
+after provisioning. No real CRM synchronization is enabled; fixtures are retained
+as immutable test history. Provisioning is opt-in, never part of CI or production.

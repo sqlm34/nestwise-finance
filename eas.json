@@ -1,0 +1,27 @@
+{
+  "cli": { "version": "25.2.0", "requireCommit": true, "appVersionSource": "local" },
+  "build": {
+    "development": {
+      "distribution": "internal",
+      "environment": "development",
+      "node": "24.19.0",
+      "env": { "APP_ENV": "development" },
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": true }
+    },
+    "staging": {
+      "distribution": "internal",
+      "environment": "preview",
+      "node": "24.19.0",
+      "env": { "APP_ENV": "staging", "EXPO_PUBLIC_API_URL": "https://nestwise-staging.alexeasyrepair.workers.dev" },
+      "android": { "buildType": "apk" },
+      "ios": { "simulator": true }
+    },
+    "production": {
+      "environment": "production",
+      "node": "24.19.0",
+      "env": { "APP_ENV": "production" },
+      "android": { "buildType": "app-bundle" }
+    }
+  }
+}

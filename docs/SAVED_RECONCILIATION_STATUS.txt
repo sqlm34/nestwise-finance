@@ -1,0 +1,47 @@
+Durable reconciliation decisions — 2026-10-20
+
+Supersedes the local-only decision limitation in RECONCILIATION_STATUS.txt.
+Original CSV preview and unsaved groups remain ephemeral. Explicit Save sends
+only file SHA-256, selected bank line numbers/dates/integer cents, normalized
+description hashes and journal IDs to the same authenticated account API.
+No filename, alias, original CSV, bank description or account number is stored.
+This is retained user-asserted evidence metadata, NOT an archived original or
+independently verified bank feed. Keep original statements separately.
+
+Integrated behavior: explicit durable save; keyset history with 50 decisions per
+page; source-journal drilldown; actor/time provenance; reasoned cancellation;
+immutable decisions and cancellation audit; live owner/accountant write policy;
+read-only member/reviewer access subject to existing account grants; bounded POST
+bodies and origin checks; integer amount/date validation in SQL; idempotent retry;
+account-row locking and active reservations prevent simultaneous duplicate use.
+
+Reservations cover journal UUID, file-hash/line and date/cents/description-hash.
+This conservative overlap check can also flag two legitimate identical bank rows;
+it never silently merges or automatically posts them. Formatting or description
+changes can evade the cross-file fingerprint; journal reuse remains blocked.
+The browser may offer candidates already saved in another session; server Save
+rejects them with a conflict and directs the user to refresh retained history.
+
+Cancel retains the original assertion and records the first actor/time/reason,
+then releases only active reservations. Retrying a canceled save does not revive
+it. A new reviewed assertion requires a new idempotency ID. Unknown network results
+are presented as uncertain and can be retried with the same ID while still open.
+Leaving/reloading during an unknown result requires checking saved history.
+
+Migration 0011 is additive. Existing financial entries and event history remain
+unchanged. Rollback redeploys the previous app but retains assertions, cancellations
+and claims; never clear claims while old saves remain active. Recovery verification
+includes all new tables plus immutability and runtime table-access probes.
+
+Validation: tests cover real authenticated HTTP save/cancel, revoked permissions,
+read-only roles, origin rejection, exact amounts/dates, overlapping statements,
+idempotency payload conflicts, canceled-save retry, 53 history entries over two
+pages, no new ledger postings, restricted runtime access and PostgreSQL concurrent
+claims. Web and mobile exports/restore checks run in the existing staging CI.
+
+Remaining: private original-document archive, adapter validation against redacted
+real samples, OCR/receipts, approved tax mappings/reports, CRM producer and device
+verification. Saved assertions are not accountant approval or production readiness.
+
+Staging snapshot: 2026-10-20 20:32:49 UTC, retained before migration 0011.
+Migration applied successfully; authorized DEMO history starts empty.

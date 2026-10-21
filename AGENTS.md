@@ -10,6 +10,12 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 
 ## Commands
 
+### Windows workspace: use the checked launcher
+
+From the repository root in PowerShell, run `& '.\scripts\check-windows.ps1'` for typecheck and lint. Use `-Check typecheck` or `-Check lint` for one check; `-NodePath 'C:\path\to\node.exe'` selects an explicit runtime. The launcher uses the bundled Codex Node when available, requires the version in `.nvmrc`, preserves argument boundaries and restores PATH/current directory afterward.
+
+Do not use `npm run typecheck`, `npm run lint`, `npx`, or `node_modules/.bin/*.cmd` for these Windows checks in this workspace. Its path contains spaces, Cyrillic and `&`; the installed CMD shims contain unquoted `SET dp0=%~dp0`, splitting the path at `&`. Invoking npm with bundled Node alone also leaves child shims resolving the system Node from PATH (currently Node 18). Use direct JavaScript entry points under the selected Node for other local CLI work; do not rename/move the project or edit generated dependency shims. Linux CI keeps its existing npm scripts.
+
 Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
 
 ```bash

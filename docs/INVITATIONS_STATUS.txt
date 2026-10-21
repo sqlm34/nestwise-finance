@@ -1,0 +1,55 @@
+Nestwise account invitations — 2026-10-20
+
+Scope
+Administrator-issued first-account activation in development/staging. Existing
+passwords cannot be reset by this flow. No public registration or invitation
+issuance API; no email sending. Production remains disabled.
+
+Design
+Each invitation contains 256 random bits, expires after 24 hours and is stored
+only as SHA-256 in nestwise_auth.invitations. Activation POSTs the code/password
+in the request body, never query parameters. The UI keeps them in memory only.
+The API validates input and checks a database-backed 20-attempt/hour limit before
+hashing the password with Better Auth's password hasher. The limiter key is a hash
+of the auth secret and the Cloudflare client IP; raw IPs are not stored there.
+Invalid, expired, consumed, revoked and limited codes share the same error.
+
+accept_invitation locks the invitation row, rechecks expiry/revocation/consumption,
+sets an initially NULL credential password, consumes the invitation and revokes
+old sessions in one transaction. Concurrent attempts permit only one winner.
+It cannot create or change workspace memberships. Auth runtime cannot read or
+insert the invitations table; it can execute only the two activation functions.
+Owner-side issueInvitation defaults to member with no account access. The first
+owner is explicitly assigned owner/allAccounts to a new empty staging workspace.
+Manual invitation delivery does not verify mailbox ownership: emailVerified is
+left false. Mail verification and password recovery are future work.
+
+Deployment
+Pre-migration Neon snapshot: staging at 2026-10-20 18:22:46 UTC (manual).
+Migration 0004_invitations.sql applied to nestwise_staging only.
+Activation page: https://nestwise-staging.alexeasyrepair.workers.dev/activate
+scripts/issue-invitation.cjs is an administrative module returning the token only
+in memory. Never log it, put it in source/env files, or pass it as a CLI argument.
+To revoke a pending invitation, set revoked_at for its exact token_hash/user_id
+using the owner connection. To reissue an expired invitation, first revoke it;
+never replace an established password through this first-activation mechanism.
+
+Validation
+Local tests cover first activation, Better Auth login, no implicit workspace
+grant, short-password rejection, expired/revoked/unknown tokens, replay, concurrent
+activation, attempt limits and runtime table access denial.
+PostgreSQL CI separately tests concurrent activation through restricted-role
+connections and includes invitations/attempts in backup/restore fingerprints.
+CI also verifies the deployed activation page and rejects malformed invitations.
+
+Recovery
+Disable AUTH_ENABLED to close auth routes if necessary. Preserve additive tables.
+Restore snapshots into a separate branch before cutover. Revoke all restored
+sessions AND pending invitations before reopening: a snapshot can resurrect a
+consumed/revoked token. Rotate AUTH_SECRET and issue replacement invitations only
+after confirming identities. Never automatically reopen a restored auth service.
+
+User handoff
+Prepare the first owner's private invitation in the browser only after CI and a
+synthetic cloud activation test pass. The owner must enter and submit their own
+new password. Do not read, record or enter the user's new password on their behalf.

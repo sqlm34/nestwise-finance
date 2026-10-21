@@ -1,0 +1,64 @@
+Dependency review — 2026-10-20
+
+The official Expo blank TypeScript template resolved Expo 58 / React Native 0.88.
+All Expo native packages were installed through Expo's SDK version resolver.
+Node 24.19.0 is required; the host's system Node 18 is not supported.
+Expo's current ESLint plugins require ESLint 9; ESLint 10 failed at rule loading.
+ESLint 9.39.5 is pinned for compatibility.
+
+npm audit reported 49 affected dependency nodes after EAS CLI was added:
+1 low, 18 moderate, 30 high. This includes transitive build/CLI packages and
+meta-vulnerable parent packages, not 49 independent application vulnerabilities.
+Compatible npm audit fix did not resolve these advisories.
+Do not apply npm audit fix --force: it proposes unrelated major downgrades
+(including EAS CLI) and would invalidate the tested SDK combination.
+
+Affected dependency chains include node-forge, braces, sprintf-js, tar, uuid,
+joi, minimatch, yaml and EAS/Expo build tooling. Some advisories report no
+available fix within their existing package range.
+
+This is an unresolved production release gate. The application now accepts
+authenticated receipt and statement uploads in isolated staging; the earlier
+preview-only threat model is no longer sufficient. Before production, review current
+advisories, adopt supported patched versions, regenerate the lockfile, rerun
+native builds and document residual risk. Do not label this build security-audited.
+
+Raw local audit output lives in ignored artifacts/audit.json.
+
+2026-10-20 follow-up (native authentication build 13244e5)
+- Removed the project-local EAS CLI dev dependency; CI uses the explicitly
+  pinned eas-cli@25.2.0 through npx. The application lockfile remains version 2.
+  All retained package versions match the previous lockfile; 359 package nodes
+  were removed. This is tooling isolation, not a complete security remediation.
+- npm audit --omit=dev reports 27 affected nodes (8 moderate, 19 high), no
+  critical findings. Expo lists its build tooling under production dependencies,
+  so this count alone does not establish reachability in the deployed Worker or
+  mobile bundle. Independent leaf advisories are braces, node-forge and uuid;
+  parent packages account for the remaining transitive findings.
+- Suggested automatic fixes include downgrading Expo to 44 and React Native
+  to 0.72. Do not apply these incompatible downgrades. Production still needs
+  reviewed patched dependency paths and build/runtime exposure analysis.
+- Current raw audit: ignored .local/audit-runtime.json. No audit-fix mutation
+  was applied. Removing the EAS CLI did not change the runtime package versions.
+
+2026-10-21 — PR21 exposure review
+- Fresh npm audit --omit=dev: 27 affected nodes, 8 moderate / 19 high,
+  zero critical. The three leaf advisories remain braces, node-forge, uuid.
+- npm explain: braces 3.0.3 is reached through micromatch; node-forge 1.4.0
+  through Expo CLI/code-signing tools; uuid 7.0.3 through xcode tooling.
+- GitHub advisories GHSA-vfj7-8cjw-p6xm and GHSA-86w9-cpqp-85rv currently
+  list no patched release. GHSA-w5hq-g745-h8pq fixes uuid in 11.1.1+;
+  xcode's declared range is ^7.0.3, so a blind override is not a compatible fix.
+- Wrangler dry-run metadata: all 635 Worker inputs exclude braces, node-forge
+  and uuid. worker:check now enforces this boundary in CI. This directly checks
+  the request-handling bundle, not merely package.json dependency labels.
+- Do not expose development servers or use untrusted source/glob/build inputs.
+  No OTA signing workflow is enabled. This narrows exposure; it does not mark
+  npm audit clean or prove every native artifact free of vulnerable tooling.
+- Upstream advisory fixes / supported Expo tooling updates and final signed
+  artifact review remain production release requirements. No unsafe major
+  downgrade or fabricated audit exemption was applied.
+Sources:
+https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
+https://github.com/advisories/GHSA-86w9-cpqp-85rv
+https://github.com/advisories/GHSA-w5hq-g745-h8pq

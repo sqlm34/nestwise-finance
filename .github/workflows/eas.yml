@@ -1,0 +1,31 @@
+name: EAS internal build
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        type: choice
+        options: [android, ios, all]
+        default: android
+permissions:
+  contents: read
+jobs:
+  internal-build:
+    if: vars.EAS_ENABLED == 'true'
+    environment: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck && npm run lint && npm test
+      - name: Build internal APK or iOS Simulator app
+        run: npx --yes eas-cli@25.2.0 build --profile staging --platform "$BUILD_PLATFORM" --non-interactive
+        env:
+          BUILD_PLATFORM: ${{ inputs.platform }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+          APP_ENV: staging

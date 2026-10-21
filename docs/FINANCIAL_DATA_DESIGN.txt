@@ -1,0 +1,236 @@
+Part 1 implementation notes — 2026-10-20 — IN PROGRESS
+
+Observed baseline
+- journal_transactions.event_id is NOT NULL with a source_events foreign key.
+  Existing read APIs join CRM events; simply adding manual rows would hide them.
+- journal_entries code constraint contains only six CRM management accounts.
+- Manual operation input contract now validates exact cent strings, calendar
+  dates, allocation totals, linked refunds and transfers. This is NOT a posting
+  API. No manual operation is available to users until the full path is ready.
+
+Next implementation sequence within this same branch/PR
+1. Add immutable manual_operations and posting origins with actor/account
+   idempotency. Preserve CRM event foreign keys; enforce exactly one origin.
+   Extend all journal/history/insights/candidate projections for both origins.
+2. Add restricted SQL write RPC, stable account lock order for transfers,
+   bounded cumulative refunds and live permissions on both transfer accounts.
+   A transfer creates two account postings atomically and never business income.
+   Reclassifications/corrections append evidence; no financial row editing.
+3. Connect authenticated Worker routes and bilingual operation forms, with a
+   review/confirm step and retry of the same idempotency identity after timeout.
+4. Add workspace/account administration and audit controls, then receipts and
+   statement extensions against this unified journal.
+5. Complete isolated CRM producer and end-to-end integration before one PR.
+
+CRM inspection findings (implementation in separate isolated worktree)
+Repository: sqlm34-alex-crm-https-github-com, existing working tree is dirty.
+worker/index.ts contains distinct mutation paths:
+- Stripe webhook route around line822 and payment materialization near2994.
+- Offline payment creation route1435 and SQL near3200/3299.
+- Offline void route1449 and SQL near3397/3439.
+- General job PATCH1474 can update finance_items/payments; must not bypass
+  the outbox or erase financial facts without an explicit corrective event.
+Existing offline_payments has stable IDs, idempotency keys and no-delete trigger.
+Existing partial-payment release preserves Stripe payment attempts and webhook
+reconciliation. Any producer must cover all paths inside their DB transaction.
+
+Planned additive CRM migration/rollback
+- Isolated branch/check-out; do not copy uncommitted unrelated Workiz changes.
+- Add financial revision/outbox/attempt tables, stable facts and transactionally
+  generated events; do not replace jobs/payments or change customer schemas.
+- Run regression and isolated PostgreSQL tests; feature flag defaults OFF.
+- Before any staging migration, verify target identity and retain snapshot.
+- Rollback disables dispatcher/flag and reverts application code; preserve
+  outbox, acknowledgements and posted financial history. No history deletion.
+- Actual production rollout and historical import remain unperformed until
+  explicit owner authorization. Never infer refunds from a missing array item.
+
+Unresolved external acceptance inputs
+- Representative redacted Chase/South National CSV/PDF layouts.
+- OCR provider/runtime choice without silently purchasing a subscription.
+- Accounting policies for Part 2; no tax approval inferred from a category key.
+  Owner confirmed CASH BASIS on 2026-10-20: actual payment dates determine
+  reporting periods; other category/tax-policy choices remain unresolved.
+- Real-device Android/iOS tests and credentials at build/signing time.
+
+Implementation checkpoint — 2026-10-20 (Part 1 remains IN PROGRESS)
+- Migrations 0014–0017 and authenticated bilingual UI cover manual operations,
+  split allocations, cumulative refunds, atomic transfers, owner administration,
+  dual-copy receipt originals/review/explicit payment, OCR draft adapter and
+  explicit verified bank-row booking. Receipt lists now use scoped keyset paging.
+- Manual journal entries are visible through both subject and legacy token
+  readers. Restore verification includes manual, administration, receipt and
+  bank-booking immutable tables; the main ledger fixture seeds receipt history.
+- Local suite: 119 tests, 114 passing and 5 real-PostgreSQL checks skipped.
+  TypeScript and ESLint passed; web export passed before the final receipt
+  pagination UI change. Browser acceptance of these screens remains outstanding.
+- CRM branch codex/nestwise-outbox: atomic job/offline-payment capture,
+  immutable outbox, ordered delivery leases/backoff/DLQ, signed transport and
+  disabled-by-default staging dispatcher. Six integration tests pass and Worker
+  preview dry-run bundles successfully. No live CRM migration or deployment.
+- CRM full regression: 353 cases at the earlier checkpoint, nine failures:
+  six require unavailable local PostgreSQL; three source assertions concern
+  existing job-text/startup UI. Re-running those two test files against copies
+  extracted from unmodified b407ee3 reproduces the same three failures.
+- Still needed: canonical CRM event generation/corrections/parts evidence,
+  review and retry UI, historical dry-run, invitations, receipt PDF/camera UX,
+  bank PDF/balances/gaps/partial workflows, integrated browser/native acceptance.
+- Automatic approval review rejected starting the local Expo preview server,
+  including a localhost-only attempt, with only "blocked by policy" supplied.
+  Do not bypass that restriction. Existing staging still serves the old version.
+- No push or Part 1 PR yet. No new staging migrations, OCR calls, production or
+  store actions. Local checkpoints do not mean the delivery is complete.
+
+Subsequent local checkpoint — 2026-10-20
+- Existing activated users can be added by owners, with an idempotent audit and
+  no account access by default. Inactive/unknown users and role-overwrite attempts
+  fail closed. Fixed an ambiguous actor column found by administration tests.
+- Receipts support explicit camera capture, Android pending-result recovery,
+  retained upload bytes for retry, private original download/native share, and
+  SHA-256 verification before export. Journal details retain the exact reviewed
+  receipt version used to book an expense. Camera/audio permissions are scoped;
+  microphone and photo-library permissions are disabled.
+- CRM offline capture-to-event converter, owner sync/retry controls and read-only
+  historical preview are implemented. Thirteen targeted CRM tests plus a separate
+  two-database signed delivery/lost-ACK test passed. Worker dry-run passed.
+- Nestwise full suite: 121 tests, 116 pass, five real-PostgreSQL checks skipped.
+  TS/ESLint and web/Android/iOS JS exports passed; receipt provenance tests passed
+  after the subsequent provenance addition. Native exports are not signed builds.
+- All new migrations remain local. Existing staging is unchanged. Browser/native
+  acceptance, remaining CRM event producers, bank PDF/partial workflows and all
+  Part 2 acceptance items remain outstanding. Local preview approval remains
+  blocked; do not bypass. No new PR yet under the two-delivery agreement.
+
+GitHub verification checkpoint — 2026-10-20
+- Nestwise feature branch pushed through d65501391806ffdd1f21f4956c3d443af53395fe.
+  CI https://github.com/sqlm34/nestwise-finance/actions/runs/39510623588 succeeded,
+  including real PostgreSQL concurrent operations, bank-origin recovery proof,
+  pg_dump/pg_restore, TypeScript, lint, web/mobile exports and Worker dry-run.
+- Feature pushes now run checks without deploying unapplied migrations.
+  Staging/EAS access jobs require STAGING_DEPLOY_BRANCH (default main).
+  Both were skipped for this feature branch. No staging schema or app changes.
+- CRM source branch pushed through 9253ea07c836b25a7d7ae64aebeedaec4303d2a0.
+  CI https://github.com/sqlm34/Alex-CRM/actions/runs/39511396229 succeeded,
+  including concurrent converters/senders on PostgreSQL 17, source outbox dump/
+  restore, immutable audit verification and two-database signed delivery.
+- Fixed historical baseline bypass for a new offline payment on a pre-existing
+  financial order. Reassigning an offline source fact to another job is blocked.
+- No new PR yet: Part 1 product scope is still incomplete. Existing frontend
+  browser acceptance restriction and remaining delivery checklist still apply.
+
+Staging schema checkpoint — 2026-10-20 19:17 America/Indianapolis
+- Neon manual snapshot: staging at 2026-10-20 23:17:06 UTC; visible in the
+  snapshot list (12 snapshots). Frozen browser tab recovered using a new tab.
+- Verified database nestwise_staging and the checksums of migrations 0001–0013.
+- Applied migrations 0014–0018 in one explicit transaction under the migration
+  advisory lock. Guard rejects a different database, CRM jobs or baseline drift.
+- Independent post-COMMIT query reports 18 migrations, latest
+  0018_statement_periods.sql. CRM database and production were not changed.
+- CI commit 3fcccfd3d17a4490421923598bb7e6174fb0becc passed run 39513333767.
+  A second attempt was requested with a temporary STAGING_DEPLOY_BRANCH variable
+  to deploy that same verified commit. Remove this variable after deployment.
+- UI acceptance is in progress; schema success alone is not product completion.
+
+Staging browser acceptance checkpoint — 2026-10-20
+- CI run 39513333767 attempt 2 succeeded, including EAS access and staging.
+  Temporary STAGING_DEPLOY_BRANCH was deleted and absence verified (HTTP 404).
+- Synthetic workspace/account: SYNTHETIC — приёмка 20 октября / Clearing 1234.
+  Manual income USD 100 and expense USD 3 were saved through the browser.
+- Archived a two-row synthetic CSV with verified dual copies. Saved October
+  period revision 1: opening 100, movement 94, closing 194, zero difference.
+- Saved a USD 97 reconciliation to two journal entries (100 and -3).
+  Created an explicit USD 3 bank expense for the second statement row.
+- Canceled the bank expense reconciliation for recheck. The decision remains
+  in audit; original evidence reports one matched row and one posted row, zero
+  unmatched rows. Its journal detail remains accessible after cancellation.
+- Corrected cancellation confirmation copy: cancellation does not remove a
+  journal operation or release a bank-origin row for duplicate posting.
+- Uploaded a synthetic screenshot as a receipt test attachment and saved reviewed
+  version 1 with synthetic merchant/item and USD 1 total. No OCR was invoked and
+  no receipt payment was confirmed. This attachment is not a real receipt.
+- TypeScript and targeted ESLint passed for the confirmation-copy correction.
+- Part 1 remains incomplete; no production, CRM backfill or store publication.
+
+Additional synthetic browser acceptance — 2026-10-20
+- Receipt review did not create a posting: journal still showed exactly three
+  entries after saving the attachment review (100 income, two 3 expenses).
+- Linked refund USD 10 against the USD 100 income saved successfully. A further
+  USD 91 refund was rejected with the remaining-amount message; no fifth entry
+  appeared until the separately confirmed transfer.
+- Created SYNTHETIC Transfer 5678 account and posted a USD 20 internal transfer.
+  Source has clearing credit / transfers debit; destination has clearing debit /
+  transfers credit, both share operation 1a4df435-973a-44b8-967e-c1aaf18b316a.
+  Source journal contains five operations; destination contains one.
+- These records are artificial acceptance data, not bank money movement.
+- Destination period summary: clearing movement +USD 20; customer income,
+  expenses and operating difference all USD 0. Transfers do not inflate income.
+- GitHub run 39515676815 completed successfully for f7fba20. This run verified
+  the confirmation-copy change; staging remains at verified 3fcccfd because the
+  temporary deployment-branch override has already been removed.
+- Follow-up copy issue: period insights still say bank reconciliation is not
+  available. Replace that obsolete wording when connecting completeness metrics;
+  do not imply tax/report approval from successful bank reconciliation.
+
+Cash basis implementation checkpoint — 2026-10-20 (not deployed)
+- Additive migration 0019 adds cash-insights and payment-date journal reads.
+  Legacy event-date journal/history remains available for audit. No posting is
+  edited; payment date, event date and recorded date retain their meanings.
+- Cash summaries use paid_at in UTC. Undated entries are counted by occurred_at
+  as review exceptions, but excluded from all monetary totals. Transaction count
+  includes these exceptions; drilldown returns only dated paid entries.
+- Summary drilldowns preserve payment-date filters through paging and live ACL
+  checks. Ordinary journal users can explicitly select event/payment dates.
+- Late-delivery test spans October/November source events paid in September,
+  an unpaid accrual, and 107 paid rows across multiple pages; totals reconcile
+  exactly and keep midnight UTC boundaries in an Indianapolis DB session.
+- Full local suite initially: 127 cases, 122 pass, five PostgreSQL-only skipped;
+  further date-filter assertions added. TypeScript and full ESLint passed.
+- This is an operational cash view, not approved tax mapping or a finalized
+  Financial Statement. Remaining policy decisions stay unresolved.
+- Android build 86a57a3 is running independently; it predates this new change.
+  Do not claim that pending APK includes cash-basis UI until a later build.
+
+Cash verification update — 2026-10-20
+- Final local suite: 128 cases, 123 passed, five PostgreSQL-only cases skipped.
+  TypeScript and full ESLint passed. Web export completed; generated output
+  retained locally under .local/dist-cash-proof and is not source-controlled.
+- Current Android EAS build: 37a51748-0a11-4259-b27e-e4aec92fcdff, commit
+  86a57a3, in progress. Apple Developer account is unavailable; signed iOS
+  device/store acceptance remains an external dependency. No store submission.
+
+Cash staging schema checkpoint — 2026-10-20 20:12 America/Indianapolis
+- CI 39519086425 found a PostgreSQL timezone alias mismatch in the test.
+  Canonical America/Indiana/Indianapolis fixed it; CI 39519377416 succeeded.
+- Snapshot: staging at 2026-10-21 00:05:37 UTC (manual), 13 snapshots.
+- Applied migration 0019 after verifying all 18 prior source checksums, exact
+  nestwise_staging identity and absence of CRM jobs, in one locked transaction.
+- Independent query after COMMIT: 19 migrations, latest 0019_cash_basis_reads.sql.
+  SHA256 0a54af1984edf8bf4208be7bdbcf662dcbdde422e381f7589312d4557bffc63a.
+- Temporary STAGING_DEPLOY_BRANCH selected for 4980771 (manual receipt UI).
+  Deployment is pending; REMOVE selection and verify absence when complete.
+- Native build remains 86a57a3 and does not contain cash UI/manual-review copy.
+  EAS_INTERNAL_BUILD_SHA was deleted after launch and absence verified (404).
+
+Android device installation checkpoint — 2026-10-20 20:15 America/Indianapolis
+- EAS build 37a51748-0a11-4259-b27e-e4aec92fcdff / commit 86a57a3 succeeded.
+- Downloaded official Expo APK; apksigner verified v2 signature, one signer.
+  SHA256 08dc5858e56168cd5bf5fab245d8825d62e858c97ae74678f312906cf93f184b.
+- Installed with ADB on the owner-authorized connected Android. Package
+  com.aksenov.nestwise.staging, versionName 1.0.0, versionCode 1.
+- Alex CRM package was not replaced. User asked to open Nestwise and confirm
+  login/space list. Installation alone does not establish native acceptance.
+
+Android native authentication correction — 2026-10-20
+- Owner opened installed APK, then reported generic login-service failure.
+- Confirmed server cookies use nestwise, while Expo client default filtered
+  better-auth. Explicit native cookiePrefix now matches the server.
+- Regression uses actual installed Expo cookie plugin and real Better Auth
+  fixture, with only platform storage/linking mocked. Old configuration fails
+  with an empty cookie jar; fixed configuration logs in, reads workspaces,
+  signs out and rejects the old session. Device verification is still pending.
+- Local suite: 129 cases, 124 pass, 5 PostgreSQL-dependent skipped.
+- EAS CLI removed from app dependencies to resolve Expo Doctor warning. CI
+  invokes the same exact CLI version via npx eas-cli@25.2.0.
+- Staging deployment 39519886642 succeeded for 4980771. Temporary deployment
+  branch override removed, absence verified (404). Browser session expired;
+  owner asked to sign in for final cash UI acceptance.

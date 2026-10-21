@@ -1,0 +1,15 @@
+Private statement archive — staging, 2026-10-20
+
+Adds original CSV storage to the saved reconciliation workflow. One feature branch / one PR, based on feature/durable-reconciliation. All prior PRs remain unmerged.
+
+Explicit archive action sends original UTF-8 bytes (including BOM/CRLF), never silently uploads a preview. Files are at most 2,000,000 bytes; 100 immutable reservations per account including incomplete uploads. Invalid CSV is rejected. PDF/OCR remains unsupported. No financial postings are created.
+
+Private R2 buckets nestwise-documents-staging and nestwise-documents-staging-backup. Both r2.dev endpoints disabled, no public domains. Only staging Worker bindings; no secrets embedded in source. Existing CRM storage untouched. These two buckets protect against individual-object failure, not loss of the entire Cloudflare account; independent off-provider disaster backup remains future work.
+
+Object key v1/workspace/account/SHA256. Conditional create prevents overwrite. Metadata reservation before storage; completion only after both copies pass byte count and SHA-256. Partial failures are pending and retriable. Original retrieval rechecks live account ACL and verifies content; corrupt/missing primary falls back to verified backup. No destructive repair/delete API. Download route is an authenticated attachment; app displays a paginated safe text preview.
+
+Owners/accountants upload; all users granted read access to that specific account can read originals. No direct database table grants. Metadata and completion immutable. Linked reconciliation count includes canceled decisions. Filename and bank alias are not persisted; original file contents are private.
+
+Migration 0012 applied after Neon snapshot 2026-10-20 21:00:06 UTC. Rollback deploys previous code without dropping metadata, completion records or objects. Database restore checks fingerprint all tables, preserves ACL and immutable triggers. R2 recovery uses verified backup retrieval; database-only snapshots do not contain object bytes. For full recovery retain both buckets plus database backup and verify every referenced hash.
+
+Local validation: 88 tests, 84 pass, 4 PostgreSQL-only skips; TypeScript, ESLint, web export, Worker dry-run passed. CI additionally exercises real PostgreSQL concurrent quota reservations, full pg_dump/restore and mobile JS exports. Live staging/browser result recorded in PR after deployment.

@@ -1,0 +1,53 @@
+Statement periods and balance evidence — 2026-10-20
+
+Part 1 implementation deployed to staging at commit 3fcccfd on 2026-10-20.
+
+Open an archived original to enter its inclusive period, opening/closing USD
+balances and account last four digits. An explicit confirmation saves a new
+immutable revision. This is user-declared evidence, not bank-certified metadata.
+The server verifies original bytes against SHA-256 and computes net movement,
+expected closing balance, signed difference, out-of-period and ambiguous rows.
+A mismatch can be saved for investigation but is visibly flagged. No journal
+transaction is created or changed by saving a period.
+
+Account overview compares the latest revision of each original for gaps,
+overlaps, adjacent balance differences and inconsistent last four digits.
+Transaction-free days do not establish missing coverage; declared periods do.
+Overlapping originals remain visible and are not silently deduplicated.
+
+API (existing authenticated account ACL and origin protection):
+GET /v1/user/workspaces/{workspace}/accounts/{account}/statement-periods
+  Latest revision per original, at most 100 originals per account.
+GET /v1/user/workspaces/{workspace}/accounts/{account}/documents/{hash}/period
+  Full immutable revision history for that original, newest first, max 100.
+POST same document period path, JSON <= 4096 bytes:
+  {id: UUID, expected: previous revision (0 for first), data: {
+    from: YYYY-MM-DD, to: YYYY-MM-DD, opening_cents: signed integer string,
+    closing_cents: signed integer string, last4: four digits, confirmed: true}}
+  Server derives all checks. Exact command retries return the original UUID.
+  Stale version or changed reuse of UUID returns 409. Invalid data returns 400.
+  Unknown/inaccessible account returns 404. Original copy integrity failures
+  remain unavailable; the API never trusts client-supplied calculated totals.
+
+Migration 0018 is additive. Apply only after a verified staging snapshot and
+successful isolated CI/restore. Rollback application code first if needed;
+retain the audit table and originals. Restore the database snapshot only in the
+designated staging recovery workflow; do not erase audit rows with down SQL.
+Staging now has migrations 1–18, applied after the manual snapshot dated
+2026-10-20 23:17:06 UTC. CI run 39513333767 attempt 2 deployed the application.
+The temporary deployment-branch variable was removed after success.
+No production deployment is authorized.
+
+Local tests cover balances, date boundaries, duplicate ambiguity, continuity,
+version conflict, lost-response retry, live ACL, immutability and no posting.
+Restricted-role ledger tests seed evidence for the PostgreSQL restore check.
+Browser acceptance confirmed a saved October period with opening USD 100,
+net USD 94 and closing USD 194 on a synthetic archived two-row statement.
+Grouped matching of USD 97 to USD 100 and USD -3 succeeded. A separate USD -3
+bank posting survived cancellation of its match, retained its journal link,
+and remained marked as already posted in original-document evidence.
+Browser revision 2 deliberately recorded closing USD 195 and displayed a USD 1
+difference while retaining revision 1. Revision 3 restores closing USD 194;
+all three immutable revisions remain visible. Signed native acceptance remains.
+Bank PDF extraction and bank-specific fixture validation remain separate open
+work; this implementation must not be represented as a PDF adapter.

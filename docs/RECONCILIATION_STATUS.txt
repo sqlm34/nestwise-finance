@@ -1,0 +1,46 @@
+Draft statement reconciliation — 2026-10-20
+
+Integrated account block: local UTF-8 CSV intake and SHA-256 fingerprint; strict
+existing parser; issue/duplicate blocking including the first copy; statement
+search and pagination; authorized paid-date cash candidate API; bounded keyset
+loading; exact integer suggestions and manual many-to-many grouping; evidence
+drill-down; no reuse within the current draft; difference gating; undo; EN/RU.
+
+The local draft is deliberately ephemeral. Leaving the account section, changing
+accounts, signing out or reloading clears files and decisions. No bank text,
+descriptions, amounts or file hashes are transmitted. Only workspace/account,
+date window and cursor go to the existing authenticated API. The file picker
+deletes its temporary native cache copy after reading, never the source file.
+Original files, persistent decisions, audit approval and cross-file deduplication
+are not implemented. No financial write route or bank-only posting is introduced.
+
+Matching uses inclusive paid dates in UTC, within seven days of a selected bank
+row. Cost corrections, accruals, absent paid dates and unposted source events are
+excluded. Clearing amounts are compared as integer cents. Any selected journal
+item must be within the date tolerance of at least one selected bank row. Exact
+sum is necessary but does not prove identity; the user must check order/source
+evidence. No confidence percentage, automatic acceptance or tax-ready state.
+
+Maximum 20 bank rows and 20 journal items per group, nonzero net total. Candidate
+API pages are 100 rows; client accepts up to 2,000 complete candidates and blocks
+confirmation on truncation/failure. Suggestions consider at most 60 candidates,
+groups of at most three, at most ten results; these limits are visibly disclosed.
+Manual grouping can inspect all fetched pages. Loading is aborted on selection,
+account or section changes. Each SQL request rechecks live account authorization.
+
+Migration 0010 adds a partial paid-date index and a scoped read function only.
+Rollback: redeploy the prior app; retain the additive function/index and all
+financial history. Applied with checksum-verified migrator after staging snapshot
+2026-10-20 20:16:29 UTC. DEMO returns exactly four cash candidates; the cost
+correction is excluded.
+CRM and production are unchanged; real financial ingestion remains disabled.
+
+Tests cover 215 paid transactions over three pages, event/payment-date distinction,
+excluded corrections/accruals/unresolved events, account/grant/cursor isolation,
+restricted SQL role, live authenticated HTTP, net processor payouts, split bank
+deposits, reuse, duplicate copies, invalid signs/dates, zero net and large cents.
+
+Remaining project gates: persistent private evidence storage, reviewed adapters
+against redacted bank samples, durable audited reconciliation, receipts/OCR,
+accountant-approved mappings/reports, CRM producer in its own repository,
+real mobile device verification and explicit production release authorization.

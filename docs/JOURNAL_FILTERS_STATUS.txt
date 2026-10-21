@@ -1,0 +1,15 @@
+Account journal filters — 2026-10-20
+
+Search the authorized, loaded page by source order, source event or journal ID.
+Filter by inclusive UTC event dates and accounting code; keep all balanced lines
+of matching transactions visible. Sort by event instant with deterministic ID
+ties. Invalid or reversed ranges show an error and no transaction results.
+Reset clears filters; switching accounts resets them; refresh preserves them.
+EN/RU labels explicitly limit the search to the latest 100 loaded transactions.
+This is not a full-history report, tax report or account balance.
+
+No API, database, credentials, permissions or CRM changes. No migrations needed.
+Rollback: redeploy the preceding application build; financial data is unaffected.
+Validation: domain tests cover UTC boundaries, inclusive ranges, invalid dates,
+combined search/code filters, balanced transaction preservation and stable sorting.
+Run full tests, typecheck, lint and CI builds before release.

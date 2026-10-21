@@ -2,5 +2,7 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true
-  }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "worker/**/*.ts", "app.config.ts", "index.ts", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", ".test-build", "dist", "dist-mobile", "artifacts", "reference"]
 }

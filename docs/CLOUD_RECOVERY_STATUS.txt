@@ -1,0 +1,35 @@
+Cloud recovery drill — 2026-10-20
+
+Source: nestwise-staging, branch staging / br-snowy-morning-b5ppnq58.
+Snapshot: staging at 2026-10-20 17:39:07 UTC (13:39:07 America/Indianapolis).
+Neon Multi-step restore created branch br-quiet-haze-b5isivqs.
+The original staging branch and Cloudflare connection were not switched.
+Snapshot and recovered branch are retained as synthetic verification evidence.
+Their storage/compute follows the existing Neon Launch plan.
+
+Verified against the actual cloud source and recovered databases:
+- All 13 Nestwise tables have matching row counts and SHA-256 fingerprints.
+- public.nestwise_schema_migrations matches, including checksums and timestamps.
+- 3 source events, 3 journal transactions, 6 journal entries, 3 audit records.
+- Direct journal access is denied through the actual nestwise_worker login.
+- Journal entries, transactions, audit records and source events reject changes.
+- A session revoked before the snapshot remains rejected after recovery.
+- A second fingerprint comparison proves the probes changed no data.
+
+Verification commands are reproducible:
+CI retains node scripts/verify-restore.cjs for local pg_dump/pg_restore.
+Cloud runs use node scripts/verify-cloud-restore.cjs, with secure environment
+injection of NESTWISE_RECOVERY_SOURCE_URL, NESTWISE_RECOVERY_COPY_URL and
+NESTWISE_RECOVERY_RUNTIME_URL, plus
+NESTWISE_RECOVERY_CONFIRM=verify-separate-staging-copy.
+Credentials must never be passed on command lines or committed.
+The cloud guard requires distinct Neon endpoints, nestwise_staging databases,
+TLS, and the nestwise_worker identity on the restored endpoint.
+The runtime credential already exists in the snapshot; no role grant or
+password rotation is needed. Cloud owners are not treated as superusers.
+All mutation probes execute on the COPY inside transactions always rolled back.
+
+Run during a controlled write pause or against a known fixed comparison point.
+The source must remain unchanged between snapshot and comparison. A snapshot
+restore drill does not prove off-provider backup durability or production RPO.
+This drill covers synthetic staging data only. Financial ingestion remains OFF.

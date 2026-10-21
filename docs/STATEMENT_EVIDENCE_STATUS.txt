@@ -1,0 +1,15 @@
+Statement evidence review and archive resume — staging, 2026-10-20
+
+One integrated block based on PR16 (private-statement-archive). Read-only evidence verification, complete row coverage, bilingual filters, exact credit/debit subtotals, journal links and explicit resume from an archived original.
+
+New GET documents/{sha256}/review requires live account ACL and a hash/size-verified private original. It compares each active saved group's date, exact cents, line and normalized description hash with the actual CSV. Every row must agree; otherwise the group is a mismatch. Duplicate/zero rows remain blocked. Canceled decisions release reservations. Matching fingerprints from another file are reserved, not marked matched. A group referring to a missing row remains an explicit invalid group even if that absent row cannot appear in the preview.
+
+All rows are bounded by the existing 5000-row CSV limit; group claims are serialized in PostgreSQL. Aggregation uses integer cents, no floating-point totals. No original descriptions are returned by the review endpoint. No money is posted and no accountant approval/final report is implied. Reader access can review; only existing owner/accountant authorization permits save/cancel.
+
+Archive resume verifies original bytes before loading, explicitly confirms replacement of local drafts, and refreshes live claims. Matching or conflicting saved rows are unavailable for another local group. While evidence is loading or failed, draft confirmation is blocked. Concurrent-device changes are still enforced by the authoritative save RPC; refresh claims after conflict. Existing local-only CSV previews retain prior behavior.
+
+Migration0013 adds only a read-only SECURITY DEFINER function with pinned search_path and restricted EXECUTE. Applied after snapshot 2026-10-20 21:15:06 UTC. Roll back app code without deleting originals, assertions or archive metadata. Existing recovery fingerprints and immutable-table probes remain in force.
+
+Validation: 94 tests total; 90 local passes, 4 PostgreSQL-only skips. TypeScript, ESLint and web export passed. CI verifies real PostgreSQL, complete database restore, mobile JS exports and staging deployment. Browser proof and CI links recorded in PR after deployment. No production, store release or CRM mutation.
+
+Browser proof: original reopened and resumed without a local upload. Initially 5 unmatched rows / 1 canceled decision. Saved DEMO payment 350.00 => 1 matched and 4 unmatched; matched-only filter and original hash verified. Canceled through history => 5 unmatched, 2 canceled decisions and row selectable again. Test decision 75bb7ed4-7555-48ed-aa34-50f5431e8b3c retained canceled. Browser observation led to automatic archive linked-count refresh on decision changes and clearer saved-claim labels. Screenshots kept in ignored artifacts.

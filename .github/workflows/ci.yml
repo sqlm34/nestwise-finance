@@ -1,0 +1,134 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main, 'feature/**']
+permissions:
+  contents: read
+concurrency:
+  # Native builds outlive ordinary checks; new feature pushes must not cancel them.
+  group: ci-v2-${{ github.ref }}-${{ github.sha == vars.EAS_INTERNAL_BUILD_SHA && 'android' || 'checks' }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: nestwise_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: disposable-ci-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nestwise_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:disposable-ci-only@localhost:5432/nestwise_test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Verify release configuration and record migration hashes
+        run: node scripts/release-preflight.cjs
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - name: Back up and restore isolated PostgreSQL
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$POSTGRES_CONTAINER" pg_dump -U postgres -d nestwise_test -Fc -f /tmp/nestwise.dump
+          docker exec "$POSTGRES_CONTAINER" createdb -U postgres nestwise_restore
+          docker exec "$POSTGRES_CONTAINER" pg_restore -U postgres -d nestwise_restore --no-owner /tmp/nestwise.dump
+          node scripts/verify-restore.cjs
+      - run: npm run build:web
+        env:
+          APP_ENV: staging
+          EXPO_PUBLIC_API_URL: https://nestwise-staging.alexeasyrepair.workers.dev
+      - run: npm run build:mobile
+      - run: npm run worker:check
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: web-preview
+          path: dist
+          retention-days: 7
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: release-evidence
+          path: .local/release-evidence.json
+          include-hidden-files: true
+          retention-days: 30
+  staging:
+    needs: checks
+    # Feature pushes always run checks. Deploy only the explicitly selected branch
+    # after its database migrations have been reviewed/applied; default is main.
+    if: github.event_name == 'push' && vars.STAGING_ENABLED == 'true' && github.ref_name == (vars.STAGING_DEPLOY_BRANCH || 'main')
+    environment: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Build staging web application
+        run: npm run build:web
+        env:
+          APP_ENV: staging
+          EXPO_PUBLIC_API_URL: https://nestwise-staging.alexeasyrepair.workers.dev
+      - name: Deploy isolated staging Worker
+        run: npm run worker:staging
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Verify deployed staging pages and authentication boundary
+        run: node scripts/verify-staging-web.cjs
+  eas-access:
+    needs: checks
+    if: github.event_name == 'push' && vars.EAS_ENABLED == 'true' && github.ref_name == (vars.STAGING_DEPLOY_BRANCH || 'main')
+    environment: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Verify CI identity can access the linked Expo project
+        run: npx --yes eas-cli@25.2.0 project:info
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+          APP_ENV: staging
+  android-internal-build:
+    needs: checks
+    # One selected commit only. No deployment, update or store submission.
+    if: github.event_name == 'push' && vars.EAS_ENABLED == 'true' && github.sha == vars.EAS_INTERNAL_BUILD_SHA
+    environment: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    concurrency:
+      group: nestwise-android-internal
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Build signed staging APK for device acceptance
+        run: npx --yes eas-cli@25.2.0 build --profile staging --platform android --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+          APP_ENV: staging

@@ -1,0 +1,262 @@
+NESTWISE — remaining delivery in TWO parts — 2026-10-20
+
+This plan supersedes the old phase breakdown in IMPLEMENTATION_PLAN.txt.
+User request: two large deliveries, one Nestwise PR per delivery, no small PRs.
+Current baseline: PR17 / 5f742e0. Existing PRs remain open and stacked.
+Part 1 branch: feature/financial-data-completion. Status: IN PROGRESS.
+
+Owner-confirmed accounting basis (2026-10-20): CASH BASIS, by actual payment.
+Use paid_on/paid_at for report periods, never upload or job-update timestamps.
+Unpaid accrued source facts remain available as evidence but must not silently
+enter the cash-basis income/expense report. This choice does not approve category
+tax treatment, deductibility, inventory policy or a specific annual tax form.
+Owner reply on 2026-10-20: remaining accountant decisions are not yet known.
+Keep parts/inventory timing, mixed-use allocation and tax mappings unresolved.
+Do not ask the same policy question again without new information; expose the
+unresolved items in review and prevent a misleading finalized tax report.
+
+PART 1 — complete financial data lifecycle (previous remaining blocks 1–6)
+[ ] Workspace, account, membership and account-grant management with live ACL,
+    owner protection, audit history and EN/RU mobile-first controls.
+[ ] Manual income/expense, split allocations, linked refunds and atomic
+    transfers. Immutable balanced postings, idempotency and no CRM duplication.
+[ ] Alex CRM producer: inspect all financial mutation paths; additive outbox,
+    ordered revisions, durable delivery leases, retry/backoff/DLQ and sync UI.
+    Historical cursor dry-run first; actual historical import requires approval.
+[ ] Receipt originals, capture/upload, reviewed OCR/item extraction, duplicate
+    detection and provenance. Never treat unreviewed OCR as booked money.
+[ ] CSV/PDF bank adapters, balances and statement gaps. Bank-specific adapters
+    require redacted representative samples; unsupported layouts stay explicit.
+[ ] Partial/many-to-many reconciliation, fees, transfers and explicit bank-only
+    booking with duplicate prevention and reversible decisions.
+[ ] Integrated tests: permissions, idempotency, concurrency, restore, CRM
+    regression, original-to-journal browser flow and native compatibility.
+
+PART 2 — accountant workflow and product completion (previous blocks 7–10)
+[ ] Versioned operational/accountant category mapping and policy approvals.
+[ ] Financial Statement with original category labels, zero lines, US Letter
+    PDF, exact journal lineage, exception gates and frozen report snapshots.
+[ ] Replace remaining demo screens with live data; notifications, safe offline
+    drafts/retry, export and operational recovery controls.
+[ ] Android/iOS signed builds, real-device scenarios and full regression.
+[ ] Resolve/review the existing stacked PR chain and prepare release/rollback.
+    Production and store submission remain separate owner-authorized actions.
+
+Delivery boundaries and safeguards
+- Two product parts do not mean skipping intermediate local tests or commits.
+- Create each Nestwise PR only after its whole part is reviewable; report
+  external prerequisites honestly, never mark an unavailable feature complete.
+- CRM source changes MUST stay in its own repository and its own review PR.
+  This necessary cross-repository companion is not a third product part.
+- Preserve existing CRM working-tree changes. Build from an isolated clean
+  checkout when modifying its code; never overwrite unrelated local work.
+- Before CRM edits, record exact mutation paths and additive migration/rollback
+  plan. Producer flag OFF; no production mutation/deployment or historical push.
+- Snapshot staging before new migrations; test restore and restricted runtime.
+- Workiz integration excluded. No new bank connections or paid OCR subscription
+  assumed. Secrets remain in existing secret stores, never repository contents.
+- Owner/accountant decisions still needed for inventory,
+  mixed-use expenses, tax/tip treatment and annual form version.
+
+Acceptance requires end-to-end data flow and failure recovery, not merely
+screens or passing unit tests. Native JS export is not a signed device build.
+
+2026-10-20 — Bank origin and Android startup checkpoint
+- Bank evidence now exposes immutable booking provenance after reconciliation
+  cancellation and across overlapping statement uploads. Posted rows remain
+  locked against repeat booking and link to the existing journal transaction.
+- TypeScript, ESLint and the 122-test local suite completed without failures;
+  five PostgreSQL-dependent cases remain CI-only locally.
+- Owner confirmed the orders list opens in installed Alex CRM 1.10 on USB
+  Android Samsung SM_G986U. ADB confirmed its running process; the current
+  process crash buffer was empty. Camera, offline writes and native interaction
+  acceptance are not yet verified. Production APK and data were not changed.
+- Migration 0017 remains unapplied to staging. This checkpoint does not mark
+  either product part complete or authorize deployment to production.
+
+2026-10-20 — Release scope and source review checkpoint
+- Owner has no Apple Developer account. Android and web implementation continues;
+  signed iOS distribution remains externally blocked. Simulator exports do not
+  establish a releasable signed iPhone build. No store account is assumed.
+- Staging is now at migrations 0001–0018 and application 3fcccfd. The earlier
+  'unapplied migration 0017' checkpoint above is historical and superseded.
+- CRM companion f7cf952 adds immutable owner-reviewed paid Stripe/fee and parts
+  source conversion, source evidence UI, idempotent release and signed receiver
+  proof. Source correction/lifecycle and live browser acceptance remain open.
+- Production authentication and ingestion currently fail closed by design. A
+  production release still needs reviewed environment configuration, isolated
+  databases/storage, a verified backup, signed build QA, operational acceptance
+  and the owner's final release approval. Do not remove gates just to claim ready.
+
+2026-10-20 — Owner decision: manual receipt review for this release
+- Automated OCR is explicitly deferred by the owner. Current acceptance uses
+  saved original images/PDFs, manual item/amount review and explicit payment.
+- Receipt UI no longer offers an unconfigured OCR action. The existing disabled
+  server adapter remains dormant; no document is sent to an OCR provider.
+- This decision removes OCR-provider setup from current release prerequisites.
+
+2026-10-20 — Cash-basis browser and native authentication checkpoint
+- Staging 4980771 / migration 0019: owner authenticated in the browser. On the
+  synthetic clearing account, October cash totals are receipts 100 USD, refunds
+  10 USD, expenses 6 USD, internal transfer 20 USD and clearing movement 64 USD.
+  The receipts drilldown returns exactly the original 100 USD posting with its
+  payment date and source operation ID. No actual financial records were added.
+- Manual receipt review is visible; OCR action is absent. The existing synthetic
+  receipt remains unposted, and posting is disabled without a payment date.
+- Installed Android build 86a57a3 opened Overview but failed account login.
+  Root cause: Expo auth client filtered out the server's nestwise cookie prefix.
+  Fix 13244e5 sets the matching prefix while retaining SecureStore persistence.
+- Real auth-plugin/server regression covers login, fresh-client cookie restore,
+  native authenticated reads and writes, idempotent retry, sign-out and rejected
+  writes after sign-out. It uses a local synthetic database only.
+- Replacement APK build requested by GitHub Actions run 39521202007. Device
+  acceptance remains pending until the signed replacement is installed and the
+  owner confirms login. Do not mark native acceptance complete from these tests.
+
+2026-10-20 — Android login acceptance
+- Signed EAS build 962198d7-8e82-449d-ad06-74cd1c139644 (13244e5) succeeded;
+  Expo Doctor passed 20/20 checks. APK signature v2 verified and update installed
+  successfully over Nestwise staging on the owner's connected Android.
+- APK SHA-256: 10a6ccbd29a5f46a9e997816251c9597721b79630ab19d4e7c1e4531b10409f2.
+- Owner confirmed successful entry in the application. The login blocker is
+  closed. Camera, offline writes and remaining end-to-end mobile scenarios are
+  separate pending acceptance items; this does not mark the full app complete.
+
+2026-10-20 — CRM correction and lifecycle integration checkpoint
+- CRM companion 7285bed adds audited owner-reviewed paid-cost correction chains
+  and finalize/reopen/empty-void assertions. Corrections retain original payment
+  dates and append only deltas; statuses create no monetary transactions.
+- CI 39524483856 passed against PostgreSQL 17: concurrent approvals, immutable
+  audit backup/restore and signed two-database receiver delivery all succeeded.
+  Separate higher/lower/zero corrections, repeated commands and delivery retries
+  retain correct totals. Paid cancellation, changed originals and mixed payment
+  edits remain blocked.
+- This closes implementation/test coverage for these supported source paths,
+  not live integration acceptance. CRM migrations and capture/dispatch remain
+  disabled. Supplier/customer refunds without source evidence, historical
+  approval and browser acceptance of source-review controls remain open.
+
+2026-10-20 — Local CRM browser acceptance
+- CRM 7502cd9 adds a reproducible loopback-only synthetic UI fixture using the
+  real NestwiseSync component, admin handler and disposable migrated database.
+- Built-in browser verified cost correction, lifecycle confirmation and delivery
+  retry with a simulated 503 after each database commit. Repeating each command
+  created exactly one corresponding audit entry and no duplicate source event.
+  Historical preview imported nothing and exposed unmaterialized source data.
+- CI 39525576272 passed, including fixture bundle/seeding, PostgreSQL concurrency,
+  backup/restore and signed receiver verification. Local UI acceptance is now
+  complete for these scenarios; live cloud auth/deployment acceptance remains open.
+- Existing CRM wrangler.preview.json targets the alex-crm-api Worker and must not
+  be used as an isolated test deployment. No CRM cloud resource was modified.
+
+2026-10-20 — Separate CRM cloud staging provisioning
+- Owner explicitly approved the new isolated database and its scoped credential.
+  Created alex_crm_nestwise_staging and alex_crm_nestwise_worker in the existing
+  Neon staging project. The role cannot CONNECT to nestwise_staging and has no
+  superuser, CREATEDB, CREATEROLE, BYPASSRLS or inherited-role permissions.
+- Separate Worker alex-crm-nestwise-staging has only DATABASE_URL as an encrypted
+  secret, no public/preview URL, routes, schedules or storage bindings. Dispatch
+  and external integrations are OFF. The live CRM Worker was not changed.
+- CRM 766476f generates atomic, guarded bootstrap SQL from actual source files
+  and the real auth handler. Cloud verification: 11 migration hashes recorded,
+  capture false, zero events, correct table owners, temporary SET grants removed.
+- CI 39527604758 passed, including fresh-schema auth tests and unsafe-config
+  rejection. Private Cloudflare HTTP tester reached the actual auth handler and
+  database; anonymous access returns the expected 401. Public activation, app
+  owner acceptance and real cross-service delivery remain separate gates.
+- Private cloud auth acceptance also passed: synthetic owner 200, technician
+  403, expired session 401. The temporary session was explicitly expired and
+  removed from the browser tester; zero active test sessions and zero events
+  verified. This does not establish delivery or public/mobile CRM acceptance.
+
+2026-10-21 — CRM cloud canary and live application navigation
+- CRM PR94 / a5684c4: actual private Worker service-binding delivery succeeded.
+  Two synthetic payments (100 USD on Oct 19, 250 USD on Oct 20) produced exactly
+  two receiver events and two balanced journal transactions. Replay after an
+  artificial lost ACK did not duplicate money. General and integration CI passed.
+- Canary is CLOSED: capture/dispatch false, receiver connection disabled,
+  ingestion false, one-hour key revoked on both Workers, session expired,
+  no public CRM URL, route, cron or retained receiver service binding.
+- Main app routes now render authenticated financial components rather than
+  sample totals: cash overview, journal, CRM events, bank evidence/reconciliation,
+  manual operations and receipts. Explicit /demo retains the visual sample.
+- Account selection is scoped to authenticated identity and revalidated against
+  current server access on route focus. Invalid/revoked choices are not replaced
+  with another account. Unfocused views clear protected state; stale requests
+  cannot restore it. No financial data is cached in the selection preference.
+- Mapping remains an unapproved reference dictionary. Accountant policy,
+  frozen report generation, native camera/offline scenarios, bank PDF samples,
+  signed iOS release and production readiness are still outstanding.
+- This navigation change requires no new database migration. Cloud database
+  baseline remains 0019; it does not enable integration or production.
+
+2026-10-21 — Owner-confirmed report scope
+- Financial Statement is exclusively for the Aksenov LLC business. Personal and
+  family workspaces must not expose this form or contribute wholesale totals.
+  Explicitly linked business portions of personally paid purchases are permitted;
+  their original personal payments remain unchanged and reimbursements must not
+  count as a second expense.
+- Enforce workspace kind in server report/mapping/snapshot authorization, including
+  saved snapshot reads; hiding a navigation button alone is insufficient.
+- Ordinary personal/family journal and cash overview remain available.
+
+2026-10-21 — Preliminary accountant reports implementation
+- Added business-only cash report, explicit personal-paid business shares,
+  reimbursement exclusion and append-only correction workflows.
+- Proposed form mappings preserve operational categories; saved input snapshots
+  are immutable and stay Accountant Review while policies remain unapproved.
+- PDF/CSV export uses a saved snapshot. Migration 0020 is additive; recovery
+  procedure and scope are documented in ACCOUNTANT_REPORTS.md.
+
+2026-10-21 — First large release block, implementation ready for acceptance
+- Durable prepared manual drafts, immutable pending retries and confirmed-command
+  recovery are scoped to device, API, identity, workspace and account.
+- Overview/journal/settings surface local recovery notices. Network waits are
+  bounded without automatically replaying financial commands.
+- Web print moved out of the main accounting screen; printable HTML fallback
+  accompanies frozen snapshot CSV. Android version 1.0.1 / code 2 is prepared.
+- Local suite: 149 tests, 143 pass, 6 PostgreSQL-only checks deferred to CI.
+- Cloud/browser and signed Android acceptance are still pending; this checkpoint
+  does not mark either large release block complete.
+
+2026-10-21 — Owner clarification: Statement handoff, not accountant approval
+- The product prepares categorized income/expenses and a Financial Statement for
+  the owner to hand to the accountant. An in-app accountant approval workflow is
+  NOT a release requirement. Earlier requirements for mandatory accountant policy
+  approval/finalization are superseded for this handoff document.
+- Keep factual exceptions (missing dates, uncategorized lines, duplicate risks)
+  visible; do not represent category assignment as approval of a tax deduction.
+- Personally paid business parts remain explicitly attributable to business.
+- Parts purchased earlier and later used on a job require distinct purchase/payment
+  and job-consumption facts. With the confirmed cash basis, consuming existing
+  stock must not create a second cash expense. Late entry retains actual payment
+  date/account; availability of historical purchase evidence is being clarified.
+- Implement this clarified reporting/source scope in the second large block;
+  complete the already queued Android acceptance for the first block first.
+- Owner follow-up: historical part cost is usually known, purchase date sometimes
+  unknown. Preserve known cost and an explicit unknown payment-date state; do not
+  substitute usage/entry dates or invent a period. Keep undated purchase evidence
+  separately visible for later owner completion, while job cost/consumption can
+  reference the known historical cost without a duplicate cash posting.
+- Owner clarification: recover historical part purchase evidence from uploaded
+  bank statements, including personal accounts. Offer candidates by amount,
+  merchant and period for explicit confirmation; equal amounts alone are not
+  proof. Support a payment covering several parts, preserve booking/payment date
+  distinctions, and link existing evidence/postings instead of booking twice.
+
+2026-10-21 — Owner continues all available work while away
+- Phone disconnected for about four hours; do not install Android. Temporary
+  Android monitoring is PAUSED. Continue implementation and cloud/web checks.
+- Second block branch feature/statement-stock-completion is stacked on PR20.
+- Scope: Statement handoff without accountant approval, old stock with unknown
+  paid dates, job consumption without cash duplication, existing purchase search,
+  immutable snapshots/evidence, permission/concurrency/restore and release audit.
+- Do not call the overall project production-complete while physical-device,
+  signed iPhone, representative bank PDF or production environment gates remain.
+
+2026-10-21 — Current release inventory
+- See RELEASE_READINESS.md for the consolidated current status. Earlier unchecked
+  phase lists above are historical, not a count of missing implemented features.
+- Android 1.0.3 native acceptance is recorded in RELIABLE_MOBILE_ACCEPTANCE.md.
+- Statement/parts are implemented; integration of the 21-PR chain and production
+  prerequisites remain explicit. No production deployment or store submission.
