@@ -36,7 +36,6 @@
     "@electric-sql/pglite": "^0.5.10",
     "@types/node": "^26.6.5",
     "@types/react": "~19.3.0",
-    "eas-cli": "^25.2.0",
     "eslint": "9.39.5",
     "eslint-config-expo": "~58.0.4",
     "pg": "^8.23.1",

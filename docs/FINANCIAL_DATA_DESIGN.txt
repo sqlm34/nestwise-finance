@@ -197,3 +197,40 @@ Cash verification update — 2026-10-20
 - Current Android EAS build: 37a51748-0a11-4259-b27e-e4aec92fcdff, commit
   86a57a3, in progress. Apple Developer account is unavailable; signed iOS
   device/store acceptance remains an external dependency. No store submission.
+
+Cash staging schema checkpoint — 2026-10-20 20:12 America/Indianapolis
+- CI 39519086425 found a PostgreSQL timezone alias mismatch in the test.
+  Canonical America/Indiana/Indianapolis fixed it; CI 39519377416 succeeded.
+- Snapshot: staging at 2026-10-21 00:05:37 UTC (manual), 13 snapshots.
+- Applied migration 0019 after verifying all 18 prior source checksums, exact
+  nestwise_staging identity and absence of CRM jobs, in one locked transaction.
+- Independent query after COMMIT: 19 migrations, latest 0019_cash_basis_reads.sql.
+  SHA256 0a54af1984edf8bf4208be7bdbcf662dcbdde422e381f7589312d4557bffc63a.
+- Temporary STAGING_DEPLOY_BRANCH selected for 4980771 (manual receipt UI).
+  Deployment is pending; REMOVE selection and verify absence when complete.
+- Native build remains 86a57a3 and does not contain cash UI/manual-review copy.
+  EAS_INTERNAL_BUILD_SHA was deleted after launch and absence verified (404).
+
+Android device installation checkpoint — 2026-10-20 20:15 America/Indianapolis
+- EAS build 37a51748-0a11-4259-b27e-e4aec92fcdff / commit 86a57a3 succeeded.
+- Downloaded official Expo APK; apksigner verified v2 signature, one signer.
+  SHA256 08dc5858e56168cd5bf5fab245d8825d62e858c97ae74678f312906cf93f184b.
+- Installed with ADB on the owner-authorized connected Android. Package
+  com.aksenov.nestwise.staging, versionName 1.0.0, versionCode 1.
+- Alex CRM package was not replaced. User asked to open Nestwise and confirm
+  login/space list. Installation alone does not establish native acceptance.
+
+Android native authentication correction — 2026-10-20
+- Owner opened installed APK, then reported generic login-service failure.
+- Confirmed server cookies use nestwise, while Expo client default filtered
+  better-auth. Explicit native cookiePrefix now matches the server.
+- Regression uses actual installed Expo cookie plugin and real Better Auth
+  fixture, with only platform storage/linking mocked. Old configuration fails
+  with an empty cookie jar; fixed configuration logs in, reads workspaces,
+  signs out and rejects the old session. Device verification is still pending.
+- Local suite: 129 cases, 124 pass, 5 PostgreSQL-dependent skipped.
+- EAS CLI removed from app dependencies to resolve Expo Doctor warning. CI
+  invokes the same exact CLI version via npx eas-cli@25.2.0.
+- Staging deployment 39519886642 succeeded for 4980771. Temporary deployment
+  branch override removed, absence verified (404). Browser session expired;
+  owner asked to sign in for final cash UI acceptance.

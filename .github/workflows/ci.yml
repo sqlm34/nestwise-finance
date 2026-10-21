@@ -96,7 +96,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Verify CI identity can access the linked Expo project
-        run: npx --no-install eas project:info
+        run: npx --yes eas-cli@25.2.0 project:info
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
@@ -119,7 +119,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build signed staging APK for device acceptance
-        run: npx --no-install eas build --profile staging --platform android --non-interactive
+        run: npx --yes eas-cli@25.2.0 build --profile staging --platform android --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}

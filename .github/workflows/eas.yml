@@ -23,7 +23,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck && npm run lint && npm test
       - name: Build internal APK or iOS Simulator app
-        run: npx --no-install eas build --profile staging --platform "$BUILD_PLATFORM" --non-interactive
+        run: npx --yes eas-cli@25.2.0 build --profile staging --platform "$BUILD_PLATFORM" --non-interactive
         env:
           BUILD_PLATFORM: ${{ inputs.platform }}
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

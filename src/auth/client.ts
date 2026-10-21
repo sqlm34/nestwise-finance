@@ -18,7 +18,7 @@ export const authClient=createAuthClient({
   baseURL:apiURL || 'https://unconfigured.invalid',
   plugins: Platform.OS==='web' ? [] : [expoClient({
     scheme:typeof scheme==='string'?scheme:'nestwise-development',
-    storagePrefix:'nestwise-auth',storage:SecureStore,
+    cookiePrefix:'nestwise',storagePrefix:'nestwise-auth',storage:SecureStore,
   })],
 });
 export async function authenticatedFetch(path: string, signal?: AbortSignal) {
