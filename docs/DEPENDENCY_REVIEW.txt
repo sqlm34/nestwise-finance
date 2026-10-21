@@ -62,3 +62,9 @@ Sources:
 https://github.com/advisories/GHSA-vfj7-8cjw-p6xm
 https://github.com/advisories/GHSA-86w9-cpqp-85rv
 https://github.com/advisories/GHSA-w5hq-g745-h8pq
+
+2026-10-21 — Post-integration toolchain verification
+- Official Node 24 Actions pinned by full SHA; all runner images pinned to ubuntu-24.04.
+- Live advisory drift check retains the three known findings visibly, rejects new/escalated findings and audit failures; no production waiver.
+- Android/iOS source-map analysis complements Worker input analysis. Both exported JS bundles exclude the three reviewed tooling packages.
+- Local audit now reports 22 nodes, but package-lock is unchanged; do not claim remediation from this count change. See TOOLCHAIN_VERIFICATION.md.

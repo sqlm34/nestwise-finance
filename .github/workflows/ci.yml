@@ -27,14 +27,16 @@ jobs:
     env:
       TEST_DATABASE_URL: postgresql://postgres:disposable-ci-only@localhost:5432/nestwise_test
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
       - name: Verify release configuration and record migration hashes
         run: node scripts/release-preflight.cjs
+      - name: Review dependency advisory changes
+        run: node scripts/dependency-audit.cjs
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -50,17 +52,24 @@ jobs:
         env:
           APP_ENV: staging
           EXPO_PUBLIC_API_URL: https://nestwise-staging.alexeasyrepair.workers.dev
-      - run: npm run build:mobile
+      - run: npm run build:mobile -- --source-maps
+      - name: Verify Android and iOS JavaScript dependency boundaries
+        run: node scripts/verify-mobile-bundle.cjs
       - run: npm run worker:check
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: web-preview
           path: dist
           retention-days: 7
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: ${{ !cancelled() }}
         with:
           name: release-evidence
-          path: .local/release-evidence.json
+          path: |
+            .local/release-evidence.json
+            .local/dependency-evidence.json
+            .local/mobile-dependency-evidence.json
+          if-no-files-found: error
           include-hidden-files: true
           retention-days: 30
   staging:
@@ -69,11 +78,11 @@ jobs:
     # after its database migrations have been reviewed/applied; default is main.
     if: github.event_name == 'push' && vars.STAGING_ENABLED == 'true' && github.ref_name == (vars.STAGING_DEPLOY_BRANCH || 'main')
     environment: staging
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -94,11 +103,11 @@ jobs:
     needs: checks
     if: github.event_name == 'push' && vars.EAS_ENABLED == 'true' && github.ref_name == (vars.STAGING_DEPLOY_BRANCH || 'main')
     environment: staging
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -120,8 +129,8 @@ jobs:
       group: nestwise-android-internal
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: .nvmrc
           cache: npm
