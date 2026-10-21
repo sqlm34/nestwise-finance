@@ -28,3 +28,14 @@ Owner reconnected the Android device on 2026-10-21. Build 4b139e30 (1.0.2 / code
 - APK SHA256 `096d87a94969abc865c80ca4f04e71de597d1833fb7ea54c814fb2a158354c40`; package `com.aksenov.nestwise.staging`, version 1.0.3, code 4.
 - `adb install -r` succeeded on the connected Samsung SM-G986U; installed-package metadata independently confirms version/code. No uninstall or data clearing.
 - Build monitor paused after installation. Owner launch and native acceptance are still pending; successful installation is not proof of crash-free runtime, camera or PDF behavior.
+- Owner subsequently confirmed the app opens and works without a crash. ADB confirms a running app process; its captured AndroidRuntime/ReactNativeJS/ReactNative error log was empty at inspection. This is a launch smoke check, not proof of all native flows. Prepared draft recovery, authenticated reports, receipt camera and PDF sharing remain separate acceptance checks.
+
+Physical-device acceptance via the scrcpy desktop window, 2026-10-21:
+- Used installed 1.0.3 on Samsung SM-G986U, not a browser substitute. Existing authenticated session and selected SYNTHETIC business card restored after app restart.
+- Prepared (did not confirm/post) synthetic expense 12.34 USD, paid date 2026-10-21, note `SYNTHETIC Android 1.0.3 draft recovery - no posting`, operation `c527e760-bdc4-4f61-b07c-1f2278f63be0`.
+- Removed only Nestwise from Android recents; ADB confirmed its process had exited. Reopened via its home-screen icon. The same amount, note, date and operation ID returned on the review screen. No uninstall/data clearing. Prepared draft deliberately remains available; no financial confirmation pressed.
+- Native Financial Statement loaded live totals 250.00 / 61.23 USD and saved snapshot `5d446a06-f641-4598-9fd5-202ded3fd9fb` with hash `2c770ad6052aaa2f8f71370c86d7ef432f123cef9f272c322cc23b2a4cabfc07`. Stock and personal-business evidence displayed. Draft did not add an expense.
+- Native Print/PDF generated a `.pdf` and opened the Android share sheet. Dismissed without selecting any recipient; delivery and an external PDF viewer were not tested.
+- Receipt camera action reached Android's permission prompt; the owner handled permission and replied ready. The native screen subsequently displayed a selected JPEG (2,854,598 bytes) awaiting explicit upload. Camera preview/shutter interaction was not directly observed. The photo was not uploaded or discarded; its contents were not inspected.
+- Final running-process AndroidRuntime/ReactNativeJS/ReactNative error-log inspection returned no matching errors. This bounded observation does not prove absence of every possible runtime issue.
+- Available native acceptance is complete for launch, authenticated report loading, prepared draft recovery, capture returning a local image and PDF share-sheet generation. External PDF viewer readability and receipt server upload were not exercised in this native pass.
