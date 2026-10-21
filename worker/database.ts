@@ -1,6 +1,13 @@
 import { neon } from '@neondatabase/serverless';
 import type {JournalFilters} from '../src/domain/journal-filters';
 export type Database = {
+  cancelOwnerExpense(subject:string,workspace:string,account:string,data:unknown):Promise<unknown>;
+  ownerExpense(subject:string,workspace:string,account:string,data:unknown,settle:boolean):Promise<unknown>;
+  reportInput(subject:string,workspace:string,account:string,from:string,to:string):Promise<unknown>;
+  proposeReportMapping(subject:string,workspace:string,account:string,data:unknown):Promise<unknown>;
+  saveReportSnapshot(subject:string,workspace:string,account:string,id:string,from:string,to:string,hash:string):Promise<unknown>;
+  readReportSnapshots(subject:string,workspace:string,account:string,id:string|null):Promise<unknown>;
+
   saveStatementPeriod(subject:string,workspace:string,account:string,hash:string,id:string,expected:number,data:unknown,checks:unknown):Promise<string>;
   readStatementPeriods(subject:string,workspace:string,account:string,hash:string|null):Promise<unknown>;
   postBankRow(subject:string,workspace:string,account:string,id:string,hash:string,row:unknown,operation:unknown):Promise<string>;
@@ -37,6 +44,13 @@ export type Database = {
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async cancelOwnerExpense(subject,workspace,account,data){return (await sql`SELECT nestwise.cancel_owner_expense(${subject},${workspace}::uuid,${account}::uuid,${JSON.stringify(data)}::jsonb) result`)[0].result;},
+    async ownerExpense(subject,workspace,account,data,settle){return settle?(await sql`SELECT nestwise.settle_owner_expense(${subject},${workspace}::uuid,${account}::uuid,${JSON.stringify(data)}::jsonb) result`)[0].result:(await sql`SELECT nestwise.link_owner_expense(${subject},${workspace}::uuid,${account}::uuid,${JSON.stringify(data)}::jsonb) result`)[0].result;},
+    async reportInput(subject,workspace,account,from,to){return (await sql`SELECT nestwise.report_input(${subject},${workspace}::uuid,${account}::uuid,${from}::date,${to}::date) result`)[0].result;},
+    async proposeReportMapping(subject,workspace,account,data){return (await sql`SELECT nestwise.propose_report_mapping(${subject},${workspace}::uuid,${account}::uuid,${JSON.stringify(data)}::jsonb) result`)[0].result;},
+    async saveReportSnapshot(subject,workspace,account,id,from,to,hash){return (await sql`SELECT nestwise.save_report_snapshot(${subject},${workspace}::uuid,${account}::uuid,${id}::uuid,${from}::date,${to}::date,${hash}) result`)[0].result;},
+    async readReportSnapshots(subject,workspace,account,id){return (await sql`SELECT nestwise.read_report_snapshots(${subject},${workspace}::uuid,${account}::uuid,${id}::uuid) result`)[0].result;},
+
     async saveStatementPeriod(subject,workspace,account,hash,id,expected,data,checks){return (await sql`SELECT nestwise.save_statement_period(${subject},${workspace}::uuid,${account}::uuid,${hash},${id}::uuid,${expected}::integer,${JSON.stringify(data)}::jsonb,${JSON.stringify(checks)}::jsonb) result`)[0].result;},
     async readStatementPeriods(subject,workspace,account,hash){return (await sql`SELECT nestwise.read_statement_periods(${subject},${workspace}::uuid,${account}::uuid,${hash}) result`)[0].result;},
     async postBankRow(subject,workspace,account,id,hash,row,operation){return (await sql`SELECT nestwise.post_bank_row(${subject},${workspace}::uuid,${account}::uuid,${id}::uuid,${hash},${JSON.stringify(row)}::jsonb,${JSON.stringify(operation)}::jsonb) result`)[0].result;},

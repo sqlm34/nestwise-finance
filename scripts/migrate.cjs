@@ -17,9 +17,12 @@ async function migrate(client, directory = 'db/migrations') {
     const files = readdirSync(directory).filter(n=>/^\d{4}_[a-z0-9_]+\.sql$/.test(n)).sort();
     for (const known of applied.keys()) if (!files.includes(known)) throw new Error('Previously applied migration is missing');
     for (const version of files) {
-      const source=readFileSync(join(directory,version),'utf8'), hash=createHash('sha256').update(source).digest('hex');
+      const source=readFileSync(join(directory,version),'utf8').replace(/\r\n/g,'\n'), hash=createHash('sha256').update(source).digest('hex');
       if (applied.has(version)) {
-        if (applied.get(version)!==hash) throw new Error('Previously applied migration changed');
+        // Earlier Windows-applied migrations may record CRLF bytes. Accept only
+        // that exact line-ending variant; never rewrite historical hashes.
+        const legacy=createHash('sha256').update(source.replace(/\n/g,'\r\n')).digest('hex');
+        if (applied.get(version)!==hash && applied.get(version)!==legacy) throw new Error('Previously applied migration changed');
         continue;
       }
       await client.query(source);

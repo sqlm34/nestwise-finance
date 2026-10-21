@@ -63,6 +63,9 @@ export async function userApi(request: Request, env: UserEnv,
     preflight.headers.set('Access-Control-Allow-Headers','Content-Type, Expo-Origin');
     return preflight;
   }
+  const reportMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reports(?:\/(mappings|snapshots|owner-expenses|reimbursements|cancellations)(?:\/([0-9a-f-]{36}))?)?$/i.exec(url.pathname);
+  const reportRoute=!!reportMatch&&(request.method==='GET'&&(!reportMatch[3]||reportMatch[3]==='snapshots')||request.method==='POST'&&!!reportMatch[3]&&!reportMatch[4]);
+  const reportWrite=reportRoute&&request.method==='POST';
   const authPaths = new Map([['/api/auth/sign-in/email','POST'],['/api/auth/sign-out','POST'],['/api/auth/get-session','GET']]);
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
   const receiptMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/receipts(?:\/([0-9a-f]{64})(?:\/(original|review|post|ocr))?)?$/i.exec(url.pathname);
@@ -88,15 +91,15 @@ export async function userApi(request: Request, env: UserEnv,
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
+  if ((url.search&&(!reportRoute||reportWrite||!!reportMatch?.[3])&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(reportRoute || periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
-  if((receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
+  if((reportWrite||receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
   if (request.method==='POST'&&!documentWrite&&!receiptUpload) {
     if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') return finish(response({error:'invalid_body'},415));
     let raw: string;
-    try {const limit=receiptWrite?65536:manualWrite||reconciliationWrite?16384:4096;raw=await limitedText(request,limit);}
+    try {const limit=reportWrite?16384:receiptWrite?65536:manualWrite||reconciliationWrite?16384:4096;raw=await limitedText(request,limit);}
     catch {return finish(response({error:'invalid_body'},413));}
     safeRequest=new Request(request.url,{method:request.method,headers:request.headers,body:raw});
   }
@@ -116,6 +119,26 @@ export async function userApi(request: Request, env: UserEnv,
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
     if(receiptRoute&&receiptMatch)return finish(await receiptApi(receiptUpload?request:safeRequest,env,db,subject,receiptMatch[1],receiptMatch[2],receiptMatch[3]?.toLowerCase(),receiptMatch[4]));
+    if(reportRoute&&reportMatch){
+      const workspace=reportMatch[1],account=reportMatch[2];
+      if(request.method==='GET'){
+        if(reportMatch[3]==='snapshots')return finish(response(await db.readReportSnapshots(subject,workspace,account,reportMatch[4]??null)));
+        let period;try{period=parsePeriodParams(url.searchParams);}catch{return finish(response({error:'invalid_report'},400));}
+        return finish(response(await db.reportInput(subject,workspace,account,period.from,period.to)));
+      }
+      let data;try{data=await safeRequest.json();if(!data||typeof data!=='object'||Array.isArray(data))throw new Error();}catch{return finish(response({error:'invalid_report'},400));}
+      const reportId=(value:unknown)=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+      if(!reportId(data.id)||(['mappings','owner-expenses','reimbursements'].includes(reportMatch[3])&&!reportId(data.transaction))
+        ||reportMatch[3]==='reimbursements'&&!reportId(data.link)
+        ||reportMatch[3]==='cancellations'&&(!reportId(data.target)||typeof data.reason!=='string'||!['purchase','reimbursement'].includes(data.kind))
+        ||reportMatch[3]==='mappings'&&(!Number.isInteger(data.line)||data.line<1||data.line>2147483647||!Number.isInteger(data.expected_revision)||data.expected_revision<0||data.expected_revision>99))return finish(response({error:'invalid_report'},400));
+      if(reportMatch[3]==='cancellations')return finish(response({id:await db.cancelOwnerExpense(subject,workspace,account,data)}));
+      if(['owner-expenses','reimbursements'].includes(reportMatch[3]))return finish(response({id:await db.ownerExpense(subject,workspace,account,data,reportMatch[3]==='reimbursements')}));
+      if(reportMatch[3]==='mappings')return finish(response({id:await db.proposeReportMapping(subject,workspace,account,data)}));
+      if(Object.keys(data).length!==4||!['id','from','to','hash'].every(k=>typeof data[k]==='string')||! /^[0-9a-f-]{36}$/i.test(data.id)||! /^[0-9a-f]{64}$/.test(data.hash))return finish(response({error:'invalid_report'},400));
+      try{parsePeriodParams(new URLSearchParams({from:data.from,to:data.to}));}catch{return finish(response({error:'invalid_report'},400));}
+      return finish(response(await db.saveReportSnapshot(subject,workspace,account,data.id,data.from,data.to,data.hash)));
+    }
     if(adminRoute&&adminMatch){
       if(!adminWrite)return finish(response(await db.workspaceAdministration(subject,adminMatch[1])));
       let payload;try{payload=parseWorkspaceCommand(await safeRequest.json());}catch{return finish(response({error:'invalid_workspace_command'},400));}
@@ -168,6 +191,8 @@ export async function userApi(request: Request, env: UserEnv,
     return finish(response({user:{id:session.user.id,name:session.user.name,email:session.user.email},
       workspaces:await db.userAccess(subject)}));
   } catch(error) {
+    if(error instanceof Error&&['report_conflict','report_limit'].includes(error.message))return finish(response({error:error.message},409));
+    if(error instanceof Error&&['invalid_report','report_too_large'].includes(error.message))return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='statement_period_conflict')return finish(response({error:error.message},409));
     if(error instanceof Error&&error.message==='invalid_statement_period')return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='bank_booking_conflict')return finish(response({error:error.message},409));

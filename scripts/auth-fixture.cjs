@@ -3,7 +3,7 @@ const {readFileSync}=require('node:fs');
 const {randomUUID,randomBytes}=require('node:crypto');
 async function createAuthFixture() {
   const {db,pool}=await require('./auth-test-db.cjs').authTestDatabase();
-  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql','0008_event_details.sql','0009_account_period_insights.sql','0010_reconciliation_candidates.sql','0011_saved_reconciliation.sql','0012_statement_archive.sql','0013_statement_evidence.sql','0014_manual_operations.sql','0015_workspace_admin.sql','0016_receipt_evidence.sql','0017_bank_booking.sql','0018_statement_periods.sql','0019_cash_basis_reads.sql'])
+  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql','0008_event_details.sql','0009_account_period_insights.sql','0010_reconciliation_candidates.sql','0011_saved_reconciliation.sql','0012_statement_archive.sql','0013_statement_evidence.sql','0014_manual_operations.sql','0015_workspace_admin.sql','0016_receipt_evidence.sql','0017_bank_booking.sql','0018_statement_periods.sql','0019_cash_basis_reads.sql','0020_accountant_reports.sql'])
     await db.exec(readFileSync(`db/migrations/${name}`,'utf8'));
   const {hashPassword}=await import('better-auth/crypto');
   const id=randomUUID(),workspace=randomUUID(),account=randomUUID(),localUser=randomUUID();
@@ -22,6 +22,12 @@ async function createAuthFixture() {
   const {authConfiguration,userApi}=require('../.test-build/worker/user-api.js');
   const auth=await createAuth(authConfiguration(env),pool);
   const ledger=()=>({
+    cancelOwnerExpense:async(subject,workspace,account,data)=>(await db.query('SELECT nestwise.cancel_owner_expense($1,$2,$3,$4) result',[subject,workspace,account,JSON.stringify(data)])).rows[0].result,
+    ownerExpense:async(subject,workspace,account,data,settle)=>(await db.query(settle?'SELECT nestwise.settle_owner_expense($1,$2,$3,$4) result':'SELECT nestwise.link_owner_expense($1,$2,$3,$4) result',[subject,workspace,account,JSON.stringify(data)])).rows[0].result,
+    reportInput:async(...args)=>(await db.query('SELECT nestwise.report_input($1,$2,$3,$4,$5) result',args)).rows[0].result,
+    proposeReportMapping:async(subject,workspace,account,data)=>(await db.query('SELECT nestwise.propose_report_mapping($1,$2,$3,$4) result',[subject,workspace,account,JSON.stringify(data)])).rows[0].result,
+    saveReportSnapshot:async(...args)=>(await db.query('SELECT nestwise.save_report_snapshot($1,$2,$3,$4,$5,$6,$7) result',args)).rows[0].result,
+    readReportSnapshots:async(...args)=>(await db.query('SELECT nestwise.read_report_snapshots($1,$2,$3,$4) result',args)).rows[0].result,
     saveStatementPeriod:async(subject,workspace,account,hash,id,expected,data,checks)=>(await db.query('SELECT nestwise.save_statement_period($1,$2,$3,$4,$5,$6,$7,$8) result',[subject,workspace,account,hash,id,expected,JSON.stringify(data),JSON.stringify(checks)])).rows[0].result,
     readStatementPeriods:async(...args)=>(await db.query('SELECT nestwise.read_statement_periods($1,$2,$3,$4) result',args)).rows[0].result,
     postBankRow:async(subject,workspace,account,id,hash,row,operation)=>(await db.query('SELECT nestwise.post_bank_row($1,$2,$3,$4,$5,$6,$7) result',[subject,workspace,account,id,hash,JSON.stringify(row),JSON.stringify(operation)])).rows[0].result,

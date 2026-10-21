@@ -50,7 +50,7 @@ async function verifyRestore(source,restored,runtime=restored) {
     await rejected('DELETE FROM nestwise.workspace_admin_audit',/immutable_financial_history/);
     await rejected('SELECT * FROM nestwise.workspace_admin_audit',/permission denied/,true);
   }
-  for(const table of ['receipt_originals','receipt_archived','receipt_reviews','receipt_postings','bank_bookings','statement_periods']){
+  for(const table of ['receipt_originals','receipt_archived','receipt_reviews','receipt_postings','bank_bookings','statement_periods','report_mappings','report_snapshots','owner_expense_links','owner_expense_settlements','owner_expense_cancellations']){
     if(expected[table]?.count){
       await rejected(`DELETE FROM nestwise.${table}`,/immutable_financial_history/);
       await rejected(`SELECT * FROM nestwise.${table}`,/permission denied/,true);

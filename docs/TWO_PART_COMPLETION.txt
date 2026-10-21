@@ -189,3 +189,21 @@ screens or passing unit tests. Native JS export is not a signed device build.
   signed iOS release and production readiness are still outstanding.
 - This navigation change requires no new database migration. Cloud database
   baseline remains 0019; it does not enable integration or production.
+
+2026-10-21 — Owner-confirmed report scope
+- Financial Statement is exclusively for the Aksenov LLC business. Personal and
+  family workspaces must not expose this form or contribute wholesale totals.
+  Explicitly linked business portions of personally paid purchases are permitted;
+  their original personal payments remain unchanged and reimbursements must not
+  count as a second expense.
+- Enforce workspace kind in server report/mapping/snapshot authorization, including
+  saved snapshot reads; hiding a navigation button alone is insufficient.
+- Ordinary personal/family journal and cash overview remain available.
+
+2026-10-21 — Preliminary accountant reports implementation
+- Added business-only cash report, explicit personal-paid business shares,
+  reimbursement exclusion and append-only correction workflows.
+- Proposed form mappings preserve operational categories; saved input snapshots
+  are immutable and stay Accountant Review while policies remain unapproved.
+- PDF/CSV export uses a saved snapshot. Migration 0020 is additive; recovery
+  procedure and scope are documented in ACCOUNTANT_REPORTS.md.

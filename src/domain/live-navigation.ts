@@ -1,4 +1,4 @@
-export type Access={user:{id:string;name:string;email:string};workspaces:{id:string;name:string;role:string;accounts:{id:string;name:string;currency:string}[]}[]};
+export type Access={user:{id:string;name:string;email:string};workspaces:{id:string;name:string;kind?:'business'|'personal'|'family';role:string;accounts:{id:string;name:string;currency:string}[]}[]};
 export type Selection={workspace:string;account:string;name:string;currency:string};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export function parseAccess(value:unknown):Access{
@@ -13,7 +13,8 @@ export function parseAccess(value:unknown):Access{
     if(!['owner','member','accountant','reviewer'].includes(String(space.role))||!Array.isArray(space.accounts))return fail();
     const accounts=space.accounts.map(v=>{const a=record(v);if(typeof a.currency!=='string'||! /^[A-Z]{3}$/.test(a.currency))return fail();return {id:id(a.id),name:text(a.name),currency:a.currency};});
     if(new Set(accounts.map(a=>a.id)).size!==accounts.length)return fail();
-    return {id:id(space.id),name:text(space.name),role:String(space.role),accounts};
+    if(space.kind!==undefined&&!['business','personal','family'].includes(String(space.kind)))return fail();
+    return {id:id(space.id),name:text(space.name),kind:space.kind as 'business'|'personal'|'family'|undefined,role:String(space.role),accounts};
   });
   if(new Set(workspaces.map(w=>w.id)).size!==workspaces.length)return fail();
   return {user:{id:text(user.id),name:text(user.name),email:text(user.email)},workspaces};

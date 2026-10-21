@@ -61,11 +61,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0017_bank_booking.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0018_statement_periods.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0019_cash_basis_reads.sql','utf8'));
+    await db.exec(readFileSync('db/migrations/0020_accountant_reports.sql','utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,19);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,20);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
@@ -534,4 +535,25 @@ test('cash summary and paged drilldown use payment dates, exclude accruals and e
     await sql('SET LOCAL ROLE nestwise_api');assert.equal((await read()).basis,'cash');
     await assert.rejects(sql('SELECT nestwise.user_cash_journal_page($1,$2,$3)',['test-accountant',workspace,cashAccount]),/forbidden/);
   }finally{await sql('ROLLBACK');}
+});
+
+
+test('PostgreSQL report proposals serialize concurrent revisions and snapshots survive replay',{skip:!process.env.TEST_DATABASE_URL},async()=>{
+ const {Client}=require('pg'),clients=[new Client({connectionString:process.env.TEST_DATABASE_URL}),new Client({connectionString:process.env.TEST_DATABASE_URL})];
+ const ra=randomUUID();await sql("INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES($1,$2,'Report concurrency proof')",[ra,workspace]);
+ const op={id:randomUUID(),kind:'expense',paid_on:'2026-10-20',amount_cents:'1234',note:'Synthetic report',destination_account:null,reference_operation:null,allocations:[{category:'supplies',cents:'1234'}]};
+ await sql('SELECT nestwise.post_manual_operation($1,$2,$3,$4)',['test-owner',workspace,ra,JSON.stringify(op)]);
+ const tx=(await sql('SELECT id FROM nestwise.journal_transactions WHERE manual_id=$1',[op.id]))[0].id;
+ const line=(await sql("SELECT line FROM nestwise.journal_entries WHERE transaction_id=$1 AND code='expenses'",[tx]))[0].line;
+ await Promise.all(clients.map(c=>c.connect()));
+ try{
+  await Promise.all(clients.map(c=>c.query('SET ROLE nestwise_api')));
+  const results=await Promise.allSettled(clients.map(c=>c.query('SELECT nestwise.propose_report_mapping($1,$2,$3,$4)',['test-owner',workspace,ra,JSON.stringify({id:randomUUID(),transaction:tx,line,expected_revision:0,allocations:[{category:'tax_23',cents:'1234'}]})])));
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.match(results.find(r=>r.status==='rejected').reason.message,/report_conflict/);
+  const raw=(await clients[0].query("SELECT nestwise.report_input($1,$2,$3,'2026-10-01','2026-10-31') result",['test-owner',workspace,ra])).rows[0].result;
+  const id=randomUUID(),args=['test-owner',workspace,ra,id,'2026-10-01','2026-10-31',raw.hash];
+  const snapshots=await Promise.all(clients.map(c=>c.query('SELECT nestwise.save_report_snapshot($1,$2,$3,$4,$5,$6,$7) result',args)));
+  assert.deepEqual(snapshots[0].rows,snapshots[1].rows);
+  await assert.rejects(clients[0].query('SELECT * FROM nestwise.report_snapshots'),/permission denied/);
+ }finally{await Promise.all(clients.map(c=>c.end()));}
 });

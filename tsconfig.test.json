@@ -4,6 +4,7 @@
     "module": "Node16",
     "moduleResolution": "Node16",
     "strict": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
     "outDir": ".test-build",
     "rootDir": ".",
