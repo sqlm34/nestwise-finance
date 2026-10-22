@@ -1,4 +1,7 @@
 import {parseReceipt,type ReceiptData} from './receipt';
+export function sameReceiptData(left:unknown,right:unknown){
+  return JSON.stringify(parseReceipt(left))===JSON.stringify(parseReceipt(right));
+}
 
 /** Diagnostics are review aids, never inferred money or accounting decisions. */
 export function receiptReviewChecks(value:ReceiptData){

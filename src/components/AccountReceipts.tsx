@@ -9,7 +9,7 @@ import {parseManualOperation} from '../domain/manual-operation';
 import {useApp} from '../state';
 import {Button,Card,Notice,styles} from './ui';
 import {ReceiptAiReview} from './ReceiptAiReview';
-import {receiptReviewChecks,possibleReceiptDuplicates} from '../domain/receipt-review';
+import {receiptReviewChecks,possibleReceiptDuplicates,sameReceiptData} from '../domain/receipt-review';
 type Receipt={hash:string;bytes:number;mime:string;archived:boolean;operation_id:string|null;review:{id:string;revision:number;data:ReceiptData}|null};
 const empty=():ReceiptData=>({supplier:'',date:'',currency:'USD',items:[],tax_cents:null,tip_cents:null,shipping_cents:null,discount_cents:null,total_cents:null});
 const moneyFields=['tax_cents','tip_cents','shipping_cents','discount_cents','total_cents'] as const;
@@ -38,7 +38,7 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
   async function responseData(response:Response){if(response.status===401){onSessionExpired();throw new Error();}if(!response.ok){const v=await response.json();if(response.status>=400&&response.status<500&&alive.current)setPending(null);if(v.error==='ocr_not_configured')throw new Error('ocr_not_configured');throw new Error();}return response.json();}
   function currentData(){const amount=(s:string|undefined)=>s?.trim()?cents(s).toString():null;
     return parseReceipt({...form,...Object.fromEntries(moneyFields.map(k=>[k,amount(money[k])])),items:items.map(i=>({description:i.description,cents:amount(i.amount)}))});}
-  let dirty=true;try{dirty=JSON.stringify(currentData())!==JSON.stringify(selected?.review?.data);}catch{/* Invalid edits cannot be posted. */}
+  let dirty=true;try{dirty=!sameReceiptData(currentData(),selected?.review?.data);}catch{/* Invalid edits cannot be posted. */}
   let checks:ReturnType<typeof receiptReviewChecks>|null=null,duplicates:string[]=[];
   try{const data=currentData();checks=receiptReviewChecks(data);duplicates=possibleReceiptDuplicates(data,selected?.hash||'',rows);}catch{/* Invalid edits remain in the editor. */}
   function prepareReview(){try{

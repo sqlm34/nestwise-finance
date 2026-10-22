@@ -33,3 +33,13 @@ On October 21, 2026 the model page lists standard token prices of $0.10/M input 
 Contract tests cover nullable fields, refusals, malformed output, transport failures, fixed provider URL, no redirects or retry, authenticated capability reporting, per-document consent, durable quotas, and rejecting paid recognition for already posted receipts. Review tests cover unknown-vs-zero, total mismatch and conservative duplicate hints.
 
 Live acceptance must use only a clearly synthetic receipt and compare visible facts; never treat mock tests as evidence that a real provider call succeeded. Keep receipt data and keys out of logs and public PR artifacts.
+
+### Live acceptance, October 21, 2026
+
+Both a synthetic PNG and its single-page PDF were processed through the authenticated staging interface with the real restricted OpenAI key. Both returned NESTWISE TEST SHOP, 2026-10-21, Printer paper $10.00, Replacement filter $20.00, tax $2.10, and total $32.10. The PNG review was saved as revision 1 without booking an expense. Applying the PDF result displayed the similar-receipt warning. No real receipt was transmitted.
+
+This uncovered two fixes beyond Node-only mocks: Workers rejects redirect mode `error`, so the transport uses `manual` and rejects every non-2xx response without following it; PostgreSQL JSONB key ordering must be normalized before comparing the saved review with the editor. Sanitized diagnostics include only transport error class, HTTP status/safe provider identifiers or SQLSTATE, never document content or credentials.
+
+Dashboard secret creation also triggered Wrangler's remote-config comparison, which exceeded the individual-Worker CI token's read scope. A local OAuth deployment of the checked commit restored the Wrangler-managed state; the unchanged restricted CI token then successfully redeployed staging (run 39697251930). No CI permissions were broadened.
+
+Android 1.0.4/code 5 carries the receipt UI; device acceptance is separate from the successful web/provider acceptance.
