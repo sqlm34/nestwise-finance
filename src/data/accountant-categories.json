@@ -269,7 +269,7 @@
   ],
   "notes": [
     "Never rely on translated visible label as primary key",
-    "Tax mapping requires accountant approval",
+    "Owner assigns Statement categories for handoff; no in-app accountant approval or tax deduction calculation",
     "Cost of Goods and business expenses must not be double-counted"
   ]
 }

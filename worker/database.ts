@@ -18,7 +18,7 @@ export type Database = {
   prepareReceipt(subject:string,workspace:string,account:string,hash:string,bytes:number,mime:string):Promise<unknown>;
   completeReceipt(subject:string,workspace:string,account:string,hash:string):Promise<unknown>;
   reviewReceipt(subject:string,workspace:string,account:string,hash:string,id:string,expected:number,data:unknown):Promise<string>;
-  postReceipt(subject:string,workspace:string,account:string,hash:string,review:string,operation:string,paid:string):Promise<string>;
+  postReceipt(subject:string,workspace:string,account:string,hash:string,review:string,operation:string,paid:string,allocations?:{category:string;cents:string}[]):Promise<string>;
   readReceipts(subject:string,workspace:string,account:string,hash:string|null,before?:string|null):Promise<unknown>;
   workspaceCommand(subject:string,workspace:string,payload:unknown):Promise<string>;
   workspaceAdministration(subject:string,workspace:string):Promise<unknown>;
@@ -64,7 +64,7 @@ export function database(url: string): Database {
     async prepareReceipt(subject,workspace,account,hash,bytes,mime){return (await sql`SELECT nestwise.prepare_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash},${bytes}::integer,${mime}) result`)[0].result;},
     async completeReceipt(subject,workspace,account,hash){return (await sql`SELECT nestwise.complete_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash}) result`)[0].result;},
     async reviewReceipt(subject,workspace,account,hash,id,expected,data){return (await sql`SELECT nestwise.review_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash},${id}::uuid,${expected}::integer,${JSON.stringify(data)}::jsonb) result`)[0].result;},
-    async postReceipt(subject,workspace,account,hash,review,operation,paid){return (await sql`SELECT nestwise.post_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash},${review}::uuid,${operation}::uuid,${paid}::date) result`)[0].result;},
+    async postReceipt(subject,workspace,account,hash,review,operation,paid,allocations){if(allocations)return (await sql`SELECT nestwise.post_receipt_categorized(${subject},${workspace}::uuid,${account}::uuid,${hash},${review}::uuid,${operation}::uuid,${paid}::date,${JSON.stringify(allocations)}::jsonb) result`)[0].result;return (await sql`SELECT nestwise.post_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash},${review}::uuid,${operation}::uuid,${paid}::date) result`)[0].result;},
     async readReceipts(subject,workspace,account,hash,before=null){return (await sql`SELECT nestwise.read_receipts(${subject},${workspace}::uuid,${account}::uuid,${hash},${before}) result`)[0].result;},
     async workspaceCommand(subject,workspace,payload){return (await sql`SELECT nestwise.workspace_command(${subject},${workspace}::uuid,${JSON.stringify(payload)}::jsonb) result`)[0].result;},
     async workspaceAdministration(subject,workspace){return (await sql`SELECT nestwise.workspace_administration(${subject},${workspace}::uuid) result`)[0].result;},

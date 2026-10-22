@@ -1,6 +1,6 @@
 # Release readiness and integration runbook
 
-Current evidence: 2026-10-21, America/Indianapolis. This is a staging acceptance record, not production approval. This current summary supersedes old pending statements in dated phase files. The owner chose manual receipt review and Statement handoff without accountant approval.
+Current evidence: 2026-10-21, America/Indianapolis. This is a staging acceptance record, not production approval. This current summary supersedes old pending statements in dated phase files. Receipt recognition is now available through OpenAI in staging with explicit per-document consent; manual review remains required. Statement handoff does not require accountant approval.
 
 ## Accepted capabilities
 
@@ -23,7 +23,7 @@ Camera preview/shutter was not directly observed; the local selected image was o
 2. Complete dependency remediation or an explicit reviewed residual-risk decision for upstream build-tool advisories. Worker bundle exclusion is tested but is not a clean dependency audit.
 3. Provision/review production isolation, secrets, actual backup and restore, domain/auth configuration and monitoring as a separate approved release. Existing production guards stay in place. Rehearse the candidate on staging first.
 4. If signed iPhone distribution is in scope, obtain Apple signing access and perform real-device QA. The owner has no Apple Developer account; no installable iOS build is claimed.
-5. For arbitrary bank PDF support, obtain redacted representative statements and implement/test the specific layouts. Supported CSV remains usable meanwhile. Automatic OCR is deferred, not an accidental missing approval step.
+5. For arbitrary bank PDF support, obtain redacted representative statements and implement/test the specific layouts. Supported CSV remains usable meanwhile. Receipt image/PDF OCR is live (see RECEIPT_AI.md); bank-statement parsing remains a separate scope.
 6. Before real financial use, validate the intended production account/data configuration and selected release artifact. Synthetic totals are not imported business records.
 
 ## Integrating the stack
@@ -46,10 +46,12 @@ If ancestry fails or main advances, stop consolidation, inspect the divergent co
 
 Keep installed APK SHA256 and signing certificate from RELIABLE_MOBILE_ACCEPTANCE.md distinct from source/migration hashes. Documentation/tooling commits do not change the already installed APK. Do not request another APK merely for documentation changes.
 
-Before a schema change, verify a fresh backup and restore into a separate database/branch. Never restore the shared Neon branch in place. Staging currently includes migrations 0001–0023; preserve historical records, including the pinned 0014 checksum attestation. Do not rewrite applied SQL.
+Before a schema change, verify a fresh backup and restore into a separate database/branch. Never restore the shared Neon branch in place. Staging currently includes migrations 0001–0024; preserve historical records, including the pinned 0014 checksum attestation. Do not rewrite applied SQL.
 
 Statement v2 API is not compatible with an unmodified v1 report parser. Rollback must retain compatible report_input behavior or use a separately restored environment; saved v1/v2 snapshots and history must survive. Disable CRM dispatch/ingestion before any data cutover, preserve stable event IDs and reconcile cursors. Do not delete financial facts to make a rollback pass.
 
 Database dumps do not contain R2 originals. Verify both object copies and their hashes against restored metadata. Two buckets in one Cloudflare account are not independent off-provider disaster recovery. An actual production backup/recovery plan is still required.
 
 Toolchain follow-up: see TOOLCHAIN_VERIFICATION.md for pinned Node 24 Actions, live audit regression detection and Android/iOS JavaScript source-map exposure checks. These checks are not acceptance of the remaining production dependency risks.
+
+Receipt follow-up (PR25): receipt image/PDF OCR is accepted on web; Android 1.0.4/code 5 was signature-verified and installed with data preserved on October 21. Device launch confirmation for this revision is pending. The newer category picker is web staging only until a subsequent APK build. Explicit business Statement splits now commit atomically with receipt payment; personal/family posting remains separate. See RECEIPT_STATEMENT_CATEGORIES.md.

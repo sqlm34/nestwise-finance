@@ -5,7 +5,7 @@ import {authenticatedFetch,authenticatedPost,authenticatedUpload} from '../auth/
 import {captureReceipt,readReceiptFile,saveReceiptOriginal,type ReceiptFile} from '../receipt-file';
 import {parseReceipt,type ReceiptData} from '../domain/receipt';
 import {cents} from '../domain/money';
-import {parseManualOperation} from '../domain/manual-operation';
+import {ReceiptPosting} from './ReceiptPosting';
 import {useApp} from '../state';
 import {Button,Card,Notice,styles} from './ui';
 import {ReceiptAiReview} from './ReceiptAiReview';
@@ -15,13 +15,13 @@ const empty=():ReceiptData=>({supplier:'',date:'',currency:'USD',items:[],tax_ce
 const moneyFields=['tax_cents','tip_cents','shipping_cents','discount_cents','total_cents'] as const;
 const moneyLabels={tax_cents:['Tax','Налог'],tip_cents:['Tip','Чаевые'],shipping_cents:['Shipping','Доставка'],discount_cents:['Discount','Скидка'],total_cents:['Total','Итого']} as const;
 const decimal=(v:string|null)=>v===null?'':`${BigInt(v)/100n}.${(BigInt(v)%100n).toString().padStart(2,'0')}`;
-export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{workspace:string;account:string;canWrite:boolean;onSessionExpired:()=>void}){
+export function AccountReceipts({workspace,account,business,canWrite,onSessionExpired}:{workspace:string;account:string;business:boolean;canWrite:boolean;onSessionExpired:()=>void}){
   const {locale}=useApp(),ru=locale==='ru';
   const [rows,setRows]=useState<Receipt[]>([]),[revision,setRevision]=useState(0),[selected,setSelected]=useState<Receipt|null>(null);
   const [before,setBefore]=useState<string|null>(null),[loadedKey,setLoadedKey]=useState('');
   const [form,setForm]=useState(empty),[money,setMoney]=useState<Record<string,string>>({}),[items,setItems]=useState<{description:string;amount:string;key:string}[]>([]);
-  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState(''),[paid,setPaid]=useState('');
-  const [pending,setPending]=useState<{mode:'review'|'post';body:unknown}|null>(null);
+  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState('');
+  const [pending,setPending]=useState<{mode:'review'|'post';body:unknown;summary?:string}|null>(null);
   const [upload,setUpload]=useState<ReceiptFile|null>(null);
   const alive=useRef(true),sending=useRef(false),path=`/v1/user/workspaces/${workspace}/accounts/${account}/receipts`;
   const loadKey=`${path}:${before}:${revision}:${ru}`,loading=loadedKey!==loadKey;
@@ -33,7 +33,7 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
     return()=>{active=false;controller.abort();};
   },[path,before,revision,onSessionExpired,ru,loadKey]);
   function fill(data:ReceiptData){setForm(data);setMoney(Object.fromEntries(moneyFields.map(k=>[k,decimal(data[k])])));setItems(data.items.map(i=>({key:randomUUID(),description:i.description,amount:decimal(i.cents)})));}
-  function open(row:Receipt){setSelected(row);fill(row.review?.data||empty());setPending(null);setError('');setPreview('');setPaid('');}
+  function open(row:Receipt){setSelected(row);fill(row.review?.data||empty());setPending(null);setError('');setPreview('');}
   async function action(task:()=>Promise<void>){if(sending.current)return;sending.current=true;setBusy(true);setError('');try{await task();}catch{if(alive.current)setError(ru?'Действие не подтверждено. Повторите запрос с теми же данными.':'Action is not confirmed. Retry the same request.');}finally{sending.current=false;if(alive.current)setBusy(false);}}
   async function responseData(response:Response){if(response.status===401){onSessionExpired();throw new Error();}if(!response.ok){const v=await response.json();if(response.status>=400&&response.status<500&&alive.current)setPending(null);if(v.error==='ocr_not_configured')throw new Error('ocr_not_configured');throw new Error();}return response.json();}
   function currentData(){const amount=(s:string|undefined)=>s?.trim()?cents(s).toString():null;
@@ -82,11 +82,13 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
       })}/>}
       {!!preview&&<Image accessibilityLabel={ru?'Оригинал чека':'Original receipt'} source={{uri:preview}} resizeMode="contain" style={{width:'100%',height:420}}/>}
       {selected.operation_id?<Text selectable style={styles.text}>{ru?'Операция журнала':'Journal operation'}: {selected.operation_id}</Text>:canWrite&&selected.archived?<>
-        {pending?<>
+        {pending&&<>
           <Notice text={pending.mode==='post'?(ru?'Подтвердите: оплата действительно произведена в указанную дату и ещё не внесена в журнал.':'Confirm: payment was made on the stated date and is not already in the journal.'):(ru?'Сохранить новую версию проверенных данных? Расход пока не создаётся.':'Save a new review version? This does not book an expense.')}/>
+          {pending.summary&&<Text selectable style={styles.text}>{pending.summary}</Text>}
           <Button primary label={ru?'Подтвердить':'Confirm'} disabled={busy} onPress={()=>void save()}/>
           <Button label={ru?'Отмена':'Cancel'} disabled={busy||!!error} onPress={()=>setPending(null)}/>
-        </>:<>
+        </>}
+        <View style={{display:pending?'none':'flex',gap:8}}>
           <ReceiptAiReview key={selected.hash} path={`${path}/${selected.hash}/ocr`} ru={ru} disabled={busy} onApply={fill} onBusy={setBusy} onSessionExpired={onSessionExpired}/>
           <Notice text={ru?'Сверьте данные с оригиналом и заполните поля вручную. Пустая сумма означает «неизвестно»; если сбора нет, укажите 0.':'Check the original and enter its details manually. An empty amount means unknown; enter 0 when a charge does not apply.'}/>
           <TextInput accessibilityLabel={ru?'Продавец':'Supplier'} placeholder={ru?'Продавец':'Supplier'} style={styles.input} value={form.supplier} onChangeText={supplier=>setForm(f=>({...f,supplier}))}/>
@@ -100,9 +102,8 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
           {checks&&checks.missing.length>0&&<Notice text={ru?`Не заполнено полей: ${checks.missing.length}. Неизвестные суммы не заменяются нулём автоматически.`:`Missing fields: ${checks.missing.length}. Unknown amounts are not automatically replaced with zero.`}/>}
           {checks?.totalsMatch===false&&<Notice error text={ru?'Сумма позиций и сборов с учётом скидки не совпадает с итогом. Проверьте оригинал.':'Items and charges less discount do not match the total. Check the original.'}/>}
           {duplicates.length>0&&<Notice error text={ru?`В загруженном списке есть похожие чеки: ${duplicates.map(h=>h.slice(0,12)).join(', ')}. Проверьте, не учтена ли покупка раньше.`:`Similar receipts on the loaded page: ${duplicates.map(h=>h.slice(0,12)).join(', ')}. Check whether the purchase was already recorded.`}/>}
-          {!!selected.review&&<><TextInput accessibilityLabel={ru?'Дата фактической оплаты YYYY-MM-DD':'Actual payment date YYYY-MM-DD'} placeholder={ru?'Дата оплаты YYYY-MM-DD':'Payment date YYYY-MM-DD'} style={styles.input} value={paid} onChangeText={setPaid}/>
-            <Button label={ru?'Создать расход из сохранённой версии':'Book expense from saved version'} disabled={busy||dirty} onPress={()=>{try{const data=parseReceipt(selected.review!.data,true),id=randomUUID();parseManualOperation({id,kind:'expense',paid_on:paid,amount_cents:data.total_cents,note:data.supplier,destination_account:null,reference_operation:null,allocations:[{category:'other_expense',cents:data.total_cents}]});setPending({mode:'post',body:{review:selected.review!.id,operation:id,paid_on:paid}});setError('');}catch{setError(ru?'Проверьте дату оплаты и суммы сохранённой версии.':'Check the payment date and saved amounts.');}}}/></>}
-        </>}
+          {!!selected.review&&<ReceiptPosting key={selected.review.id} data={selected.review.data} review={selected.review.id} business={business} ru={ru} disabled={busy||dirty} onPrepare={(body,summary)=>{setPending({mode:'post',body,summary});setError('');}}/>}
+        </View>
       </>:null}
     </>}
   </Card>;
