@@ -43,8 +43,15 @@ test('receipt review versions reject stale changes and explicit posting is atomi
  await assert.rejects(fixture.db.query('DELETE FROM nestwise.receipt_reviews'),/immutable/);
 });
 test('OCR requires explicit per-document consent, stays disabled without configuration and uses durable quotas',async()=>{
+ const status=await fixture.fetch(request(base()+`/${hash}/ocr`));assert.equal(status.status,200);
+ assert.deepEqual(await status.json(),{enabled:false,provider:'OpenAI',review_required:true});
+ assert.equal((await fixture.fetch(request(base()+`/${hash}/ocr`,undefined,false,{origin:'http://localhost:8081'}))).status,401);
  assert.equal((await fixture.fetch(request(base()+`/${hash}/ocr`,{}))).status,400);
  assert.equal((await fixture.fetch(request(base()+`/${hash}/ocr`,{consent:true}))).status,503);
+ fixture.env.NESTWISE_OCR_ENABLED='true';fixture.env.NESTWISE_OCR_API_KEY='synthetic-not-a-key';fixture.env.NESTWISE_OCR_MODEL='configured-model';
+ const configured=await (await fixture.fetch(request(base()+`/${hash}/ocr`))).json();assert.equal(configured.enabled,true);assert.equal(Object.hasOwn(configured,'key'),false);
+ assert.equal((await fixture.fetch(request(base()+`/${hash}/ocr`,{consent:true}))).status,409,'already posted receipt must not incur another provider request');
+ delete fixture.env.NESTWISE_OCR_ENABLED;delete fixture.env.NESTWISE_OCR_API_KEY;delete fixture.env.NESTWISE_OCR_MODEL;
  for(let i=0;i<20;i++)await fixture.db.query('SELECT nestwise.claim_receipt_ocr($1,$2,$3,$4)',[`better-auth:${fixture.id}`,fixture.workspace,fixture.account,hash]);
  await assert.rejects(fixture.db.query('SELECT nestwise.claim_receipt_ocr($1,$2,$3,$4)',[`better-auth:${fixture.id}`,fixture.workspace,fixture.account,hash]),/ocr_rate_limited/);
 });

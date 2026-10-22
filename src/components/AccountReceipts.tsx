@@ -8,6 +8,8 @@ import {cents} from '../domain/money';
 import {parseManualOperation} from '../domain/manual-operation';
 import {useApp} from '../state';
 import {Button,Card,Notice,styles} from './ui';
+import {ReceiptAiReview} from './ReceiptAiReview';
+import {receiptReviewChecks,possibleReceiptDuplicates} from '../domain/receipt-review';
 type Receipt={hash:string;bytes:number;mime:string;archived:boolean;operation_id:string|null;review:{id:string;revision:number;data:ReceiptData}|null};
 const empty=():ReceiptData=>({supplier:'',date:'',currency:'USD',items:[],tax_cents:null,tip_cents:null,shipping_cents:null,discount_cents:null,total_cents:null});
 const moneyFields=['tax_cents','tip_cents','shipping_cents','discount_cents','total_cents'] as const;
@@ -37,6 +39,8 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
   function currentData(){const amount=(s:string|undefined)=>s?.trim()?cents(s).toString():null;
     return parseReceipt({...form,...Object.fromEntries(moneyFields.map(k=>[k,amount(money[k])])),items:items.map(i=>({description:i.description,cents:amount(i.amount)}))});}
   let dirty=true;try{dirty=JSON.stringify(currentData())!==JSON.stringify(selected?.review?.data);}catch{/* Invalid edits cannot be posted. */}
+  let checks:ReturnType<typeof receiptReviewChecks>|null=null,duplicates:string[]=[];
+  try{const data=currentData();checks=receiptReviewChecks(data);duplicates=possibleReceiptDuplicates(data,selected?.hash||'',rows);}catch{/* Invalid edits remain in the editor. */}
   function prepareReview(){try{
     const data=currentData();
     setPending({mode:'review',body:{id:randomUUID(),expected:selected?.review?.revision||0,data}});setError('');
@@ -83,6 +87,7 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
           <Button primary label={ru?'Подтвердить':'Confirm'} disabled={busy} onPress={()=>void save()}/>
           <Button label={ru?'Отмена':'Cancel'} disabled={busy||!!error} onPress={()=>setPending(null)}/>
         </>:<>
+          <ReceiptAiReview key={selected.hash} path={`${path}/${selected.hash}/ocr`} ru={ru} disabled={busy} onApply={fill} onBusy={setBusy} onSessionExpired={onSessionExpired}/>
           <Notice text={ru?'Сверьте данные с оригиналом и заполните поля вручную. Пустая сумма означает «неизвестно»; если сбора нет, укажите 0.':'Check the original and enter its details manually. An empty amount means unknown; enter 0 when a charge does not apply.'}/>
           <TextInput accessibilityLabel={ru?'Продавец':'Supplier'} placeholder={ru?'Продавец':'Supplier'} style={styles.input} value={form.supplier} onChangeText={supplier=>setForm(f=>({...f,supplier}))}/>
           <TextInput accessibilityLabel={ru?'Дата чека YYYY-MM-DD':'Receipt date YYYY-MM-DD'} placeholder="YYYY-MM-DD" style={styles.input} value={form.date} onChangeText={date=>setForm(f=>({...f,date}))}/>
@@ -92,6 +97,9 @@ export function AccountReceipts({workspace,account,canWrite,onSessionExpired}:{w
           <Button label={ru?'Добавить позицию':'Add item'} disabled={items.length>=100} onPress={()=>setItems(v=>[...v,{key:randomUUID(),description:'',amount:''}])}/>
           {moneyFields.map(k=><View key={k}><Text style={styles.text}>{moneyLabels[k][ru?1:0]} · USD</Text><TextInput accessibilityLabel={moneyLabels[k][ru?1:0]} style={styles.input} keyboardType="decimal-pad" value={money[k]||''} onChangeText={value=>setMoney(v=>({...v,[k]:value}))}/></View>)}
           <Button label={ru?'Проверить и сохранить версию':'Review and save version'} disabled={busy} onPress={prepareReview}/>
+          {checks&&checks.missing.length>0&&<Notice text={ru?`Не заполнено полей: ${checks.missing.length}. Неизвестные суммы не заменяются нулём автоматически.`:`Missing fields: ${checks.missing.length}. Unknown amounts are not automatically replaced with zero.`}/>}
+          {checks?.totalsMatch===false&&<Notice error text={ru?'Сумма позиций и сборов с учётом скидки не совпадает с итогом. Проверьте оригинал.':'Items and charges less discount do not match the total. Check the original.'}/>}
+          {duplicates.length>0&&<Notice error text={ru?`В загруженном списке есть похожие чеки: ${duplicates.map(h=>h.slice(0,12)).join(', ')}. Проверьте, не учтена ли покупка раньше.`:`Similar receipts on the loaded page: ${duplicates.map(h=>h.slice(0,12)).join(', ')}. Check whether the purchase was already recorded.`}/>}
           {!!selected.review&&<><TextInput accessibilityLabel={ru?'Дата фактической оплаты YYYY-MM-DD':'Actual payment date YYYY-MM-DD'} placeholder={ru?'Дата оплаты YYYY-MM-DD':'Payment date YYYY-MM-DD'} style={styles.input} value={paid} onChangeText={setPaid}/>
             <Button label={ru?'Создать расход из сохранённой версии':'Book expense from saved version'} disabled={busy||dirty} onPress={()=>{try{const data=parseReceipt(selected.review!.data,true),id=randomUUID();parseManualOperation({id,kind:'expense',paid_on:paid,amount_cents:data.total_cents,note:data.supplier,destination_account:null,reference_operation:null,allocations:[{category:'other_expense',cents:data.total_cents}]});setPending({mode:'post',body:{review:selected.review!.id,operation:id,paid_on:paid}});setError('');}catch{setError(ru?'Проверьте дату оплаты и суммы сохранённой версии.':'Check the payment date and saved amounts.');}}}/></>}
         </>}

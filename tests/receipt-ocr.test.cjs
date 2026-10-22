@@ -6,10 +6,18 @@ const draft={supplier:'Synthetic',date:'',currency:'USD',items:[],tax_cents:null
 test('OCR sends only explicit document bytes to the fixed provider and returns unbooked, nullable review data',async()=>{
  let calls=0;const result=await recognizeReceipt(bytes,'synthetic-not-a-key','configured-model',async(url,request)=>{
   calls++;assert.equal(url,'https://api.openai.com/v1/responses');const payload=JSON.parse(request.body);
-  assert.equal(payload.store,false);assert.equal(payload.text.format.strict,true);assert.equal(payload.input[0].content[0].type,'input_file');
+  assert.equal(payload.store,false);assert.equal(request.redirect,'error');assert.equal(payload.text.format.strict,true);assert.equal(payload.input[0].content[0].type,'input_file');
   assert.ok(payload.input[0].content[0].file_data.startsWith('data:application/pdf;base64,'));
   return Response.json({status:'completed',output:[{content:[{type:'output_text',text:JSON.stringify(draft)}]}]});
  });assert.deepEqual(result,draft);assert.equal(calls,1);
+});
+test('OCR treats transport failures and malformed provider envelopes as recoverable errors without leaking data',async()=>{
+ await assert.rejects(recognizeReceipt(bytes,'secret','model',async()=>{throw Error('secret transport details');}),/^Error: ocr_unavailable$/);
+ for(const value of [null,{}, {status:'completed',output:{}},{status:'completed',output:[null]},
+ {status:'completed',output:[{content:[null]}]}, {status:'completed',output:[{content:[{type:'output_text',text:123}]}]}]){
+  await assert.rejects(recognizeReceipt(bytes,'secret','model',async()=>Response.json(value)),/^Error: ocr_incomplete$/);
+ }
+ await assert.rejects(recognizeReceipt(bytes,'secret','model',async()=>new Response('<html>upstream unavailable</html>')),/ocr_incomplete/);
 });
 test('OCR refuses incomplete, refusal, fabricated schema and rate limited results without automatic spending retries',async()=>{
  for(const response of [{status:'incomplete',output:[]},{status:'completed',output:[{content:[{type:'refusal'}]}]},

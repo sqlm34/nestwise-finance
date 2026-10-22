@@ -74,7 +74,7 @@ export async function userApi(request: Request, env: UserEnv,
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
   const receiptMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/receipts(?:\/([0-9a-f]{64})(?:\/(original|review|post|ocr))?)?$/i.exec(url.pathname);
   const receiptList=!!receiptMatch&&!receiptMatch[3]&&request.method==='GET';
-  const receiptRoute=receiptList||!!receiptMatch&&!url.search&&(request.method==='GET'&&(!receiptMatch[4]||receiptMatch[4]==='original')||request.method==='POST'&&!!receiptMatch[4]);
+  const receiptRoute=receiptList||!!receiptMatch&&!url.search&&(request.method==='GET'&&(!receiptMatch[4]||receiptMatch[4]==='original'||receiptMatch[4]==='ocr')||request.method==='POST'&&!!receiptMatch[4]);
   const receiptWrite=receiptRoute&&request.method==='POST';
   const receiptUpload=receiptWrite&&receiptMatch?.[4]==='original';
   const adminMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/administration$/i.exec(url.pathname);

@@ -8,6 +8,9 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subject:string,workspace:string,account:string,hash?:string,mode?:string){
   const write=request.method==='POST';
   await db.documentAccess(subject,workspace,account,write);
+  if(mode==='ocr'&&!write){
+    return Response.json({enabled:env.NESTWISE_OCR_ENABLED==='true'&&!!env.NESTWISE_OCR_API_KEY&&!!env.NESTWISE_OCR_MODEL&&!!env.STATEMENTS&&!!env.STATEMENTS_BACKUP,provider:'OpenAI',review_required:true});
+  }
   if(mode==='original'){
     if(!env.STATEMENTS||!env.STATEMENTS_BACKUP)return Response.json({error:'archive_unavailable'},{status:503});
     const key=`receipts/v1/${workspace.toLowerCase()}/${account.toLowerCase()}/${hash}`;
@@ -38,8 +41,9 @@ export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subj
   if(mode==='ocr'){
     if(Object.keys(body).length!==1||body.consent!==true)return Response.json({error:'ocr_consent_required'},{status:400});
     if(env.NESTWISE_OCR_ENABLED!=='true'||!env.NESTWISE_OCR_API_KEY||!env.NESTWISE_OCR_MODEL||!env.STATEMENTS||!env.STATEMENTS_BACKUP)return Response.json({error:'ocr_not_configured'},{status:503});
-    const rows=await db.readReceipts(subject,workspace,account,hash!) as {hash:string;bytes:number;archived:boolean}[];
+    const rows=await db.readReceipts(subject,workspace,account,hash!) as {hash:string;bytes:number;archived:boolean;operation_id:string|null}[];
     const doc=rows.find(r=>r.hash===hash&&r.archived);if(!doc)return Response.json({error:'not_found'},{status:404});
+    if(doc.operation_id)return Response.json({error:'receipt_already_posted'},{status:409});
     const key=`receipts/v1/${workspace.toLowerCase()}/${account.toLowerCase()}/${hash}`;
     const bytes=await verified(env.STATEMENTS,key,hash!,doc.bytes,5_000_000)??await verified(env.STATEMENTS_BACKUP,key,hash!,doc.bytes,5_000_000);
     if(!bytes)return Response.json({error:'archive_integrity_error'},{status:503});
