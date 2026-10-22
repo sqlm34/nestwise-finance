@@ -47,7 +47,10 @@ export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subj
     const key=`receipts/v1/${workspace.toLowerCase()}/${account.toLowerCase()}/${hash}`;
     const bytes=await verified(env.STATEMENTS,key,hash!,doc.bytes,5_000_000)??await verified(env.STATEMENTS_BACKUP,key,hash!,doc.bytes,5_000_000);
     if(!bytes)return Response.json({error:'archive_integrity_error'},{status:503});
-    await db.claimReceiptOcr(subject,workspace,account,hash!);
+    try{await db.claimReceiptOcr(subject,workspace,account,hash!);}catch(error){
+      const code=(error as {code?:unknown})?.code;
+      console.warn('receipt_ocr_quota_failure',{code:typeof code==='string'&&/^[A-Z0-9]{5}$/.test(code)?code:undefined});throw error;
+    }
     const data=await recognizeReceipt(bytes,env.NESTWISE_OCR_API_KEY,env.NESTWISE_OCR_MODEL);
     await db.documentAccess(subject,workspace,account,true);
     return Response.json({data,review_required:true});
