@@ -46,10 +46,12 @@ If ancestry fails or main advances, stop consolidation, inspect the divergent co
 
 Keep installed APK SHA256 and signing certificate from RELIABLE_MOBILE_ACCEPTANCE.md distinct from source/migration hashes. Documentation/tooling commits do not change the already installed APK. Do not request another APK merely for documentation changes.
 
-Before a schema change, verify a fresh backup and restore into a separate database/branch. Never restore the shared Neon branch in place. Staging currently includes migrations 0001–0023; preserve historical records, including the pinned 0014 checksum attestation. Do not rewrite applied SQL.
+Before a schema change, verify a fresh backup and restore into a separate database/branch. Never restore the shared Neon branch in place. Staging currently includes migrations 0001–0024; preserve historical records, including the pinned 0014 checksum attestation. Do not rewrite applied SQL.
 
 Statement v2 API is not compatible with an unmodified v1 report parser. Rollback must retain compatible report_input behavior or use a separately restored environment; saved v1/v2 snapshots and history must survive. Disable CRM dispatch/ingestion before any data cutover, preserve stable event IDs and reconcile cursors. Do not delete financial facts to make a rollback pass.
 
 Database dumps do not contain R2 originals. Verify both object copies and their hashes against restored metadata. Two buckets in one Cloudflare account are not independent off-provider disaster recovery. An actual production backup/recovery plan is still required.
 
 Toolchain follow-up: see TOOLCHAIN_VERIFICATION.md for pinned Node 24 Actions, live audit regression detection and Android/iOS JavaScript source-map exposure checks. These checks are not acceptance of the remaining production dependency risks.
+
+Receipt follow-up (PR25): receipt image/PDF OCR is accepted on web; Android 1.0.4/code 5 was signature-verified and installed with data preserved on October 21. Device launch confirmation for this revision is pending. The newer category picker is web staging only until a subsequent APK build. Explicit business Statement splits now commit atomically with receipt payment; personal/family posting remains separate. See RECEIPT_STATEMENT_CATEGORIES.md.
