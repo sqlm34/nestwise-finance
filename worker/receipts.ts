@@ -1,4 +1,5 @@
 import {parseReceipt,receiptMime} from '../src/domain/receipt';
+import {parseReceiptAllocations} from '../src/domain/receipt-posting';
 import {parseManualOperation} from '../src/domain/manual-operation';
 import {boundedBody,sha256,verified,type DocumentEnv} from './documents';
 import type {Database} from './database';
@@ -63,11 +64,13 @@ export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subj
     return Response.json({id:await db.reviewReceipt(subject,workspace,account,hash!,body.id as string,body.expected as number,data)});
   }
   if(mode==='post'){
+    let allocations;
     try{
-      if(Object.keys(body).length!==3||typeof body.review!=='string'||!uuid.test(body.review)||typeof body.operation!=='string'||!uuid.test(body.operation))throw new Error();
+      if(Object.keys(body).length!==(Object.hasOwn(body,'allocations')?4:3)||typeof body.review!=='string'||!uuid.test(body.review)||typeof body.operation!=='string'||!uuid.test(body.operation))throw new Error();
+      if(Object.hasOwn(body,'allocations'))allocations=parseReceiptAllocations(body.allocations);
       parseManualOperation({id:body.operation,kind:'expense',paid_on:body.paid_on,amount_cents:'1',note:'',destination_account:null,reference_operation:null,allocations:[{category:'other_expense',cents:'1'}]});
     }catch{return Response.json({error:'invalid_receipt'},{status:400});}
-    return Response.json({id:await db.postReceipt(subject,workspace,account,hash!,body.review as string,body.operation as string,body.paid_on as string)});
+    return Response.json({id:await db.postReceipt(subject,workspace,account,hash!,body.review as string,body.operation as string,body.paid_on as string,allocations)});
   }
   return Response.json({error:'not_found'},{status:404});
 }

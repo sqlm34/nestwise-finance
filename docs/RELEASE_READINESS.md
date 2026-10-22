@@ -1,6 +1,6 @@
 # Release readiness and integration runbook
 
-Current evidence: 2026-10-21, America/Indianapolis. This is a staging acceptance record, not production approval. This current summary supersedes old pending statements in dated phase files. The owner chose manual receipt review and Statement handoff without accountant approval.
+Current evidence: 2026-10-21, America/Indianapolis. This is a staging acceptance record, not production approval. This current summary supersedes old pending statements in dated phase files. Receipt recognition is now available through OpenAI in staging with explicit per-document consent; manual review remains required. Statement handoff does not require accountant approval.
 
 ## Accepted capabilities
 
@@ -23,7 +23,7 @@ Camera preview/shutter was not directly observed; the local selected image was o
 2. Complete dependency remediation or an explicit reviewed residual-risk decision for upstream build-tool advisories. Worker bundle exclusion is tested but is not a clean dependency audit.
 3. Provision/review production isolation, secrets, actual backup and restore, domain/auth configuration and monitoring as a separate approved release. Existing production guards stay in place. Rehearse the candidate on staging first.
 4. If signed iPhone distribution is in scope, obtain Apple signing access and perform real-device QA. The owner has no Apple Developer account; no installable iOS build is claimed.
-5. For arbitrary bank PDF support, obtain redacted representative statements and implement/test the specific layouts. Supported CSV remains usable meanwhile. Automatic OCR is deferred, not an accidental missing approval step.
+5. For arbitrary bank PDF support, obtain redacted representative statements and implement/test the specific layouts. Supported CSV remains usable meanwhile. Receipt image/PDF OCR is live (see RECEIPT_AI.md); bank-statement parsing remains a separate scope.
 6. Before real financial use, validate the intended production account/data configuration and selected release artifact. Synthetic totals are not imported business records.
 
 ## Integrating the stack
