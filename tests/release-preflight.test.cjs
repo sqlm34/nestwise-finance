@@ -34,7 +34,7 @@ test('release preflight catches native runtime and environment drift', () => {
 });
 
 test('production release rejects widened access and origin drift', () => {
-  for (const patch of [{FINANCIAL_INGESTION_ENABLED:'true'}, {NESTWISE_OCR_ENABLED:'true'},
+  for (const patch of [{FINANCIAL_INGESTION_ENABLED:'true'}, {NESTWISE_OCR_ENABLED:'false'}, {NESTWISE_OCR_MODEL:'unapproved-model'},
     {PRODUCTION_CRM_APPROVED:'confirmed-account-mapping-v1'}, {AUTH_ENABLED:'false'},
     {AUTH_WEB_ORIGIN:'https://other.example'}, {PRODUCTION_RELEASE_APPROVED:undefined}]) {
     const config=fixture(); Object.assign(config.worker.env.production.vars,patch);

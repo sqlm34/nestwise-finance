@@ -43,3 +43,18 @@ This uncovered two fixes beyond Node-only mocks: Workers rejects redirect mode `
 Dashboard secret creation also triggered Wrangler's remote-config comparison, which exceeded the individual-Worker CI token's read scope. A local OAuth deployment of the checked commit restored the Wrangler-managed state; the unchanged restricted CI token then successfully redeployed staging (run 39697251930). No CI permissions were broadened.
 
 Android 1.0.4/code 5 carries the receipt UI; device acceptance is separate from the successful web/provider acceptance.
+
+Production OCR activation — 2026-10-25
+The owner approved a separate OpenAI project, restricted Responses API write key
+with a 30-day lifetime, a $5 monthly hard spend limit, and at most $1 of synthetic
+acceptance calls within that budget. Automatic balance replenishment was not
+enabled. Spend enforcement can lag slightly behind actual usage; request quotas
+are not a dollar cap. The limit was verified in the provider dashboard before
+creating the key. The key is stored only in NESTWISE_OCR_API_KEY on the production
+Cloudflare Worker, never in application bundles or repository files.
+The configured model remains gpt-6-luna. Each real document still needs the owner's
+explicit recognition action and consent. No bank PDF parsing or automatic posting
+is added. Production end-to-end acceptance is pending; staging acceptance does not
+substitute for that check. Rotate the production key before its November 24, 2026
+expiry. Changing project spend limits or extending credential access requires a
+new owner decision; never silently remove the cap to resolve an OCR error.
