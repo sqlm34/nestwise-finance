@@ -32,6 +32,18 @@ Only aggregate evidence is uploaded. Source maps are not part of the web deploym
 
 Both normal CI and manually requested EAS builds execute the checks. No schedule, background polling or extra APK build is introduced.
 
+## Web export boundary and remaining advisory disposition
+
+CI now exports the web build with external source maps, verifies every JavaScript chunk (including lazy chunks), and removes all map files and sourceMappingURL comments before uploading the web-preview artifact. The staging deploy job repeats this on its own actual export before deploying. Missing, malformed, orphan or inline maps and unsafe filesystem links fail the job. The aggregate `.local/web-dependency-evidence.json` contains source counts and hashes of the sanitized deployed JavaScript, not source contents. This closes the previous gap where the mobile and Worker bundles were checked but the web bundle was not. The check is read-before-mutate: failed validation leaves source evidence intact and blocks publication. This evidence is not a clean dependency audit.
+
+The advisory review still has three findings. Installed braces 3.0.3 and node-forge 1.4.0 have no patched release listed in the GitHub advisories checked on October 21, 2026. braces needs attacker-controlled deeply nested patterns for its stack-exhaustion path. Expo's code-signing library actually calls node-forge certificate/publicKey verification; do not claim that the vulnerable function is never invoked by tooling. This application has no expo-updates or OTA code-signing configuration. That limits the current surface but does not prove every build-time input harmless.
+
+The uuid finding concerns v3/v5/v6 with caller-supplied buffers. Installed xcode 3.0.1 calls only uuid.v4() without a buffer, so the identified vulnerable method is not used by that consumer. xcode still declares uuid ^7.0.3. A forced override to patched uuid 11.1.1 would cross a major range and needs separate Xcode parse/write and prebuild compatibility tests. No override or package/lockfile change is included here.
+
+The production residual-risk decision remains open. A future decision must identify the exact candidate, trusted build inputs, closed development servers, disabled unused signing flows, and fresh Worker/web/mobile evidence. Source-map evidence covers exported JavaScript only; it is not a full native APK/IPA audit. Do not describe these controls as patched packages or automatic acceptance of production risk.
+
+Sources: [braces advisory](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), [node-forge advisory](https://github.com/advisories/GHSA-86w9-cpqp-85rv), [uuid advisory](https://github.com/advisories/GHSA-w5hq-g745-h8pq).
+
 ## Production handoff still required
 
 The current production Worker configuration is deliberately inactive. Before a separate activation change, record the exact candidate SHA and the following actual evidence; placeholder names and successful staging tests do not satisfy these requirements:

@@ -52,9 +52,23 @@
     "production": {
       "name": "nestwise-production",
       "workers_dev": false,
+      "assets": {
+        "directory": "./dist",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*", "/v1/*", "/health"]
+      },
       "vars": {
-        "ENVIRONMENT": "production"
-      }
+        "ENVIRONMENT": "production",
+        "AUTH_ENABLED": "false",
+        "AUTH_BASE_URL": "https://nestwise.universestitch.com",
+        "AUTH_WEB_ORIGIN": "https://nestwise.universestitch.com",
+        "FINANCIAL_INGESTION_ENABLED": "false",
+        "NESTWISE_OCR_ENABLED": "false"
+      },
+      "r2_buckets": [
+        {"binding": "STATEMENTS", "bucket_name": "nestwise-documents-production"},
+        {"binding": "STATEMENTS_BACKUP", "bucket_name": "nestwise-documents-production-backup"}
+      ]
     }
   }
 }

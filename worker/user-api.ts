@@ -13,6 +13,7 @@ import {parseSave,parseCancellation,savedCursor} from '../src/domain/saved-recon
 import {parseManualOperation} from '../src/domain/manual-operation';
 import {parseWorkspaceCommand} from '../src/domain/workspace-admin';
 import {receiptApi,type ReceiptEnv} from './receipts';
+import {nativeAppOrigin,trustedNativeOrigin} from './auth-origins';
 
 export type UserEnv = DocumentEnv & ReceiptEnv & {
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
@@ -29,7 +30,9 @@ export function authConfiguration(env: UserEnv): AuthConfig | null {
     const base = new URL(env.AUTH_BASE_URL!);
     const local = env.ENVIRONMENT === 'development' && ['localhost','127.0.0.1'].includes(base.hostname);
     if (base.origin !== env.AUTH_BASE_URL || (!local && base.protocol !== 'https:')) return null;
-    const origins = [base.origin, `nestwise-${env.ENVIRONMENT}://`];
+    const nativeOrigin=nativeAppOrigin(env.ENVIRONMENT);
+    if(!nativeOrigin)return null;
+    const origins = [base.origin, nativeOrigin];
     if (env.AUTH_WEB_ORIGIN) {
       const web = new URL(env.AUTH_WEB_ORIGIN);
       if (web.origin !== env.AUTH_WEB_ORIGIN || (!local && web.protocol !== 'https:')) return null;
@@ -97,7 +100,7 @@ export async function userApi(request: Request, env: UserEnv,
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
   if ((url.search&&!purchaseMatch&&(!reportRoute||reportWrite||!!reportMatch?.[3])&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(purchaseMatch || partsRoute || reportRoute || periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
-  if((partsRoute&&request.method==='POST'||reportWrite||receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!config.origins.filter(value=>value.startsWith('nestwise-')).includes(request.headers.get('expo-origin')||''))return finish(response({error:'forbidden_origin'},403));
+  if((partsRoute&&request.method==='POST'||reportWrite||receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!trustedNativeOrigin(request.headers.get('expo-origin'),config.origins))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
   if (request.method==='POST'&&!documentWrite&&!receiptUpload) {

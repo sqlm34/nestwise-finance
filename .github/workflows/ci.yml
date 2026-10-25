@@ -48,10 +48,12 @@ jobs:
           docker exec "$POSTGRES_CONTAINER" createdb -U postgres nestwise_restore
           docker exec "$POSTGRES_CONTAINER" pg_restore -U postgres -d nestwise_restore --no-owner /tmp/nestwise.dump
           node scripts/verify-restore.cjs
-      - run: npm run build:web
+      - run: npm run build:web -- --source-maps external
         env:
           APP_ENV: staging
           EXPO_PUBLIC_API_URL: https://nestwise-staging.alexeasyrepair.workers.dev
+      - name: Verify web dependency boundary and remove source maps
+        run: node scripts/verify-web-bundle.cjs
       - run: npm run build:mobile -- --source-maps
       - name: Verify Android and iOS JavaScript dependency boundaries
         run: node scripts/verify-mobile-bundle.cjs
@@ -69,6 +71,7 @@ jobs:
             .local/release-evidence.json
             .local/dependency-evidence.json
             .local/mobile-dependency-evidence.json
+            .local/web-dependency-evidence.json
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 30
@@ -88,10 +91,12 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build staging web application
-        run: npm run build:web
+        run: npm run build:web -- --source-maps external
         env:
           APP_ENV: staging
           EXPO_PUBLIC_API_URL: https://nestwise-staging.alexeasyrepair.workers.dev
+      - name: Verify deployed web export and remove source maps
+        run: node scripts/verify-web-bundle.cjs
       - name: Deploy isolated staging Worker
         run: npm run worker:staging
         env:

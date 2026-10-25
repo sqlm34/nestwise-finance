@@ -1,0 +1,20 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {receiptStage,receiptTitle,receiptMatches,receiptAmount}=require('../.test-build/src/domain/receipt-inbox.js');
+const row={hash:'a'.repeat(64),mime:'application/pdf',archived:true,operation_id:null,review:null};
+test('receipt inbox distinguishes original, reviewed and posted without treating review as payment',()=>{
+  assert.equal(receiptStage({...row,archived:false}),'upload');
+  assert.equal(receiptStage(row),'review');
+  const reviewed={...row,review:{data:{supplier:' Shop ',date:'2026-10-21',total_cents:'3210',items:[{description:'Filter',cents:'3210'}]}}};
+  assert.equal(receiptStage(reviewed),'payment');
+  assert.equal(receiptStage({...reviewed,operation_id:'operation'}),'posted');
+  assert.equal(receiptTitle(row,true),'Чек PDF');
+  assert.equal(receiptTitle(reviewed,false),'Shop');
+  assert.equal(receiptMatches(reviewed,'SHOP filter 32.10','payment'),true);
+  assert.equal(receiptMatches(reviewed,'2026-10-21','posted'),false);
+  assert.equal(receiptMatches(reviewed,'32.11','all'),false);
+  assert.equal(receiptMatches(row,'','all'),true);
+  assert.equal(receiptMatches(row,row.hash,'all'),false);
+  assert.equal(receiptAmount(null),'');
+  assert.equal(receiptAmount('0'),'0.00 USD');
+});

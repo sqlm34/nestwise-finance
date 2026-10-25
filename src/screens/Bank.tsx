@@ -51,7 +51,8 @@ export default function Bank() {
     <Card>
       <View style={styles.between}><Text style={styles.h2}>{t('import')}</Text><Badge>{t('importWorkspace')}: {t(workspace)}</Badge></View>
       <Text style={styles.muted}>{t('chooseBank')}</Text>
-      <View style={styles.row}><Button label="Chase" selected={bank === 'chase'} onPress={() => setBank('chase')} /><Button label="South National" selected={bank === 'south-national'} onPress={() => setBank('south-national')} /></View>
+      <View style={styles.row}><Button label="Chase" selected={bank === 'chase'} onPress={() => setBank('chase')} /><Button label="Old National Bank" selected={bank === 'south-national'} onPress={() => setBank('south-national')} /></View>
+      {bank === 'south-national' && <Notice text={locale === 'ru' ? 'Для Old National Bank используется общий формат CSV с указанными ниже колонками. Отдельный формат выписки этого банка пока не проверен; сверьте даты и суммы с оригиналом.' : 'Old National Bank uses the generic CSV format with the columns listed below. A bank-specific statement layout has not yet been verified; check dates and amounts against the original.'} />}
       <Text style={styles.muted}>{t('alias')}</Text><TextInput accessibilityLabel={t('alias')} value={alias} onChangeText={setAlias} placeholder={t('aliasHint')} placeholderTextColor={colors.muted} maxLength={60} style={styles.input} />
       <Text style={styles.muted}>{t('formatHint')}</Text>
       <View style={styles.row}><Button primary label={t('upload')} disabled={busy} onPress={() => void load(false)} icon={<FileUp size={17} color="white" />} /><Button label={t('sampleFile')} disabled={busy} onPress={() => void load(true)} /></View>

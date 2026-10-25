@@ -18,10 +18,11 @@
       "ios": { "simulator": true }
     },
     "production": {
+      "distribution": "internal",
       "environment": "production",
       "node": "24.19.0",
-      "env": { "APP_ENV": "production" },
-      "android": { "buildType": "app-bundle" }
+      "env": { "APP_ENV": "production", "EXPO_PUBLIC_API_URL": "https://nestwise.universestitch.com" },
+      "android": { "buildType": "apk" }
     }
   }
 }

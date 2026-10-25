@@ -10,6 +10,7 @@ import {useApp} from '../state';
 import {Button,Card,Notice,styles} from './ui';
 import {ReceiptAiReview} from './ReceiptAiReview';
 import {receiptReviewChecks,possibleReceiptDuplicates,sameReceiptData} from '../domain/receipt-review';
+import {receiptTitle,receiptStage,receiptStageLabel,receiptAmount,receiptMatches,type ReceiptStage} from '../domain/receipt-inbox';
 type Receipt={hash:string;bytes:number;mime:string;archived:boolean;operation_id:string|null;review:{id:string;revision:number;data:ReceiptData}|null};
 const empty=():ReceiptData=>({supplier:'',date:'',currency:'USD',items:[],tax_cents:null,tip_cents:null,shipping_cents:null,discount_cents:null,total_cents:null});
 const moneyFields=['tax_cents','tip_cents','shipping_cents','discount_cents','total_cents'] as const;
@@ -23,6 +24,7 @@ export function AccountReceipts({workspace,account,business,canWrite,onSessionEx
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState('');
   const [pending,setPending]=useState<{mode:'review'|'post';body:unknown;summary?:string}|null>(null);
   const [upload,setUpload]=useState<ReceiptFile|null>(null);
+  const [query,setQuery]=useState(''),[stage,setStage]=useState<ReceiptStage|'all'>('all'),[technical,setTechnical]=useState(false);
   const alive=useRef(true),sending=useRef(false),path=`/v1/user/workspaces/${workspace}/accounts/${account}/receipts`;
   const loadKey=`${path}:${before}:${revision}:${ru}`,loading=loadedKey!==loadKey;
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
@@ -33,7 +35,7 @@ export function AccountReceipts({workspace,account,business,canWrite,onSessionEx
     return()=>{active=false;controller.abort();};
   },[path,before,revision,onSessionExpired,ru,loadKey]);
   function fill(data:ReceiptData){setForm(data);setMoney(Object.fromEntries(moneyFields.map(k=>[k,decimal(data[k])])));setItems(data.items.map(i=>({key:randomUUID(),description:i.description,amount:decimal(i.cents)})));}
-  function open(row:Receipt){setSelected(row);fill(row.review?.data||empty());setPending(null);setError('');setPreview('');}
+  function open(row:Receipt){setSelected(row);fill(row.review?.data||empty());setPending(null);setError('');setPreview('');setTechnical(false);}
   async function action(task:()=>Promise<void>){if(sending.current)return;sending.current=true;setBusy(true);setError('');try{await task();}catch{if(alive.current)setError(ru?'Действие не подтверждено. Повторите запрос с теми же данными.':'Action is not confirmed. Retry the same request.');}finally{sending.current=false;if(alive.current)setBusy(false);}}
   async function responseData(response:Response){if(response.status===401){onSessionExpired();throw new Error();}if(!response.ok){const v=await response.json();if(response.status>=400&&response.status<500&&alive.current)setPending(null);if(v.error==='ocr_not_configured')throw new Error('ocr_not_configured');throw new Error();}return response.json();}
   function currentData(){const amount=(s:string|undefined)=>s?.trim()?cents(s).toString():null;
@@ -63,14 +65,23 @@ export function AccountReceipts({workspace,account,business,canWrite,onSessionEx
       <Button label={ru?'Сфотографировать чек':'Photograph receipt'} disabled={busy||!!pending} onPress={()=>void action(async()=>{const file=await captureReceipt();if(alive.current)setUpload(file);})}/>
       {Platform.OS==='android'&&<Button label={ru?'Восстановить фото после перезапуска':'Recover photo after restart'} disabled={busy||!!pending} onPress={()=>void action(async()=>{const file=await captureReceipt(true);if(alive.current)setUpload(file);})}/>}
     </>}</>}
-    {!selected?<>{rows.map(row=><Button key={row.hash} label={`${row.review?.data.supplier||row.hash.slice(0,12)} · ${row.operation_id?(ru?'Учтён':'Posted'):row.archived?(ru?'На проверке':'Review'):(ru?'Загрузка не завершена':'Upload pending')}`} disabled={busy||loading} onPress={()=>open(row)}/>)}
+    {!selected?<>
+      <TextInput accessibilityLabel={ru?'Поиск чеков на странице':'Search receipts on this page'} placeholder={ru?'Продавец, дата, сумма или позиция':'Supplier, date, amount or item'} style={styles.input} value={query} onChangeText={setQuery}/>
+      <Text style={styles.muted}>{ru?'Поиск и фильтры относятся к загруженной странице (до 100 чеков).':'Search and filters cover the loaded page (up to 100 receipts).'}</Text>
+      {(['all','upload','review','payment','posted'] as const).map(value=><Button key={value} label={`${stage===value?'✓ ':''}${value==='all'?(ru?'Все чеки':'All receipts'):receiptStageLabel(value,ru)} (${rows.filter(row=>value==='all'||receiptStage(row)===value).length})`} disabled={busy||loading} onPress={()=>setStage(value)}/>)}
+      <Button label={ru?'Обновить список':'Refresh list'} disabled={busy||loading} onPress={()=>setRevision(v=>v+1)}/>
+      {rows.filter(row=>receiptMatches(row,query,stage)).map(row=><Button key={row.hash} label={[receiptTitle(row,ru),row.review?.data.date,receiptAmount(row.review?.data.total_cents),receiptStageLabel(receiptStage(row),ru)].filter(Boolean).join(' · ')} disabled={busy||loading} onPress={()=>open(row)}/>)}
+      {!loading&&rows.length>0&&!rows.some(row=>receiptMatches(row,query,stage))&&<Notice text={ru?'На этой странице совпадений нет. Измените поиск или откройте другую страницу.':'No matches on this page. Change the search or open another page.'}/>}
       {loading&&<Text style={styles.muted}>{ru?'Загрузка…':'Loading…'}</Text>}
       {!!before&&<Button label={ru?'К новым чекам':'Newest receipts'} disabled={busy||loading} onPress={()=>setBefore(null)}/>}
       {rows.length===100&&<Button label={ru?'Более ранние чеки':'Older receipts'} disabled={busy||loading||!!error} onPress={()=>setBefore(rows[rows.length-1].hash)}/>}
       {!loading&&rows.length===0&&<Text style={styles.muted}>{ru?'Чеков на этой странице нет.':'No receipts on this page.'}</Text>}
     </>:<>
       <Button label={ru?'К списку':'Back to list'} disabled={busy||!!pending} onPress={()=>setSelected(null)}/>
-      <Text selectable style={styles.muted}>{selected.hash} · {selected.bytes} bytes</Text>
+      <Text style={styles.h2}>{receiptTitle(selected,ru)}</Text>
+      <Notice text={receiptStageLabel(receiptStage(selected),ru)}/>
+      <Button label={technical?(ru?'Скрыть технические сведения':'Hide technical details'):(ru?'Технические сведения':'Technical details')} onPress={()=>setTechnical(v=>!v)}/>
+      {technical&&<Text selectable style={styles.muted}>{ru?'Идентификатор оригинала SHA-256 (не содержимое чека)':'Original SHA-256 identifier (not receipt contents)'}: {selected.hash}{'\n'}{selected.mime} · {selected.bytes} {ru?'байт':'bytes'}{selected.operation_id?`\n${ru?'Операция журнала':'Journal operation'}: ${selected.operation_id}`:''}</Text>}
       <Button label={ru?'Сохранить оригинал / открыть в приложении':'Save original / open in app'} disabled={busy||!selected.archived} onPress={()=>void action(async()=>{
         const r=await authenticatedFetch(`${path}/${selected.hash}/original`);if(r.status===401){onSessionExpired();return;}if(!r.ok)throw new Error();
         await saveReceiptOriginal(new Uint8Array(await r.arrayBuffer()),selected.hash);
@@ -81,7 +92,7 @@ export function AccountReceipts({workspace,account,business,canWrite,onSessionEx
         const bytes=new Uint8Array(await r.arrayBuffer());if(bytes.length>5_000_000)throw new Error();let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.slice(i,i+8192));if(alive.current)setPreview(`data:${selected.mime};base64,${btoa(raw)}`);
       })}/>}
       {!!preview&&<Image accessibilityLabel={ru?'Оригинал чека':'Original receipt'} source={{uri:preview}} resizeMode="contain" style={{width:'100%',height:420}}/>}
-      {selected.operation_id?<Text selectable style={styles.text}>{ru?'Операция журнала':'Journal operation'}: {selected.operation_id}</Text>:canWrite&&selected.archived?<>
+      {selected.operation_id?<Notice text={ru?'Оплата уже внесена в журнал. Категории и итог доступны в отчётах. Повторно создавать расход не нужно.':'Payment is already in the journal. Categories and totals are available in reports. Do not record this expense again.'}/>:canWrite&&selected.archived?<>
         {pending&&<>
           <Notice text={pending.mode==='post'?(ru?'Подтвердите: оплата действительно произведена в указанную дату и ещё не внесена в журнал.':'Confirm: payment was made on the stated date and is not already in the journal.'):(ru?'Сохранить новую версию проверенных данных? Расход пока не создаётся.':'Save a new review version? This does not book an expense.')}/>
           {pending.summary&&<Text selectable style={styles.text}>{pending.summary}</Text>}
