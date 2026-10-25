@@ -31,13 +31,15 @@ function validateConfiguration({worker, eas, nodeVersion, migrations}) {
   requireCondition(eas.cli?.requireCommit === true, 'EAS must build a committed source revision');
   requireCondition(eas.build?.staging?.distribution === 'internal' && eas.build?.staging?.android?.buildType === 'apk',
     'staging: expected an internal APK');
-  // Production is intentionally unprovisioned. Replace this guard only in the
+  // Production is provisioned but closed. Replace this guard only in the
   // explicitly approved production release change, with deployment evidence.
   const production = worker.env?.production;
   requireCondition(production?.workers_dev === false && !(production?.routes?.length) && !production?.route,
     'production: public routing requires a separate approved release');
   requireCondition(production?.vars?.AUTH_ENABLED !== 'true' && production?.vars?.FINANCIAL_INGESTION_ENABLED !== 'true',
     'production: activation requires a separate approved release');
+  requireCondition(!production?.vars?.PRODUCTION_RELEASE_APPROVED && !production?.vars?.PRODUCTION_CRM_APPROVED,
+    'production: release and CRM mapping approval must remain unset until activation');
   requireCondition(migrations.length > 0, 'No migrations found');
   migrations.forEach((name, index) => requireCondition(
     /^\d{4}_[a-z0-9_]+\.sql$/.test(name) && Number(name.slice(0, 4)) === index + 1,

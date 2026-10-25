@@ -1,0 +1,23 @@
+name: Production liveness
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,37 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: production-liveness
+  cancel-in-progress: true
+jobs:
+  probe:
+    if: vars.PRODUCTION_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/production-health.cjs
+        env:
+          EXPECT_CRM_ENABLED: ${{ vars.PRODUCTION_CRM_ENABLED }}

@@ -14,17 +14,19 @@ import {parseManualOperation} from '../src/domain/manual-operation';
 import {parseWorkspaceCommand} from '../src/domain/workspace-admin';
 import {receiptApi,type ReceiptEnv} from './receipts';
 import {nativeAppOrigin,trustedNativeOrigin} from './auth-origins';
+import {productionReady} from './production-policy';
 
 export type UserEnv = DocumentEnv & ReceiptEnv & {
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
   AUTH_SECRET?: string; AUTH_BASE_URL?: string; AUTH_WEB_ORIGIN?: string;
   NESTWISE_DATABASE_URL?: string;
+  PRODUCTION_RELEASE_APPROVED?: string;
 };
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
 });
 export function authConfiguration(env: UserEnv): AuthConfig | null {
-  if (!['development','staging'].includes(env.ENVIRONMENT) || env.AUTH_ENABLED !== 'true'
+  if ((!['development','staging'].includes(env.ENVIRONMENT) && !productionReady(env)) || env.AUTH_ENABLED !== 'true'
     || !env.AUTH_DATABASE_URL || !env.NESTWISE_DATABASE_URL || !env.AUTH_SECRET || env.AUTH_SECRET.length < 32) return null;
   try {
     const base = new URL(env.AUTH_BASE_URL!);

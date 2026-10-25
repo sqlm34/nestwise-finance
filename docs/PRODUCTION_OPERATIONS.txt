@@ -1,0 +1,50 @@
+Production operations — prepared, activation pending
+
+Candidate preparation
+Run Prepare production candidate only from main after CI for the exact revision
+has succeeded. It builds the production-origin assets, verifies dependency
+boundaries and retains the Worker/assets/evidence artifact for 14 days. It has
+no deployment credential and cannot activate a route or change cloud secrets.
+The activation change must separately update the release preflight's closed
+configuration guard, with evidence and owner approval. Never bypass that guard
+or deploy a dirty checkout as the release candidate.
+
+Runtime activation has separate switches:
+- AUTH_ENABLED=true plus PRODUCTION_RELEASE_APPROVED=nestwise-production-v1,
+  the exact production HTTPS origin and isolated same-endpoint production roles.
+- CRM additionally needs FINANCIAL_INGESTION_ENABLED=true,
+  PRODUCTION_CRM_APPROVED=confirmed-account-mapping-v1 and CRM_SERVICE_KEYS.
+  Do not enable these before actual workspace/account mapping and source totals
+  are checked. Historical backfill is not implied.
+- OCR remains separately disabled until a production provider credential and
+  its permitted usage are configured. Document recognition remains opt-in.
+
+Monitoring and incident handling
+Cloudflare records aggregate invocations/errors. Explicit 5xx logs contain only
+environment, HTTP status and a random incident ID, also returned in the response
+header. Invocation logs are disabled; request paths, query strings, document
+contents, credentials and exception text are not emitted by our logger.
+After activation, set GitHub PRODUCTION_ENABLED=true. Production liveness runs
+every 30 minutes and can be run manually. Set PRODUCTION_CRM_ENABLED only when
+the ingestion channel is actually enabled. GitHub's normal failed-workflow
+notification settings apply; no separate email or messaging integration exists.
+The repository owner is the initial operator. Liveness checks TLS/HTTP and the
+configured ingestion switch; it does not prove database or financial correctness.
+For a 5xx, use the incident ID in Cloudflare logs, inspect deployment/secrets and
+database availability, then verify authenticated synthetic acceptance separately.
+
+Recovery and rollback
+Preserve both the pre-migration and post-migration snapshots. Restore to a NEW
+Neon branch, verify hashes/roles and populated data recovery before switching
+connections. Never restore production in place. Empty-database snapshot testing
+does not prove recovery of future financial records.
+Keep completed-document inventories with local encrypted archives; see
+LOCAL_DOCUMENT_RECOVERY.txt. Run after new originals are archived and before
+schema/data cutovers; retain dated archives rather than overwrite them. Current
+local recovery is manual, not a background job. Preserve the Windows user profile
+and protected key; a second independently recoverable key copy is not yet set up.
+Before rollback disable CRM sender/receiver; preserve outbox IDs, immutable
+financial history and both object copies. Use a schema-compatible prior Worker
+or a separately restored environment. Do not roll the database back while later
+financial events may still be arriving. Reconcile event cursors/totals before
+re-enabling delivery. Store publication requires separate owner permission.
