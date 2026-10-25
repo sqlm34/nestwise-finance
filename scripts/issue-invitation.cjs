@@ -1,13 +1,16 @@
 // Administrative API: returns the invitation only in memory. No mail or secret files.
 const {randomUUID,randomBytes,createHash}=require('node:crypto');
 const assert=require('node:assert/strict');
-async function issueInvitation(client,{email,name,workspace,role='member',allAccounts=false}) {
+const {productionMode,validateAdminIdentity}=require('./admin-target.cjs');
+async function issueInvitation(client,{email,name,workspace,role='member',allAccounts=false},options={}) {
+  const production=productionMode(options,'issue-nestwise-production-invitation');
   assert.match(email,/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
   assert.ok(name.trim().length>0 && name.length<=100);
   assert.ok(['owner','member','accountant','reviewer'].includes(role));
   assert.equal(typeof allAccounts,'boolean');
   const target=(await client.query("SELECT current_database() name,to_regclass('public.jobs') crm")).rows[0];
-  assert.match(target.name,/^nestwise_(staging|development|test)$/);assert.equal(target.crm,null);
+  const adminRole=production?(await client.query('SELECT current_user role')).rows[0].role:null;
+  validateAdminIdentity(target.name,adminRole,production);assert.equal(target.crm,null);
   const token=randomBytes(32).toString('hex'),hash=createHash('sha256').update(token).digest('hex');
   const id=randomUUID(),actor=randomUUID();
   await client.query('BEGIN');

@@ -46,7 +46,8 @@ Planned additive CRM migration/rollback
   explicit owner authorization. Never infer refunds from a missing array item.
 
 Unresolved external acceptance inputs
-- Representative redacted Chase/South National CSV/PDF layouts.
+- Representative redacted Chase/Old National Bank CSV/PDF layouts. Old National
+  currently uses generic CSV mapping; its bank-specific layout is unverified.
 - OCR provider/runtime choice without silently purchasing a subscription.
 - Accounting policies for Part 2; no tax approval inferred from a category key.
   Owner confirmed CASH BASIS on 2026-10-20: actual payment dates determine

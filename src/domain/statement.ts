@@ -1,5 +1,7 @@
 import { cents, sumCents } from './money';
 
+// Legacy persisted identifier retained for compatibility. The owner's bank is
+// Old National Bank; this choice uses mapped-csv, not a verified bank adapter.
 export type Bank = 'chase' | 'south-national';
 export type IssueCode = 'invalidDate' | 'invalidAmount' | 'duplicateRow' | 'ambiguousDirection' | 'columnMismatch';
 export type BankRow = { line: number; date: string; description: string; amountCents: number; issues: IssueCode[] };

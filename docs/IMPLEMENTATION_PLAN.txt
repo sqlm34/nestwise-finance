@@ -38,7 +38,9 @@ PHASE 3
 Private receipt capture and storage, OCR review, real bank format adapters,
 one-to-many and many-to-one matches, evidence deduplication, explicit posting
 approval for new bank-only transactions. No invented parsing confidence.
-Validate Chase and South National adapters against redacted real samples.
+Validate Chase and Old National Bank layouts against redacted real samples.
+Old National currently uses the generic CSV mapper; the historical persisted
+identifier south-national is retained for compatibility, not a verified adapter.
 
 PHASE 4
 Versioned accountant-approved mapping, original category labels, report lineage,

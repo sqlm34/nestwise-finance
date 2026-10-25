@@ -50,7 +50,9 @@ test('unknown schema and full account numbers fail closed', () => {
   assert.throws(() => preview('Date,Description,Amount'), /emptyFile/);
   assert.throws(() => parseCsv('x'.repeat(2_000_001)), /fileTooLarge/);
 });
-test('South National uses an explicit generic mapping, not an unverified bank-specific claim', () => {
+test('Old National retains its legacy identifier and uses generic mapping, not an unverified bank adapter', () => {
   const data = previewStatement('Date,Description,Debit,Credit\n10/1/2026,Fee,5,', 'south-national', 'Business');
   assert.equal(data.adapter, 'mapped-csv'); assert.equal(data.debitsCents, 500);
+  assert.equal(data.bank, 'south-national');
+  assert.equal(previewStatement(sampleStatement, 'south-national', 'Personal').adapter, 'mapped-csv');
 });
