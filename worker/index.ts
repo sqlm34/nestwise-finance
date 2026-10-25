@@ -2,15 +2,19 @@ import { validateEvent, uuid } from './contract';
 import { authenticateEvent, limitedText, sha256 } from './security';
 import { database, type Database } from './database';
 import { userApi, type UserEnv } from './user-api';
+import {productionReady} from './production-policy';
+import {observeRequest} from './observability';
 export type Env = UserEnv & {
   ENVIRONMENT: 'development' | 'staging' | 'production';
   FINANCIAL_INGESTION_ENABLED?: string;
   NESTWISE_DATABASE_URL?: string;
   CRM_SERVICE_KEYS?: string;
+  PRODUCTION_CRM_APPROVED?: string;
 };
 const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers });
-const enabled = (env: Env) => env.ENVIRONMENT !== 'production' && env.FINANCIAL_INGESTION_ENABLED === 'true'
+const enabled = (env: Env) => (['development','staging'].includes(env.ENVIRONMENT)
+  || (productionReady(env) && env.PRODUCTION_CRM_APPROVED === 'confirmed-account-mapping-v1')) && env.FINANCIAL_INGESTION_ENABLED === 'true'
   && !!env.NESTWISE_DATABASE_URL && !!env.CRM_SERVICE_KEYS;
 export function createWorker(connect: (url: string) => Database = database) {
   return {
@@ -67,6 +71,8 @@ export function createWorker(connect: (url: string) => Database = database) {
     },
   };
 }
+const service=createWorker();
 export default {
-  ...createWorker(),
+  ...service,
+  fetch: (request:Request,env:Env) => observeRequest(()=>service.fetch(request,env),env.ENVIRONMENT),
 };

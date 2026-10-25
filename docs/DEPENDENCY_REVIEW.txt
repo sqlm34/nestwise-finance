@@ -85,3 +85,26 @@ https://github.com/advisories/GHSA-w5hq-g745-h8pq
 - Recovery URL validation rejects connection-string query overrides and
   duplicate SSL parameters; tests also check the effective pg client target.
 Source: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5
+
+2026-10-25 — Residual build-tool disposition for the web/Worker candidate
+- Reviewed official advisories again: node-forge <=1.4.0 has no patched version;
+  the issue is RSA PKCS#1 v1.5 verification of attacker-controlled encodings
+  (GHSA-86w9-cpqp-85rv). Expo's certificate helper does call forge verification,
+  so the installed tooling package is not described as harmless or fixed.
+- This candidate serves exported static files and a separately bundled Worker;
+  neither contains forge or uuid, verified from their source maps/input graph.
+  No development server, OTA update signing, or user-supplied certificate/key
+  processing is deployed. Builds use trusted repository inputs and controlled
+  runners. Any future OTA/dev-server exposure reopens this disposition.
+- uuid 7.0.3 is consumed by xcode's pbxProject.generateUuid() through uuid.v4()
+  without an output buffer. The official advisory affects v3/v5/v6 with external
+  buffers, not that v4 call. No uuid code is present in delivered JS/Worker.
+- Engineering disposition: these two retained tooling findings do not block
+  activation of the verified static-web/Worker artifact under these constraints.
+  They remain tracked; CI still rejects new/escalated advisories. Native release
+  additionally requires independent APK signature and device acceptance. This
+  is a scoped reachability/risk decision, not a clean npm audit or a waiver for
+  unrelated build inputs, future dependency updates or arbitrary native code.
+Sources:
+https://github.com/advisories/GHSA-86w9-cpqp-85rv
+https://github.com/advisories/GHSA-w5hq-g745-h8pq

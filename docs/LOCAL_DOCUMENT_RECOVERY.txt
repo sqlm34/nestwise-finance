@@ -1,0 +1,45 @@
+Encrypted document recovery on Windows
+
+The owner selected an independent encrypted archive on the local Windows PC.
+This complements Neon database snapshots and the two private R2 buckets. It is
+not a database dump, continuous backup, or automatic backup schedule.
+
+Storage: %LOCALAPPDATA%/Nestwise/Recovery, outside the repository and OneDrive.
+The AES-256-GCM key is generated locally and protected by Windows DPAPI for
+the current Windows user. No database/API credentials are written there.
+The original Windows user profile is needed to unlock this key. Losing that
+profile or the local disk can make these archives unrecoverable; this protects
+against provider loss, not simultaneous loss of the PC. A portable key escrow
+or a second offline medium remains a separate owner-controlled operation.
+
+Commands (invoke with the repository's Node 24 executable, never CMD shims):
+  node scripts/document-recovery.cjs init-key <private-key.dpapi>
+  node scripts/document-recovery.cjs backup <private-key.dpapi> <private-inventory.json> <new-archive.nwr>
+  node scripts/document-recovery.cjs verify <private-key.dpapi> <archive.nwr>
+  node scripts/document-recovery.cjs restore <private-key.dpapi> <archive.nwr> <NEW-private-output-directory>
+
+Create the key once, keep it outside version control and do not overwrite it.
+Use db/document-backup-inventory.sql against the intended database as its owner.
+Save its JSON value privately. The inventory contains account IDs and hashes;
+do not attach it to a public PR. It includes all completed archived originals,
+including documents hidden from the application's current view, but not pending
+uploads. The tool refuses oversized inventories rather than omit objects:
+500 objects, 5 MB per object and 50 MB total per archive. For larger inventories,
+split into explicitly recorded batches and retain a complete batch index.
+
+Backup uses the existing authorized Wrangler login. It downloads each listed
+object from BOTH environment-specific R2 buckets into memory, checks the
+database-recorded SHA-256 and byte length, and requires both copies to match.
+It never writes plaintext documents or raw keys to temporary files. Environment,
+keys, hashes and contents are authenticated and encrypted together. Verification
+decrypts in memory and writes no plaintext. Restore verifies the entire archive
+before extracting into a newly created directory; an existing directory is
+rejected. Explicit restoration creates plaintext documents, so use a private
+folder and protect restored files like the originals.
+
+Database recovery must be performed separately. Match the inventory to the
+restored database metadata before re-uploading any document. The tool does not
+modify cloud buckets or databases, delete originals, or activate production.
+Retain the command's archive SHA-256 and object count with the recovery evidence.
+An empty production inventory proves no financial document recovery; use the
+synthetic staging acceptance to demonstrate encryption/download/restore first.

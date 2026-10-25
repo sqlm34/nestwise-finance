@@ -1,0 +1,46 @@
+name: Prepare production candidate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Require successful CI for this exact main revision
+        run: node scripts/verify-ci-candidate.cjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: npm ci
+      - run: node scripts/release-preflight.cjs
+      - run: node scripts/dependency-audit.cjs
+      - name: Build production web assets
+        run: npm run build:web -- --source-maps external
+        env:
+          APP_ENV: production
+          EXPO_PUBLIC_API_URL: https://nestwise.universestitch.com
+      - run: node scripts/verify-web-bundle.cjs
+      - name: Package Worker without publishing routes or secrets
+        run: |
+          node node_modules/wrangler/bin/wrangler.js deploy --env production --dry-run --outdir .local/production-worker --metafile .local/production-worker/meta.json
+          node scripts/verify-worker-bundle.cjs .local/production-worker/meta.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: production-candidate-${{ github.sha }}
+          path: |
+            dist
+            .local/production-worker
+            .local/release-evidence.json
+            .local/dependency-evidence.json
+            .local/web-dependency-evidence.json
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: error
