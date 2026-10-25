@@ -31,6 +31,8 @@ function validateConfiguration({worker, eas, nodeVersion, migrations}) {
   requireCondition(eas.cli?.requireCommit === true, 'EAS must build a committed source revision');
   requireCondition(eas.build?.staging?.distribution === 'internal' && eas.build?.staging?.android?.buildType === 'apk',
     'staging: expected an internal APK');
+  requireCondition(eas.build?.production?.distribution === 'internal' && eas.build?.production?.android?.buildType === 'apk'
+    && eas.build?.production?.environment === 'production', 'production: expected an internal APK in the production EAS environment');
   // Owner approved invitation-only web activation on 2026-10-25.
   // CRM delivery and OCR require separate activation.
   const production = worker.env?.production;

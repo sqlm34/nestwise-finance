@@ -60,3 +60,28 @@ Remaining: production restore rehearsal and independent document recovery, depen
 - Android build f2b56128-d679-49ef-bc2a-ac8a95fe76a9 from dfe7e0e completed. Version 1.0.5/code 6 was installed over the existing staging application via USB without clearing data. Signing certificate SHA256 matched 18512e460f8eff93b69ce565a2c6c3d097b7f779080198b4ae4f589478072266. APK SHA256: b527d883ed666857f426347f6b8f77a77566aa22760feb46d83298294a8d1d38. The owner confirmed the updated application and Receipts open without a crash and show readable names.
 - Tooling dependency residual-risk disposition is recorded in DEPENDENCY_REVIEW.txt. It is scoped to the current architecture and does not declare a clean audit.
 - The next candidate adds guarded production runtime configuration, redacted incident identifiers, manual candidate packaging, and disabled-until-activation liveness monitoring. None of these changes alone enables production authentication or CRM delivery.
+
+## 2026-10-25 production web acceptance
+
+The owner explicitly approved invitation-only production activation. PR28 merged
+as 6e1b80365c0e5886fc1daf932a6a920754490747 after 208/208 tests. Main CI
+40199613506 passed; the production candidate packaging run 40200071012 passed.
+Worker version 0887d6a8-81ec-47ba-bf0a-8c0cd0da29ed serves
+https://nestwise.universestitch.com. HTTPS routes, unauthenticated API denial,
+untrusted-origin rejection, invalid invitation rejection and disabled CRM health
+passed. The owner accepted the invitation and signed in. Authenticated business
+and personal account switching, zero-state cash summary and empty receipt archive
+were verified. No synthetic records were copied into production.
+Production liveness run 40200007362 passed; its 30-minute schedule is enabled.
+
+Production Android is a separate package from the installed staging APK. The new
+manual workflow uses the existing project-wide Expo CI identity held in the GitHub
+staging environment; EAS uses the production environment/profile and production
+API origin. No database or OCR credentials enter the build. Queuing a build is not
+success of the APK: native signing setup, final artifact verification and device
+acceptance remain required. No store submission or iOS signing is configured.
+
+CRM PR94 remains separate and unmerged into the CRM source branch; its dispatcher
+currently permits only a bounded staging window. Production syncing requires an
+explicit implementation and source-data cutover, not merely setting a flag.
+Production OCR is disabled pending its provider credential and permitted usage.

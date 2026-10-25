@@ -43,3 +43,10 @@ test('production release rejects widened access and origin drift', () => {
   const config=fixture();config.worker.env.production.workers_dev=true;
   assert.ok(validateConfiguration(config).length>0);
 });
+
+test('production native release remains an internal APK with isolated EAS environment', () => {
+  for (const patch of [{distribution:'store'}, {environment:'preview'}, {android:{buildType:'app-bundle'}}]) {
+    const config=fixture();Object.assign(config.eas.build.production,patch);
+    assert.ok(validateConfiguration(config).some(e=>e.includes('production: expected an internal APK')));
+  }
+});
