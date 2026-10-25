@@ -61,5 +61,8 @@
   "engines": {
     "node": ">=24.3.0 <25"
   },
+  "overrides": {
+    "@expo/cli": { "zod": "4.6.7" }
+  },
   "private": true
 }

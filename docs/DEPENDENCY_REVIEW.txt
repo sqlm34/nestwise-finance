@@ -68,3 +68,20 @@ https://github.com/advisories/GHSA-w5hq-g745-h8pq
 - Live advisory drift check retains the three known findings visibly, rejects new/escalated findings and audit failures; no production waiver.
 - Android/iOS source-map analysis complements Worker input analysis. Both exported JS bundles exclude the three reviewed tooling packages.
 - Local audit now reports 22 nodes, but package-lock is unchanged; do not claim remediation from this count change. See TOOLCHAIN_VERIFICATION.md.
+
+2026-10-25 — Expo CLI Zod advisory remediation (PR26)
+- GHSA-mrhx-c7xc-m3w5 affects the nested Zod 3.25.76. Scoped @expo/cli
+  override resolves Zod 4.6.7; the lockfile removes only the vulnerable nested
+  copy. This is a cross-major tooling override, with direct compatibility tests
+  for both Expo CLI schema consumers (plugin validation and MCP commands).
+- Fresh npm ci succeeded. Local suite: 199 tests, 192 passed, 7 PostgreSQL
+  tests deferred to CI; typecheck and lint passed. Web export and dependency
+  boundary passed. Native export and exact-revision CI remain required.
+- npm audit --omit=dev now reports 7 affected nodes (4 high, 3 moderate),
+  2 distinct advisories: node-forge and uuid. No new advisory waiver was added.
+  Braces is absent from the current registry report; no braces package changed,
+  so this is not claimed as a package remediation. Production is not approved
+  by this audit regression check.
+- Recovery URL validation rejects connection-string query overrides and
+  duplicate SSL parameters; tests also check the effective pg client target.
+Source: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5

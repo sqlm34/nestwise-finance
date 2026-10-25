@@ -11,10 +11,16 @@ function validateTargets(source,restored,runtime,options={}) {
   const policy=recoveryPolicy(options);
   const urls=[source,restored,runtime].map(value=>new URL(value));
   for(const url of urls) {
+    // pg accepts query overrides for host/user/port and the LAST sslmode value.
+    // Validate a minimal unique parameter set before constructing any Client;
+    // otherwise URL-level endpoint checks could probe the source by mistake.
+    assert.deepEqual([...url.searchParams.keys()],['sslmode'],'Only one sslmode parameter is allowed');
     assert.equal(url.protocol,'postgresql:');
     assert.equal(url.pathname,`/${policy.database}`);
     assert.ok(/^ep-[a-z0-9-]+(?:\.[a-z0-9-]+)+\.neon\.tech$/.test(url.hostname));
     assert.equal(url.searchParams.get('sslmode'),'require');
+    assert.ok(url.port===''||url.port==='5432','Unexpected PostgreSQL port');
+    assert.equal(url.hash,'','Connection fragments are not allowed');
   }
   const endpoint=url=>url.hostname.replace('-pooler.','.');
   assert.notEqual(endpoint(urls[0]),endpoint(urls[1]),'Never run recovery probes against the source');
