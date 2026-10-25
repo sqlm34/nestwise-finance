@@ -32,3 +32,14 @@ test('release preflight catches native runtime and environment drift', () => {
   assert.ok(errors.some(e => e.includes('Node version')));
   assert.ok(errors.some(e => e.includes('APK environment')));
 });
+
+test('production release rejects widened access and origin drift', () => {
+  for (const patch of [{FINANCIAL_INGESTION_ENABLED:'true'}, {NESTWISE_OCR_ENABLED:'true'},
+    {PRODUCTION_CRM_APPROVED:'confirmed-account-mapping-v1'}, {AUTH_ENABLED:'false'},
+    {AUTH_WEB_ORIGIN:'https://other.example'}, {PRODUCTION_RELEASE_APPROVED:undefined}]) {
+    const config=fixture(); Object.assign(config.worker.env.production.vars,patch);
+    assert.ok(validateConfiguration(config).length>0);
+  }
+  const config=fixture();config.worker.env.production.workers_dev=true;
+  assert.ok(validateConfiguration(config).length>0);
+});

@@ -31,15 +31,21 @@ function validateConfiguration({worker, eas, nodeVersion, migrations}) {
   requireCondition(eas.cli?.requireCommit === true, 'EAS must build a committed source revision');
   requireCondition(eas.build?.staging?.distribution === 'internal' && eas.build?.staging?.android?.buildType === 'apk',
     'staging: expected an internal APK');
-  // Production is provisioned but closed. Replace this guard only in the
-  // explicitly approved production release change, with deployment evidence.
+  // Owner approved invitation-only web activation on 2026-10-25.
+  // CRM delivery and OCR require separate activation.
   const production = worker.env?.production;
-  requireCondition(production?.workers_dev === false && !(production?.routes?.length) && !production?.route,
+  requireCondition(production?.workers_dev === false && !production?.route &&
+    JSON.stringify(production?.routes) === JSON.stringify([{pattern:'nestwise.universestitch.com',custom_domain:true}]),
     'production: public routing requires a separate approved release');
-  requireCondition(production?.vars?.AUTH_ENABLED !== 'true' && production?.vars?.FINANCIAL_INGESTION_ENABLED !== 'true',
-    'production: activation requires a separate approved release');
-  requireCondition(!production?.vars?.PRODUCTION_RELEASE_APPROVED && !production?.vars?.PRODUCTION_CRM_APPROVED,
-    'production: release and CRM mapping approval must remain unset until activation');
+  requireCondition(production?.vars?.AUTH_ENABLED === 'true' && production?.vars?.PRODUCTION_RELEASE_APPROVED === 'nestwise-production-v1',
+    'production: invitation-only activation configuration is incomplete');
+  requireCondition(production?.vars?.AUTH_BASE_URL === 'https://nestwise.universestitch.com' &&
+    production?.vars?.AUTH_WEB_ORIGIN === production?.vars?.AUTH_BASE_URL &&
+    eas.build?.production?.env?.EXPO_PUBLIC_API_URL === production?.vars?.AUTH_BASE_URL,
+    'production: browser, authentication and APK origins differ');
+  requireCondition(production?.vars?.FINANCIAL_INGESTION_ENABLED === 'false' &&
+    production?.vars?.NESTWISE_OCR_ENABLED === 'false' && !production?.vars?.PRODUCTION_CRM_APPROVED,
+    'production: CRM and OCR require separate approved activation');
   requireCondition(migrations.length > 0, 'No migrations found');
   migrations.forEach((name, index) => requireCondition(
     /^\d{4}_[a-z0-9_]+\.sql$/.test(name) && Number(name.slice(0, 4)) === index + 1,

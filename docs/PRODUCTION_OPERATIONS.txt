@@ -48,3 +48,13 @@ financial history and both object copies. Use a schema-compatible prior Worker
 or a separately restored environment. Do not roll the database back while later
 financial events may still be arriving. Reconcile event cursors/totals before
 re-enabling delivery. Store publication requires separate owner permission.
+
+2026-10-25 owner-approved web activation
+The owner explicitly approved opening nestwise.universestitch.com with invitation-only
+access and empty business/personal workspaces. Production configuration now names
+only that custom domain; workers.dev remains disabled. This supersedes the earlier
+closed-route preparation instructions. Deploy only the merged, CI-verified revision.
+CRM ingestion and OCR remain false and require separate configuration/approval.
+Run scripts/verify-production-web.cjs after HTTPS becomes available, then complete
+owner invitation acceptance and verify the empty real account mapping in the UI.
+No staging records or passwords are copied into production. No store submission.

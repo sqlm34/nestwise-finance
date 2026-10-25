@@ -52,6 +52,7 @@
     "production": {
       "name": "nestwise-production",
       "workers_dev": false,
+      "routes": [{"pattern": "nestwise.universestitch.com", "custom_domain": true}],
       "observability": {
         "enabled": true,
         "logs": {"enabled": true, "invocation_logs": false, "head_sampling_rate": 1, "persist": true}
@@ -63,7 +64,8 @@
       },
       "vars": {
         "ENVIRONMENT": "production",
-        "AUTH_ENABLED": "false",
+        "AUTH_ENABLED": "true",
+        "PRODUCTION_RELEASE_APPROVED": "nestwise-production-v1",
         "AUTH_BASE_URL": "https://nestwise.universestitch.com",
         "AUTH_WEB_ORIGIN": "https://nestwise.universestitch.com",
         "FINANCIAL_INGESTION_ENABLED": "false",
