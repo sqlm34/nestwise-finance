@@ -1,0 +1,45 @@
+name: Production Android internal build
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: production-android-build-dispatch
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main' && vars.EAS_ENABLED == 'true'
+    # This environment holds the existing project-wide Expo CI identity only.
+    # EAS profile/environment and app/backend origin are explicitly production.
+    environment: staging
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Require successful CI for the exact main revision
+        run: node scripts/verify-ci-candidate.cjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: npm ci
+      - run: node scripts/release-preflight.cjs
+      - run: node scripts/dependency-audit.cjs
+      - name: Verify production mobile JavaScript
+        run: |
+          npm run build:mobile -- --source-maps
+          node scripts/verify-mobile-bundle.cjs
+        env:
+          APP_ENV: production
+          EXPO_PUBLIC_API_URL: https://nestwise.universestitch.com
+      - name: Queue internal APK only; no store submission
+        run: npx --yes eas-cli@25.2.0 build --profile production --platform android --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+          APP_ENV: production
+      # Success means queued, not that EAS finished. Verify the final APK
+      # certificate, package and device behavior before declaring acceptance.
