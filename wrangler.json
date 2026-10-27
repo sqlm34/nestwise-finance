@@ -69,7 +69,8 @@
         "AUTH_BASE_URL": "https://nestwise.universestitch.com",
         "AUTH_WEB_ORIGIN": "https://nestwise.universestitch.com",
         "FINANCIAL_INGESTION_ENABLED": "false",
-        "NESTWISE_OCR_ENABLED": "false"
+        "NESTWISE_OCR_ENABLED": "true",
+        "NESTWISE_OCR_MODEL": "gpt-6-luna"
       },
       "r2_buckets": [
         {"binding": "STATEMENTS", "bucket_name": "nestwise-documents-production"},

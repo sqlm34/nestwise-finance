@@ -34,7 +34,7 @@ function validateConfiguration({worker, eas, nodeVersion, migrations}) {
   requireCondition(eas.build?.production?.distribution === 'internal' && eas.build?.production?.android?.buildType === 'apk'
     && eas.build?.production?.environment === 'production', 'production: expected an internal APK in the production EAS environment');
   // Owner approved invitation-only web activation on 2026-10-25.
-  // CRM delivery and OCR require separate activation.
+  // Owner separately approved production OCR on 2026-10-25; CRM stays off.
   const production = worker.env?.production;
   requireCondition(production?.workers_dev === false && !production?.route &&
     JSON.stringify(production?.routes) === JSON.stringify([{pattern:'nestwise.universestitch.com',custom_domain:true}]),
@@ -46,8 +46,9 @@ function validateConfiguration({worker, eas, nodeVersion, migrations}) {
     eas.build?.production?.env?.EXPO_PUBLIC_API_URL === production?.vars?.AUTH_BASE_URL,
     'production: browser, authentication and APK origins differ');
   requireCondition(production?.vars?.FINANCIAL_INGESTION_ENABLED === 'false' &&
-    production?.vars?.NESTWISE_OCR_ENABLED === 'false' && !production?.vars?.PRODUCTION_CRM_APPROVED,
-    'production: CRM and OCR require separate approved activation');
+    !production?.vars?.PRODUCTION_CRM_APPROVED, 'production: CRM requires separate approved activation');
+  requireCondition(production?.vars?.NESTWISE_OCR_ENABLED === 'true' && production?.vars?.NESTWISE_OCR_MODEL === 'gpt-6-luna',
+    'production: expected the approved receipt OCR model');
   requireCondition(migrations.length > 0, 'No migrations found');
   migrations.forEach((name, index) => requireCondition(
     /^\d{4}_[a-z0-9_]+\.sql$/.test(name) && Number(name.slice(0, 4)) === index + 1,
