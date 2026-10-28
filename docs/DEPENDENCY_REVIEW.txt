@@ -108,3 +108,22 @@ Source: https://github.com/advisories/GHSA-mrhx-c7xc-m3w5
 Sources:
 https://github.com/advisories/GHSA-86w9-cpqp-85rv
 https://github.com/advisories/GHSA-w5hq-g745-h8pq
+
+2026-10-28 — deepmerge advisory reachability review
+GHSA-gcqx-w48m-w2h4 was updated 2026-10-27; deepmerge 4.3.1 is the
+latest published release and no patched version is listed. npm ls shows the
+only installed path is expo -> @expo/config -> deepmerge. Config.js uses it
+when merging repository Expo configuration modifications and plugin options.
+This deployment builds trusted committed app.json/app.config.ts; it does not
+accept customer-controlled Expo configuration, publish a development server,
+or invoke Expo configuration merging inside the production API.
+
+The known low-severity advisory is retained visibly in audit evidence. Unknown
+or escalated findings still fail CI. Worker input metadata and web/Android/iOS
+source-map guards now reject deepmerge as well as the previously reviewed
+build-only packages. The guard's rejection is covered by a regression test.
+This is a scoped static artifact reachability disposition, not remediation or
+a clean dependency audit. If untrusted config/plugin inputs or a development
+server are introduced, reassess before enabling them. Native artifacts still
+require normal signature and device checks.
+Source: https://github.com/advisories/GHSA-gcqx-w48m-w2h4

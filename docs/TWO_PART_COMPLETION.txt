@@ -260,3 +260,12 @@ screens or passing unit tests. Native JS export is not a signed device build.
 - Android 1.0.3 native acceptance is recorded in RELIABLE_MOBILE_ACCEPTANCE.md.
 - Statement/parts are implemented; integration of the 21-PR chain and production
   prerequisites remain explicit. No production deployment or store submission.
+
+2026-10-28 live workspace interface (1.0.6 / Android 7):
+The authenticated account now uses a shared responsive shell with real workspace
+names, authorized accounts and live section navigation. Legacy /demo bookmarks
+open the authenticated workspace; no demo balances or static CRM status are
+reachable through the app routes. Unknown routes do not load the sample shell.
+Switching accounts remounts account-specific data/forms; persisted selection is
+still revalidated against current server access. No financial records or
+permissions are changed by this interface update.

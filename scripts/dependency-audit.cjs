@@ -2,6 +2,7 @@
 const {spawnSync} = require('node:child_process');
 const {mkdirSync, writeFileSync} = require('node:fs');
 const reviewed = new Map([
+  ['deepmerge|https://github.com/advisories/GHSA-gcqx-w48m-w2h4', 'low'],
   ['braces|https://github.com/advisories/GHSA-vfj7-8cjw-p6xm', 'high'],
   ['node-forge|https://github.com/advisories/GHSA-86w9-cpqp-85rv', 'high'],
   ['uuid|https://github.com/advisories/GHSA-w5hq-g745-h8pq', 'moderate'],

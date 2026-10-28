@@ -9,6 +9,7 @@ import {metricKeys,periodPreset,validatePeriod,parsePeriodInsights,periodMetrics
 import {AccountJournal} from './AccountJournal';
 import type {MessageKey} from '../i18n';
 const labels:Record<Metric,MessageKey>={receipts:'insightsReceipts',refunds:'journalRefunds',net_receipts:'insightsNetReceipts',parts_cost:'insightsParts',fees:'journalFees',recorded_difference:'insightsDifference',clearing:'insightsClearing',parts_payable:'insightsPayable',expenses:'journalExpenses',transfers:'journalTransfers'};
+const primaryMetrics:Metric[]=['receipts','parts_cost','fees','recorded_difference'];
 export function AccountInsights({workspace,account,name,currency,onSessionExpired,onEvents}:{workspace:string;account:string;name:string;currency:string;onSessionExpired:()=>void;onEvents:()=>void}){
   const {t,locale}=useApp();
   const [period,setPeriod]=useState<Period>(()=>periodPreset('month'));
@@ -42,6 +43,15 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
   return <Card>
     <Text accessibilityRole="header" style={styles.h2}>{t('insightsTitle')}</Text>
     <Text style={styles.text}>{name} · {currency}</Text>
+    {data&&metrics&&prior&&<>
+      <Text style={styles.muted}>{data.current.from} — {data.current.to}</Text>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:14}}>{primaryMetrics.map(metric=><View key={metric} style={{flexBasis:220,flexGrow:1,gap:10,padding:18,borderRadius:14,backgroundColor:metric==='recorded_difference'?colors.ink:colors.pale}}>
+        <Text style={[styles.text,{color:metric==='recorded_difference'?'#fff':colors.ink}]}>{t(labels[metric])}</Text>
+        <Text style={[styles.title,{color:metric==='recorded_difference'?'#fff':colors.ink}]}>{insightMoney(metrics[metric],locale)}</Text>
+        <Text style={[styles.muted,{color:metric==='recorded_difference'?'#c8dfd0':colors.muted}]}>{t('insightsPrevious')}: {insightMoney(prior[metric],locale)} · {t('insightsChange')}: {insightMoney(metrics[metric]-prior[metric],locale)}</Text>
+        {journalCodes.includes(metric as JournalCode)&&<Button label={t('insightsShowLines')} onPress={()=>openJournal(data.current,metric as JournalCode)}/>}
+      </View>)}</View>
+    </>}
     <Notice text={t('insightsScope')}/>
     <View style={styles.row}>{(['month','quarter','year'] as const).map(kind=><Button key={kind} label={t(({month:'insightsMonth',quarter:'insightsQuarter',year:'insightsYear'} as const)[kind])}
       disabled={busy} onPress={()=>{const next=periodPreset(kind);setPeriod(next);apply(next);}}/>)}</View>
@@ -72,11 +82,11 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
       <Text style={styles.muted}>{t('insightsAttentionScope')}</Text>
       <Text style={styles.text}>{t('insightsMissingPaid')}: {data.current.missing_paid_date}</Text>
       <Button label={t('eventsTitle')} onPress={onEvents}/>
-      {metricKeys.map(metric=><View key={metric} style={{gap:6,paddingVertical:12,borderTopWidth:1,borderColor:colors.line}}>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:14}}>{metricKeys.filter(metric=>!primaryMetrics.includes(metric)).map(metric=><View key={metric} style={{gap:8,padding:20,borderWidth:1,borderRadius:14,borderColor:colors.line,flexBasis:260,flexGrow:1,backgroundColor:metric==='recorded_difference'?colors.pale:'#fff'}}>
         <Text style={styles.h2}>{t(labels[metric])}</Text><Text style={styles.title}>{insightMoney(metrics[metric],locale)}</Text>
         <Text style={styles.muted}>{t('insightsPrevious')}: {insightMoney(prior[metric],locale)} · {t('insightsChange')}: {insightMoney(metrics[metric]-prior[metric],locale)}</Text>
         {journalCodes.includes(metric as JournalCode)&&<Button label={t('insightsShowLines')} onPress={()=>openJournal(data.current,metric as JournalCode)}/>}
-      </View>)}
+      </View>)}</View>
       <Notice text={t('insightsFormula')}/>
       <Button label={t('insightsAllLines')} onPress={()=>openJournal(data.current)}/>
       <Button label={t('insightsPreviousLines')} onPress={()=>openJournal(data.previous)}/>
