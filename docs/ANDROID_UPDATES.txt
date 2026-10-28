@@ -1,0 +1,13 @@
+Android over-the-air updates
+
+Bootstrap: install APK 1.0.7 / code 8 once. Existing APKs through 1.0.6 cannot acquire this native capability remotely. APK installation preserves application data when package and signing certificate match.
+
+The release app checks EAS Update at startup. It starts its cached/embedded version immediately, downloads a compatible update, and uses it on a later cold start. No forced reload interrupts expense entry. Offline startup retains the installed/cached version. Native startup recovery remains enabled; it does not guarantee recovery from every application bug.
+
+Channels: production, staging, development are distinct. Development downloads are disabled. Runtime policy fingerprint changes when native inputs change; a native dependency/config change requires a new APK. Do not bypass runtime checks or redirect production to staging. API authorization remains server-side.
+
+Publishing: manually dispatch eas-update.yml on main after exact-main CI succeeds; default target staging. Production target is an explicit release. Existing Expo CI identity is used; no new key is stored in source. The workflow verifies exports before upload and publishes Android only. There is no automatic publication on push and no store submission. Check the Expo update group, runtime and target before declaring delivery.
+
+Rollback: use EAS update:rollback with the exact published group ID and --platform android --non-interactive; inspect its target/runtime first. Alternatively republish a known working group to the same channel. A device must connect and restart to receive recovery. Keep the last signed working APK available. Never remove financial data to repair an update.
+
+Acceptance pending until the owner installs the bootstrap APK: launch online/offline, verify real Aksenov LLC data, publish a compatible test update, cold-start twice and confirm that the update is used. Build/export checks alone cannot prove on-device delivery. Separate end-to-end update code-signing is not configured; APK signing and HTTPS/EAS access controls remain in force.
