@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions, type ViewStyle } from 'react-native';
 import { Search } from 'lucide-react-native';
 
 export const colors = { ink: '#19372f', muted: '#70857c', line: '#dfe9e3', green: '#137c5a', pale: '#e8f3ed', bg: '#f4f7f5', amber: '#956a26', red: '#a34242' };
@@ -9,16 +9,17 @@ export const styles = StyleSheet.create({
   text: { color: colors.ink, fontSize: 14, lineHeight: 22 },
   muted: { color: colors.muted, fontSize: 13, lineHeight: 21 },
   title: { color: colors.ink, fontSize: 29, fontWeight: '700', letterSpacing: -0.9, lineHeight: 37 },
-  h2: { color: colors.ink, fontSize: 18, fontWeight: '600', letterSpacing: -0.3, lineHeight: 26 },
+  h2: { color: colors.ink, fontSize: 17, fontWeight: '800', letterSpacing: -0.3, lineHeight: 26 },
   label: { color: colors.muted, fontSize: 10, letterSpacing: 1.5, fontWeight: '700' },
-  card: { padding: 22, backgroundColor: '#fff', borderRadius: 18, borderWidth: 1, borderColor: colors.line, gap: 14 },
-  button: { minHeight: 44, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, borderWidth: 1, borderColor: colors.line, backgroundColor: '#fff' },
+  card: { padding: 21, backgroundColor: '#fff', borderRadius: 17, borderWidth: 1, borderColor: colors.line, gap: 14 },
+  button: { minHeight: 44, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, borderWidth: 1, borderColor: colors.line, backgroundColor: '#fff' },
   buttonText: { fontSize: 13, fontWeight: '600', color: colors.ink },
   divider: { height: 1, backgroundColor: colors.line, marginVertical: 2 },
   input: { minHeight: 46, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.line, borderRadius: 10, fontSize: 14, color: colors.ink },
 });
 export function Card({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  const {width}=useWindowDimensions();
+  return <View style={[styles.card, width<=720&&{padding:15}, style]}>{children}</View>;
 }
 export function Button({ label, onPress, primary, icon, disabled = false, selected = false, testID }: {
   label: string; onPress: () => void; primary?: boolean; icon?: React.ReactNode; disabled?: boolean; selected?: boolean; testID?: string;
@@ -43,4 +44,9 @@ export function SearchField({ value, onChange, placeholder }: { value: string; o
     <Search size={17} color={colors.muted} />
     <TextInput accessibilityLabel={placeholder} placeholder={placeholder} placeholderTextColor={colors.muted} value={value} onChangeText={onChange} style={[styles.input, { flex: 1, borderWidth: 0 }]} />
   </View>;
+}
+
+/** Flat sidebar navigation from the supplied nestwise-final prototype. */
+export function NavigationItem({label,onPress,selected=false,disabled=false}:{label:string;onPress:()=>void;selected?:boolean;disabled?:boolean}){
+ return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{selected,disabled}} disabled={disabled} onPress={onPress} style={({pressed})=>({minHeight:44,paddingVertical:11,paddingHorizontal:12,borderRadius:10,marginVertical:2,backgroundColor:selected?'#e1f2e9':pressed?'#f0f6f2':'transparent',opacity:disabled?0.5:1})}><Text style={{fontSize:14,fontWeight:'600',color:selected?'#086e4e':'#647870'}}>{label}</Text></Pressable>;
 }

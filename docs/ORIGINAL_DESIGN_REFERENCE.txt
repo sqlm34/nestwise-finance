@@ -1,0 +1,11 @@
+Design authority: the user-supplied nestwise-final/prototype/index.html.
+The user explicitly requested the original appearance, not the older repository demo screens.
+Mobile exception explicitly approved 2026-10-28: keep hamburger navigation, styled like the reference sidebar.
+
+Reference tokens: ink #19372f; muted #70857c; line #dfe9e3; accent #137c5a; background #f4f7f5.
+Sidebar: 248px desktop, white; flat left-aligned navigation; active #e1f2e9 / #086e4e; lowercase n square brand.
+Cards: white, 17px radius, 21px padding desktop / 15px mobile. Metrics: two columns on mobile, four on desktop; no dark result card or decorative metric icons.
+Keep production session authorization, account isolation and real cash amounts. Reference figures and DESIGN DEMO labels must not enter live accounts.
+Accountant approval in the historical concept is superseded by the user: prepare and export, no in-app approval gate.
+Receipts, manual operations and administration remain accessible because they are working product functions beyond the static concept.
+Visual preview uses isolated synthetic data; it is not evidence of live financial balances.
