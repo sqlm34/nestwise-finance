@@ -1,8 +1,8 @@
 import React,{useEffect,useState} from 'react';
-import {ActivityIndicator,Pressable,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import {Card,Button,Notice,SearchField,styles,colors} from './ui';
 import {useApp} from '../state';
-import {journalCodes,journalDate,journalMoney,type JournalCode} from '../domain/journal';
+import {journalCodes,journalMoney,type JournalCode} from '../domain/journal';
 import {defaultJournalFilters,type JournalFilters} from '../domain/journal-filters';
 import {historyParams,parseHistoryPage,validateHistoryFilters,type HistoryPage} from '../domain/journal-history';
 import {authenticatedFetch} from '../auth/client';
@@ -19,6 +19,7 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
   compact?:boolean;onViewAll?:()=>void;
 }) {
   const {t,locale}=useApp();
+  const [showFilters,setShowFilters]=useState(false);
   const [filters,setFilters]=useState(initialFilters);
   const [selectedTransaction,setSelectedTransaction]=useState<string|null>(null);
   const [request,setRequest]=useState<HistoryRequest>({filters:initialFilters,cursors:[null],revision:0});
@@ -69,6 +70,8 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
     <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{t('journalTitle')}</Text>
       <Button label={t('journalRefresh')} disabled={busy} onPress={()=>restart(request.filters)}/></View>
     <Text style={styles.text}>{name} · {currency}</Text>
+    <Button label={locale==='ru'?'Поиск и фильтры':'Search and filters'} selected={showFilters} onPress={()=>setShowFilters(value=>!value)}/>
+    {showFilters&&<View style={{gap:12}}>
     <Text style={styles.muted}>{t('journalScope')}</Text>
     <Text style={styles.muted}>{t('journalFilterScope')}</Text>
     <SearchField value={filters.query} onChange={query=>setFilters(current=>({...current,query}))} placeholder={t('journalSearch')}/>
@@ -97,6 +100,7 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
       <Button label={t('journalReset')} disabled={busy} onPress={()=>{setFilters(defaultJournalFilters);restart(defaultJournalFilters);}}/>
       <Button label={t('journalApply')} primary disabled={busy||!!filterError} onPress={()=>restart(filters)}/>
     </View>
+    </View>}
     {filterError&&<Notice error text={t(filterError==='invalidDate'?'journalInvalidDate':filterError==='reversedRange'?'journalReversedRange':'journalInvalidQuery')}/>}
     {dirty&&<Notice text={t('journalUnapplied')}/>}
     {error&&<Notice error text={t(error)}/>}
@@ -104,23 +108,15 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
     {page&&<>
       <Text style={styles.muted}>{t('page')} {request.cursors.length} · {t('journalShown')} {page.entries.length} · {t('journalLimit')}</Text>
       {page.entries.length===0&&<Notice text={t(emptyFiltered?'journalNoMatches':'journalEmpty')}/>}
-      {page.entries.map(transaction=><View key={transaction.id} style={{gap:10,paddingTop:14,borderTopWidth:1,borderColor:colors.line}}>
-        <Text style={styles.h2}>{journalDate(transaction.occurred_at,locale)}</Text>
-        <Text style={styles.muted}>{t('journalPaidAt')}: {transaction.paid_at?journalDate(transaction.paid_at,locale):t('journalNotPaid')}</Text>
-        {transaction.entries.map((line,index)=>{
-          const amount=BigInt(line.cents);
-          return <View key={`${transaction.id}:${index}`} style={styles.between}>
-            <View><Text style={styles.text}>{t(labels[line.code])}</Text>
-              <Text style={styles.muted}>{t(amount>=0n?'journalDebit':'journalCredit')}</Text></View>
-            <Text style={[styles.text,{fontWeight:'600'}]}>{journalMoney((amount<0n?-amount:amount).toString(),locale,currency)}</Text>
-          </View>;
-        })}
-        <Text selectable style={styles.muted}>{transaction.source_order_id.startsWith('manual:')?(locale==='ru'?'Ручная операция':'Manual operation'):t('journalOrder')}: {transaction.source_order_id}</Text>
-        <Text selectable style={styles.muted}>{t('journalEntry')}: {transaction.id}</Text>
-        <Text selectable style={styles.muted}>{t('journalEvent')}: {transaction.source_event_id}</Text>
-        <Text style={styles.muted}>{t('journalPostedAt')}: {journalDate(transaction.posted_at,locale)}</Text>
-        <Button label={t('provenanceOpen')} onPress={()=>setSelectedTransaction(transaction.id)}/>
-      </View>)}
+      <ScrollView horizontal><View style={{minWidth:640,flex:1}}>
+       <View style={{flexDirection:'row',backgroundColor:'#f8faf9',padding:10}}>{[locale==='ru'?'ИСТОЧНИК':'SOURCE',locale==='ru'?'ДАТА ОПЛАТЫ':'PAID DATE',locale==='ru'?'СТАТУС':'STATUS',locale==='ru'?'КЛИРИНГ':'CLEARING'].map((heading,index)=><Text key={heading} style={[styles.label,{width:index===0?250:120,textAlign:index===3?'right':'left'}]}>{heading}</Text>)}</View>
+       {page.entries.map(transaction=>{const cash=transaction.entries.filter(line=>line.code==='clearing').reduce((total,line)=>total+BigInt(line.cents),0n);return <Pressable key={transaction.id} accessibilityRole="button" accessibilityLabel={`${transaction.source_order_id}. ${t('provenanceOpen')}`} onPress={()=>setSelectedTransaction(transaction.id)} style={{flexDirection:'row',alignItems:'center',paddingHorizontal:10,paddingVertical:13,borderBottomWidth:1,borderColor:'#edf1ef'}}>
+        <Text numberOfLines={2} style={[styles.text,{width:250,fontSize:12}]}>{transaction.source_order_id.startsWith('manual:')?(locale==='ru'?'Ручная операция':'Manual operation'):`CRM · ${transaction.source_order_id}`}</Text>
+        <Text style={[styles.muted,{width:120,fontSize:12}]}>{transaction.paid_at?.slice(0,10)??t('journalNotPaid')}</Text>
+        <Text style={[styles.muted,{width:120,fontSize:12}]}>{locale==='ru'?'Проведено':'Posted'}</Text>
+        <Text style={[styles.text,{width:120,textAlign:'right',fontSize:12,fontVariant:['tabular-nums']}]}>{journalMoney(cash.toString(),locale,currency).replace(/ USD$/,'')}</Text>
+       </Pressable>;})}
+      </View></ScrollView>
       <Text style={styles.muted}>{t(page.next_cursor?'journalMore':'journalEnd')}</Text>
     </>}
     <View style={styles.row}>
