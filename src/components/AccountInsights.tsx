@@ -44,16 +44,13 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
   </>;
   const metrics=data?periodMetrics(data.current):null,prior=data?periodMetrics(data.previous):null;
   return <View style={{gap:20}}>
-    <View style={styles.between}><Text style={styles.h2}>{name}</Text>
-      <View style={[styles.row,{gap:6}]}>{(['month','year'] as const).map(kind=><Button key={kind} label={t(kind)} disabled={busy} onPress={()=>{const next=periodPreset(kind);setPeriod(next);apply(next);}}/>)}</View></View>
-    <View style={styles.row}><Button label={locale==='ru'?'Отчёт для бухгалтера':'Accountant report'} onPress={onReports}/><Button primary label={locale==='ru'?'Импортировать выписку':'Import statement'} onPress={onBank}/></View>
+    <View style={[styles.row,{gap:8}]}>{(['month','year'] as const).map(kind=><Button key={kind} label={t(kind)} disabled={busy} onPress={()=>{const next=periodPreset(kind);setPeriod(next);apply(next);}}/>)}<Button label={locale==='ru'?'Отчёт для бухгалтера':'Accountant report'} onPress={onReports}/><Button primary label={locale==='ru'?'Импортировать выписку':'Import statement'} onPress={onBank}/></View>
     <View style={{padding:12,borderRadius:11,backgroundColor:'#fff6e7',borderWidth:1,borderColor:'#f0dec0'}}><Text style={{fontSize:12,color:'#976018'}}>{locale==='ru'?'Не учитывайте повторно доходы и расходы CRM при загрузке банковской выписки.':'Do not double count CRM revenue, expenses and bank evidence.'}</Text></View>
     {data&&metrics&&prior&&<>
-      <Text style={styles.muted}>{data.current.from} — {data.current.to}</Text>
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:width<=720?9:14}}>{primaryMetrics.map(metric=>{return <Pressable key={metric} accessibilityRole="button" accessibilityLabel={`${t(labels[metric])}: ${insightMoney(metrics[metric],locale)}. ${t('insightsShowLines')}`} onPress={()=>openJournal(data.current,journalCodes.includes(metric as JournalCode)?metric as JournalCode:'all')} style={{flexBasis:width<=1020?'44%':'22%',flexGrow:1,minWidth:130,gap:10,padding:width<=720?15:21,borderRadius:17,borderWidth:1,borderColor:colors.line,backgroundColor:'#fff'}}>
         <Text style={[styles.muted,{color:colors.muted}]}>{metric==='recorded_difference'?(locale==='ru'?'Операционный результат':'Operating result'):t(compactLabels[metric])}</Text>
         <Text adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={1} style={{fontSize:width<=720?22:27,fontWeight:'800',letterSpacing:-1,fontVariant:['tabular-nums'],color:colors.ink}}>{insightMoney(metrics[metric],locale).replace(/ USD$/,'')}</Text>
-        <Text style={{fontSize:11,color:'#81928a'}}>{currency}</Text>
+        <Text style={{fontSize:11,color:'#81928a'}}>{currency} · {data.current.from} — {data.current.to}</Text>
       </Pressable>;})}</View>
       <Text style={[styles.muted,{fontSize:11}]}>{locale==='ru'?'По проведённым операциям. Результат — разница поступлений и учтённых расходов, не остаток банка.':'Posted transactions only. Result is receipts less recorded expenses, not a bank balance.'}</Text>
       <View style={{flexDirection:width>1020?'row':'column',gap:14}}>
