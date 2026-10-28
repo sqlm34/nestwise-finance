@@ -1,3 +1,4 @@
+import {CrmConnectionStatus} from './CrmConnectionStatus';
 import React,{useState} from 'react';
 import {Modal,Pressable,ScrollView,Text,View,useWindowDimensions} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -44,6 +45,7 @@ export function LiveShell({children,access,selected,title,navigation,onSelect,on
       {wide&&access&&selected&&<Badge>{locale==='ru'?'Рабочий аккаунт':'Live account'}</Badge>}</View>
      <Text style={styles.muted}>{locale==='ru'?'Единая финансовая система':'Finance that stays in sync'}</Text>
      {children}
+     {selected&&space?.kind==='business'&&<CrmConnectionStatus key={`${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account}/>}
     </ScrollView>
    </View>
   </View>
