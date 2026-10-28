@@ -24,6 +24,11 @@ test('real Better Auth login, workspace authorization, logout and stale cookie r
   assert.equal(result.workspaces.length,1);assert.equal(result.workspaces[0].id,fixture.workspace);
   assert.equal(result.workspaces[0].accounts[0].id,fixture.account);
   const path=`/v1/user/workspaces/${fixture.workspace}/accounts/${fixture.account}/journal`;
+  const crmPath=path.replace(/journal$/,'crm-status');
+  assert.equal((await fixture.fetch(request(crmPath))).status,401);
+  const crmResponse=await fixture.fetch(request(crmPath,{cookie}));assert.equal(crmResponse.status,200);
+  assert.equal((await crmResponse.json()).connected,false);
+  assert.equal((await fixture.fetch(request(crmPath.replace(fixture.account,randomUUID()),{cookie}))).status,404);
   const eventsPath=path.replace(/journal$/,'events');
   const candidatePath=path.replace(/journal$/,'reconciliation-candidates')+'?from=2026-10-20&to=2026-10-20';
   assert.equal((await fixture.fetch(request(candidatePath))).status,401);

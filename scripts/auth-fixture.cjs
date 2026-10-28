@@ -3,7 +3,7 @@ const {readFileSync}=require('node:fs');
 const {randomUUID,randomBytes}=require('node:crypto');
 async function createAuthFixture() {
   const {db,pool}=await require('./auth-test-db.cjs').authTestDatabase();
-  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql','0008_event_details.sql','0009_account_period_insights.sql','0010_reconciliation_candidates.sql','0011_saved_reconciliation.sql','0012_statement_archive.sql','0013_statement_evidence.sql','0014_manual_operations.sql','0015_workspace_admin.sql','0016_receipt_evidence.sql','0017_bank_booking.sql','0018_statement_periods.sql','0019_cash_basis_reads.sql','0020_accountant_reports.sql','0021_parts_register.sql','0022_statement_handoff.sql','0023_purchase_search.sql','0024_receipt_statement_categories.sql'])
+  for(const name of ['0001_ledger.sql','0002_auth.sql','0003_user_access.sql','0004_invitations.sql','0005_journal_history.sql','0006_journal_provenance.sql','0007_account_events.sql','0008_event_details.sql','0009_account_period_insights.sql','0010_reconciliation_candidates.sql','0011_saved_reconciliation.sql','0012_statement_archive.sql','0013_statement_evidence.sql','0014_manual_operations.sql','0015_workspace_admin.sql','0016_receipt_evidence.sql','0017_bank_booking.sql','0018_statement_periods.sql','0019_cash_basis_reads.sql','0020_accountant_reports.sql','0021_parts_register.sql','0022_statement_handoff.sql','0023_purchase_search.sql','0024_receipt_statement_categories.sql','0025_crm_status.sql'])
     await db.exec(readFileSync(`db/migrations/${name}`,'utf8'));
   const {hashPassword}=await import('better-auth/crypto');
   const id=randomUUID(),workspace=randomUUID(),account=randomUUID(),localUser=randomUUID();
@@ -56,6 +56,7 @@ async function createAuthFixture() {
     userPeriodInsights:async(...args)=>(await db.query('SELECT nestwise.user_period_insights($1,$2,$3,$4,$5) result',args)).rows[0].result,
     userEventDetail:async(...args)=>(await db.query('SELECT nestwise.user_event_detail($1,$2,$3,$4,$5) result',args)).rows[0].result,
     userAccountEvents:async(...args)=>(await db.query('SELECT nestwise.user_account_events($1,$2,$3,$4,$5,$6) result',args)).rows[0].result,
+    userCrmStatus:async(...args)=>(await db.query('SELECT nestwise.user_crm_status($1,$2,$3) result',args)).rows[0].result,
     userAccess:async subject=>(await db.query('SELECT nestwise.user_access($1) result',[subject])).rows[0].result,
     userJournal:async(...args)=>(await db.query('SELECT nestwise.user_journal($1,$2,$3) result',args)).rows[0].result,
     userJournalDetail:async(...args)=>(await db.query('SELECT nestwise.user_journal_detail($1,$2,$3,$4,$5) result',args)).rows[0].result,

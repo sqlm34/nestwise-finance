@@ -1,3 +1,4 @@
+import {crmStatus} from './crm-status';
 import {parsePartsCommand} from '../src/domain/parts';
 import { connectAuth, type AuthService, type AuthConfig } from './auth';
 import {documentApi,type DocumentEnv} from './documents';
@@ -17,6 +18,7 @@ import {nativeAppOrigin,trustedNativeOrigin} from './auth-origins';
 import {productionReady} from './production-policy';
 
 export type UserEnv = DocumentEnv & ReceiptEnv & {
+  FINANCIAL_INGESTION_ENABLED?:string;CRM_SERVICE_KEYS?:string;PRODUCTION_CRM_APPROVED?:string;
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
   AUTH_SECRET?: string; AUTH_BASE_URL?: string; AUTH_WEB_ORIGIN?: string;
   NESTWISE_DATABASE_URL?: string;
@@ -95,13 +97,14 @@ export async function userApi(request: Request, env: UserEnv,
   const documentWrite=documentRoute&&request.method==='POST';
   const reconciliationWrite=request.method==='POST'&&(savedMatch||cancelMatch);
   const reconciliationMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/reconciliation-candidates$/i.exec(url.pathname);
+  const crmMatch=request.method==='GET'&&!url.search?/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/crm-status$/i.exec(url.pathname):null;
   const insightsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/(?:cash-)?insights$/i.exec(url.pathname);
   const eventsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events$/i.exec(url.pathname);
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
   if ((url.search&&!purchaseMatch&&(!reportRoute||reportWrite||!!reportMatch?.[3])&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(purchaseMatch || partsRoute || reportRoute || periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
-    request.method === 'GET' && (url.pathname === '/v1/session' || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
+    request.method === 'GET' && (url.pathname === '/v1/session' || crmMatch || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
   if((partsRoute&&request.method==='POST'||reportWrite||receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!trustedNativeOrigin(request.headers.get('expo-origin'),config.origins))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
@@ -127,6 +130,7 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
+    if(crmMatch)return finish(response(crmStatus(await db.userCrmStatus(subject,crmMatch[1],crmMatch[2]),env)));
     if(receiptRoute&&receiptMatch)return finish(await receiptApi(receiptUpload?request:safeRequest,env,db,subject,receiptMatch[1],receiptMatch[2],receiptMatch[3]?.toLowerCase(),receiptMatch[4]));
     if(purchaseMatch){
       const q=url.searchParams;const query=q.get('query')??'',from=q.get('from'),to=q.get('to'),min=q.get('min')??'0';

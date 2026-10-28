@@ -35,6 +35,7 @@ export type Database = {
   accept(connection: string, nonce: string, timestamp: number, raw: string): Promise<unknown>;
   journal(hash: string, workspace: string, account: string): Promise<unknown>;
   processPending(): Promise<void>;
+  userCrmStatus(subject:string,workspace:string,account:string):Promise<unknown>;
   userAccess(subject: string): Promise<unknown>;
   userJournal(subject: string, workspace: string, account: string): Promise<unknown>;
   userJournalPage(subject:string,workspace:string,account:string,filters:JournalFilters,cursor:string|null):Promise<unknown>;
@@ -47,6 +48,7 @@ export type Database = {
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async userCrmStatus(subject,workspace,account) { return (await sql`SELECT nestwise.user_crm_status(${subject},${workspace}::uuid,${account}::uuid) result`)[0].result; },
     async cancelOwnerExpense(subject,workspace,account,data){return (await sql`SELECT nestwise.cancel_owner_expense(${subject},${workspace}::uuid,${account}::uuid,${JSON.stringify(data)}::jsonb) result`)[0].result;},
     async purchaseCandidates(subject,workspace,account,query,from,to,min){return (await sql`SELECT nestwise.purchase_candidates(${subject},${workspace}::uuid,${account}::uuid,${query},${from}::date,${to}::date,${min}::bigint) result`)[0].result;},
     async readParts(subject,workspace,account){return (await sql`SELECT nestwise.read_parts(${subject},${workspace}::uuid,${account}::uuid) result`)[0].result;},
