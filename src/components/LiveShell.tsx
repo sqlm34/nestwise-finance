@@ -51,4 +51,3 @@ export function LiveShell({children,access,selected,title,navigation,onSelect,on
   </Modal>
  </SafeAreaView>;
 }
-

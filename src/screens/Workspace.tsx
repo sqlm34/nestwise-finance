@@ -150,4 +150,3 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
 
     </LiveShell>;
 }
-
