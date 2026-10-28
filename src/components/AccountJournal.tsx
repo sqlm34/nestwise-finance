@@ -54,10 +54,11 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
     transaction={selectedTransaction} currency={currency} name={name} onOpen={setSelectedTransaction} onSessionExpired={onSessionExpired}
     onClose={()=>{setSelectedTransaction(null);setRequest(current=>({...current,revision:current.revision+1}));}}/>;
   if(compact)return <Card>
-    <View style={styles.between}><Text style={styles.h2}>{t('recent')}</Text>{onViewAll&&<Button label={t('viewAll')} onPress={onViewAll}/>}</View>
+    <View style={styles.between}><Text style={styles.h2}>{locale==='ru'?'Операции':'Transactions'}</Text>{onViewAll&&<Button label={t('viewAll')} onPress={onViewAll}/>}</View>
     {busy&&<ActivityIndicator color={colors.green} accessibilityLabel={t('authLoading')}/>}
     {error&&<Notice error text={t(error)}/>}
     {page?.entries.length===0&&<Text style={styles.muted}>{t('journalNoMatches')}</Text>}
+    <View style={{flexDirection:'row',justifyContent:'space-between',padding:10,backgroundColor:'#f8faf9'}}><Text style={styles.label}>{locale==='ru'?'ИСТОЧНИК':'SOURCE'}</Text><Text style={styles.label}>{locale==='ru'?'СУММА':'AMOUNT'}</Text></View>
     {page?.entries.slice(0,5).map(row=>{const cash=row.entries.filter(line=>line.code==='clearing').reduce((sum,line)=>sum+BigInt(line.cents),0n);return <Pressable key={row.id} accessibilityRole="button" accessibilityLabel={`${t('journalOrder')} ${row.source_order_id}. ${journalMoney(cash.toString(),locale,currency)}`} onPress={()=>setSelectedTransaction(row.id)} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:12,borderTopWidth:1,borderColor:colors.line}}>
       <View style={{flex:1,gap:3}}><Text numberOfLines={1} style={styles.text}>{row.source_order_id.startsWith('manual:')?(locale==='ru'?'Ручная операция':'Manual operation'):`${t('journalOrder')} ${row.source_order_id}`}</Text><Text style={styles.muted}>{row.paid_at?.slice(0,10)??t('journalNotPaid')}</Text></View>
       <Text style={[styles.text,{fontWeight:'600',color:cash<0n?colors.red:colors.green}]}>{journalMoney(cash.toString(),locale,currency).replace(/ USD$/,'')}</Text>

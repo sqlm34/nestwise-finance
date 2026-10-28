@@ -3,7 +3,7 @@ import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import {LiveShell} from '../components/LiveShell';
 import { router, useFocusEffect } from 'expo-router';
 import { apiURL, authClient, authenticatedFetch } from '../auth/client';
-import { Button, Card, Notice, styles, colors } from '../components/ui';
+import { Button, NavigationItem, Card, Notice, styles, colors } from '../components/ui';
 import { useApp } from '../state';
 import {AccountJournal} from '../components/AccountJournal';
 import {AccountEvents} from '../components/AccountEvents';
@@ -16,9 +16,10 @@ import {AccountReports} from '../components/AccountReports';
 import {AccountReceipts} from '../components/AccountReceipts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {resolveSelection, parseAccess, selectionKey, type Access, type Selection} from '../domain/live-navigation';
+import {defaultJournalFilters} from '../domain/journal-filters';
 import categories from '../data/accountant-categories.json';
-export type LiveSection='insights'|'journal'|'events'|'reconciliation'|'operations'|'receipts'|'mapping'|'settings'|'reports';
-const routes:Record<LiveSection,string>={insights:'/',journal:'/transactions',events:'/crm',reconciliation:'/bank',operations:'/operations',receipts:'/receipts',mapping:'/mapping',settings:'/settings',reports:'/reports'};
+export type LiveSection='insights'|'journal'|'refunds'|'expenses'|'events'|'reconciliation'|'operations'|'receipts'|'mapping'|'settings'|'reports';
+const routes:Record<LiveSection,string>={insights:'/',journal:'/transactions',refunds:'/refunds',expenses:'/expenses',events:'/crm',reconciliation:'/bank',operations:'/operations',receipts:'/receipts',mapping:'/mapping',settings:'/settings',reports:'/reports'};
 export default function Workspace({initialSection='insights'}:{initialSection?:LiveSection}) {
   const {t,locale,offline}=useApp();
   const [email,setEmail]=useState(''),[password,setPassword]=useState('');
@@ -27,7 +28,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   const [expired,setExpired]=useState(false);
   const [administration,setAdministration]=useState<string|null|undefined>(undefined);
   const section=initialSection;
-  const sectionTitle={insights:t('insightsTitle'),journal:t('journalTitle'),events:t('crm'),reconciliation:t('reconciliationTitle'),operations:locale==='ru'?'Новая операция':'New operation',receipts:locale==='ru'?'Чеки':'Receipts',mapping:t('mapping'),settings:t('settings'),reports:'Financial Statement'}[section];
+  const sectionTitle={insights:t('insightsTitle'),journal:t('journalTitle'),refunds:locale==='ru'?'Возвраты и корректировки':'Refunds & Adjustments',expenses:locale==='ru'?'Расходы бизнеса':'Business Expenses',events:t('crm'),reconciliation:t('reconciliationTitle'),operations:locale==='ru'?'Новая операция':'New operation',receipts:locale==='ru'?'Чеки':'Receipts',mapping:t('mapping'),settings:t('settings'),reports:'Financial Statement'}[section];
   const setSection=(next:LiveSection)=>router.replace(routes[next] as '/');
   const [selectionError,setSelectionError]=useState(false);
   const [chooseAccount,setChooseAccount]=useState(false);
@@ -86,16 +87,18 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
     } catch {if(version===requestVersion.current)setError(t('authLogoutFailed'));}
     finally {if(version===requestVersion.current)setBusy(false);}
   }
-  const navigation=(close:()=>void)=>access&&selected?(        <View style={{gap:8}}>
-          <Button label={t('insightsTitle')} selected={section==='insights'} onPress={() => {setSection('insights');close();}}/>
-          <Button label={t('journalTitle')} selected={section==='journal'} onPress={() => {setSection('journal');close();}}/>
-          <Button label={t('crm')} selected={section==='events'} onPress={() => {setSection('events');close();}}/>
-          <Button label={t('bank')+' / '+t('reconcile')} selected={section==='reconciliation'} onPress={() => {setSection('reconciliation');close();}}/>
-          {access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'&&<Button label="Financial Statement" selected={section==='reports'} onPress={() => {setSection('reports');close();}}/>}
-          <Button label={t('mapping')} selected={section==='mapping'} onPress={() => {setSection('mapping');close();}}/>
-          <Button label={t('settings')} selected={section==='settings'} onPress={() => {setSection('settings');close();}}/>
-          <Button label={locale==='ru'?'Чеки':'Receipts'} selected={section==='receipts'} onPress={() => {setSection('receipts');close();}}/>
-          {['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')&&<Button label={locale==='ru'?'Новая операция':'New operation'} selected={section==='operations'} onPress={() => {setSection('operations');close();}}/>}
+  const navigation=(close:()=>void)=>access&&selected?(        <View style={{gap:0}}>
+          <NavigationItem label={t('overview')} selected={section==='insights'} onPress={() => {setSection('insights');close();}}/>
+          <NavigationItem label={t('journalTitle')} selected={section==='journal'} onPress={() => {setSection('journal');close();}}/>
+          <NavigationItem label={t('crm')} selected={section==='events'} onPress={() => {setSection('events');close();}}/>
+          <NavigationItem label={locale==='ru'?'Возвраты и корректировки':'Refunds & Adjustments'} selected={section==='refunds'} onPress={()=>{setSection('refunds');close();}}/>
+          <NavigationItem label={locale==='ru'?'Расходы бизнеса':'Business Expenses'} selected={section==='expenses'} onPress={()=>{setSection('expenses');close();}}/>
+          <NavigationItem label={t('bank')+' / '+t('reconcile')} selected={section==='reconciliation'} onPress={() => {setSection('reconciliation');close();}}/>
+          {access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'&&<NavigationItem label="Financial Statement" selected={section==='reports'} onPress={() => {setSection('reports');close();}}/>}
+          <NavigationItem label={t('mapping')} selected={section==='mapping'} onPress={() => {setSection('mapping');close();}}/>
+          <NavigationItem label={t('settings')} selected={section==='settings'} onPress={() => {setSection('settings');close();}}/>
+          <NavigationItem label={locale==='ru'?'Чеки':'Receipts'} selected={section==='receipts'} onPress={() => {setSection('receipts');close();}}/>
+          {['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')&&<NavigationItem label={locale==='ru'?'Новая операция':'New operation'} selected={section==='operations'} onPress={() => {setSection('operations');close();}}/>}
         </View>):null;
   return <LiveShell access={access} selected={selected} title={access?(section==='insights'?t('overview'):sectionTitle):t('authSignIn')} navigation={navigation} onSelect={selectAccount} onSignOut={()=>void signOut()} onAccounts={()=>setChooseAccount(value=>!value)} busy={busy}>
 
@@ -141,8 +144,8 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
           section==='operations'&&!['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')?<Notice error text={t('journalAccessLost')}/>:section==='operations'?<ManualOperationForm user={access.user.id} key={`${access.user.id}:${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account} accounts={access.workspaces.find(space=>space.id===selected.workspace)?.accounts||[]} onSaved={()=>setSection('journal')} onSessionExpired={sessionExpired}/>:
           section==='reconciliation'?<AccountReconciliation canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} key={`${selected.workspace}:${selected.account}`} name={selected.name} workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
           section==='insights'?<AccountInsights key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
-          workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired} onEvents={()=>setSection('events')}/>:
-          section==='journal'?<AccountJournal key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
+          workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired} onEvents={()=>setSection('events')} onReports={()=>setSection('reports')} onBank={()=>setSection('reconciliation')} onReceipts={()=>setSection('receipts')}/>:
+          ['journal','refunds','expenses'].includes(section)?<AccountJournal initialFilters={{...defaultJournalFilters,code:section==='refunds'?'refunds':section==='expenses'?'expenses':'all'}} key={`${selected.workspace}:${selected.account}:${section}`} name={selected.name} currency={selected.currency}
           workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
           <AccountEvents key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
             workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>}
