@@ -1,1 +1,2 @@
-export {default} from '../screens/Overview';
+// Legacy bookmarks open the authenticated workspace, never sample finances.
+export {default} from '../screens/Workspace';

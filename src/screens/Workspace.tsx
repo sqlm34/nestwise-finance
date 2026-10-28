@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
+import {LiveShell} from '../components/LiveShell';
 import { router, useFocusEffect } from 'expo-router';
 import { apiURL, authClient, authenticatedFetch } from '../auth/client';
 import { Button, Card, Notice, styles, colors } from '../components/ui';
@@ -20,7 +20,7 @@ import categories from '../data/accountant-categories.json';
 export type LiveSection='insights'|'journal'|'events'|'reconciliation'|'operations'|'receipts'|'mapping'|'settings'|'reports';
 const routes:Record<LiveSection,string>={insights:'/',journal:'/transactions',events:'/crm',reconciliation:'/bank',operations:'/operations',receipts:'/receipts',mapping:'/mapping',settings:'/settings',reports:'/reports'};
 export default function Workspace({initialSection='insights'}:{initialSection?:LiveSection}) {
-  const {t,locale,setLocale,offline}=useApp();
+  const {t,locale,offline}=useApp();
   const [email,setEmail]=useState(''),[password,setPassword]=useState('');
   const [access,setAccess]=useState<Access|null>(null),[busy,setBusy]=useState(!!apiURL),[error,setError]=useState('');
   const [selected,setSelected]=useState<Selection|null>(null);
@@ -86,10 +86,21 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
     } catch {if(version===requestVersion.current)setError(t('authLogoutFailed'));}
     finally {if(version===requestVersion.current)setBusy(false);}
   }
-  return <SafeAreaView style={{flex:1,backgroundColor:colors.bg}}>
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:24,gap:20,maxWidth:1100,width:'100%',alignSelf:'center'}}>
-      <View style={styles.between}><Text style={styles.title}>nestwise</Text><Button label={locale==='ru'?'EN':'RU'} onPress={()=>setLocale(locale==='ru'?'en':'ru')}/></View>
-      <Card><Text accessibilityRole="header" style={styles.title}>{access?sectionTitle:t('authSignIn')}</Text>
+  const navigation=access&&selected?(        <View style={{gap:8}}>
+          <Button label={t('insightsTitle')} selected={section==='insights'} onPress={()=>setSection('insights')}/>
+          <Button label={t('journalTitle')} selected={section==='journal'} onPress={()=>setSection('journal')}/>
+          <Button label={t('crm')} selected={section==='events'} onPress={()=>setSection('events')}/>
+          <Button label={t('bank')+' / '+t('reconcile')} selected={section==='reconciliation'} onPress={()=>setSection('reconciliation')}/>
+          {access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'&&<Button label="Financial Statement" selected={section==='reports'} onPress={()=>setSection('reports')}/>}
+          <Button label={t('mapping')} selected={section==='mapping'} onPress={()=>setSection('mapping')}/>
+          <Button label={t('settings')} selected={section==='settings'} onPress={()=>setSection('settings')}/>
+          <Button label={locale==='ru'?'Чеки':'Receipts'} selected={section==='receipts'} onPress={()=>setSection('receipts')}/>
+          {['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')&&<Button label={locale==='ru'?'Новая операция':'New operation'} selected={section==='operations'} onPress={()=>setSection('operations')}/>}
+        </View>):null;
+  return <LiveShell access={access} selected={selected} title={access?sectionTitle:t('authSignIn')} navigation={navigation} onSelect={selectAccount} onSignOut={()=>void signOut()} busy={busy}>
+
+
+      {(!access||busy||!!error||offline||selectionError||expired)&&<Card>
         {!access&&<Text style={styles.muted}>{t('authHint')}</Text>}
         {!apiURL&&<Notice text={t('authNotConfigured')}/>}
         {!!error&&<Notice error text={error==='authUnavailable'?t('authUnavailable'):error}/>}
@@ -109,7 +120,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
           <Button label={t('authSignIn')} primary disabled={busy||!apiURL||!email||!password} onPress={()=>void signIn()}/>
           <Button label={t('inviteTitle')} disabled={busy} onPress={()=>router.push('/activate')}/>
         </>}
-      </Card>
+      </Card>}
       {access&&(!selected||chooseAccount)&&<Card><Text style={styles.h2}>{t('authSpaces')}</Text>
         <Button label={locale==='ru'?'Новое пространство':'New workspace'} onPress={()=>setAdministration(null)}/>
         {access.workspaces.length===0&&<Notice text={t('authNoAccess')}/>}
@@ -122,18 +133,8 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
       </Card>}
       {access&&administration!==undefined&&<WorkspaceAdministration key={administration||'new'} workspace={administration} onChanged={refreshAccess} onSessionExpired={sessionExpired}/>}
       {access&&selected&&!busy&&<>
-        <Card><Button label={locale==='ru'?'Сменить счёт / управление':'Change account / manage'} onPress={()=>setChooseAccount(value=>!value)}/><Text accessibilityRole="header" style={styles.h2}>{selected.name} · {selected.currency}</Text><Text style={styles.muted}>{locale==='ru'?'Рабочие данные выбранного счёта. Смена счёта закрывает текущую форму.':'Live data for the selected account. Changing accounts closes the current form.'}</Text></Card>
-        <View style={styles.row}>
-          <Button label={t('insightsTitle')} selected={section==='insights'} onPress={()=>setSection('insights')}/>
-          <Button label={t('journalTitle')} selected={section==='journal'} onPress={()=>setSection('journal')}/>
-          <Button label={t('crm')} selected={section==='events'} onPress={()=>setSection('events')}/>
-          <Button label={t('bank')+' / '+t('reconcile')} selected={section==='reconciliation'} onPress={()=>setSection('reconciliation')}/>
-          {access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'&&<Button label="Financial Statement" selected={section==='reports'} onPress={()=>setSection('reports')}/>}
-          <Button label={t('mapping')} selected={section==='mapping'} onPress={()=>setSection('mapping')}/>
-          <Button label={t('settings')} selected={section==='settings'} onPress={()=>setSection('settings')}/>
-          <Button label={locale==='ru'?'Чеки':'Receipts'} selected={section==='receipts'} onPress={()=>setSection('receipts')}/>
-          {['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')&&<Button label={locale==='ru'?'Новая операция':'New operation'} selected={section==='operations'} onPress={()=>setSection('operations')}/>}
-        </View>
+        <View style={styles.row}><Button label={locale==='ru'?'Счета и пространства':'Accounts and workspaces'} onPress={()=>setChooseAccount(value=>!value)}/></View>
+
         {['insights','settings','journal'].includes(section)&&<OperationRecovery key={`${access.user.id}:${selected.workspace}:${selected.account}`} user={access.user.id} workspace={selected.workspace} account={selected.account} onOpen={()=>setSection('operations')}/>}
         {section==='reports'?(access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'?<AccountReports personalAccounts={access.workspaces.filter(w=>['personal','family'].includes(w.kind||'')&&['owner','accountant'].includes(w.role)).flatMap(w=>w.accounts.map(a=>({workspace:w.id,account:a.id,name:w.name+' · '+a.name})))} key={`${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account} canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} onSessionExpired={sessionExpired}/>:<Notice text={locale==='ru'?'Форма только для бизнеса Aksenov LLC.':'This form is for the Aksenov LLC business only.'}/>):section==='mapping'?<Card><Text accessibilityRole="header" style={styles.h2}>{t('mapping')}</Text><Notice text={t('mappingHint')}/><Notice text={locale==='ru'?'Категории используются для Statement. Они не определяют налоговые вычеты; согласование в приложении не требуется.':'Categories organize the Statement. They do not determine tax deductions; no in-app approval is required.'}/>{categories.categories.map(row=><View key={row.id} style={{gap:4,paddingVertical:8}}><Text style={styles.text}>{row[locale]}</Text><Text style={styles.muted}>{row.id} · {row.en}</Text></View>)}</Card>:
           section==='settings'?<Card><Text style={styles.h2}>{t('settings')}</Text><Text style={styles.muted}>{t('privacyHint')}</Text><Button label={locale==='ru'?'Обновить доступ':'Refresh access'} onPress={refreshAccess}/></Card>:
@@ -147,7 +148,6 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
           <AccountEvents key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
             workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>}
       </>}
-      <Button label={t('authDemoBack')} onPress={()=>router.push('/demo')}/>
-    </ScrollView>
-  </SafeAreaView>;
+
+    </LiveShell>;
 }
