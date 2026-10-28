@@ -3,7 +3,7 @@ import {ActivityIndicator,Text,TextInput,View} from 'react-native';
 import {Button,Card,Notice,SearchField,styles} from './ui';
 import {useApp,type PreviewFile} from '../state';
 import {previewStatement} from '../domain/statement';
-import {bankAmount,bankWindow,cashAmount,createDraft,eligibleBankRows,parseCandidates,reconciliationSample,suggestGroups,type Candidate,type DraftGroup} from '../domain/reconciliation';
+import {bankAmount,bankWindow,cashAmount,createDraft,eligibleBankRows,parseCandidates,suggestGroups,type Candidate,type DraftGroup} from '../domain/reconciliation';
 import {insightMoney,type Period} from '../domain/period-insights';
 import {readStatementFile} from '../statement-file';
 import {authenticatedFetch} from '../auth/client';
@@ -22,7 +22,7 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
   const [archiveHash,setArchiveHash]=useState<string|null>(null);
   const [archiveEvidence,setArchiveEvidence]=useState<{hash:string;revision:number;data:EvidenceReview|null}|null>(null);
   const [original,setOriginal]=useState<{hash:string;bytes:Uint8Array}|null>(null);
-  const [file,setFile]=useState<PreviewFile|null>(null),[alias,setAlias]=useState('');
+  const [file,setFile]=useState<PreviewFile|null>(null),[alias,setAlias]=useState(name);
   const [loading,setLoading]=useState(false),[error,setError]=useState<MessageKey|null>(null);
   const [selected,setSelected]=useState<number[]>([]),[chosen,setChosen]=useState<string[]>([]);
   const [groups,setGroups]=useState<DraftGroup[]>([]),[search,setSearch]=useState(''),[page,setPage]=useState(0);
@@ -47,12 +47,12 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
   try{if(evidenceReady)draft=createDraft(rows,selected,candidates,chosen,[...groups,{rows:lockedRows,transactions:lockedIds,cents:'0'}]);}catch{/* Incomplete or ambiguous selections stay unconfirmed. */}
   let period:Period|null=null;try{period=bankWindow(bank);}catch{/* Select at most 20 nearby rows. */}
   const resetSelection=()=>{setSelected([]);setChosen([]);setRequest(null);setResult(null);setCandidatePage(0);};
-  async function load(sample:boolean){
+  async function load(){
     setLoading(true);setError(null);
     try{
-      const loaded=await readStatementFile(sample?reconciliationSample:undefined);if(!loaded||!mounted.current)return;
-      const preview=previewStatement(loaded.text,'chase',sample?'DEMO · 1234':alias);
-      setArchiveHash(null);setArchiveEvidence(null);setOriginal({hash:loaded.hash,bytes:loaded.bytes});setFile({name:loaded.name,hash:loaded.hash,preview,sample});setGroups([]);setSavedLocal([]);resetSelection();setSearch('');setPage(0);
+      const loaded=await readStatementFile();if(!loaded||!mounted.current)return;
+      const preview=previewStatement(loaded.text,'chase',alias);
+      setArchiveHash(null);setArchiveEvidence(null);setOriginal({hash:loaded.hash,bytes:loaded.bytes});setFile({name:loaded.name,hash:loaded.hash,preview,sample:false});setGroups([]);setSavedLocal([]);resetSelection();setSearch('');setPage(0);
     }catch(cause){if(mounted.current){const message=cause instanceof Error?cause.message:'';setError(message in messages.en?message as MessageKey:'importError');}}
     finally{if(mounted.current)setLoading(false);}
   }
@@ -98,9 +98,9 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
       <Text style={styles.muted}>{say('UTF-8 CSV, up to 2 MB / 5,000 rows. Date, Description, Amount or Debit/Credit columns. Dates: YYYY-MM-DD or MM/DD/YYYY. PDF/OCR is not supported.','CSV UTF-8, до 2 МБ / 5 000 строк. Колонки Date, Description, Amount либо Debit/Credit. Даты: YYYY-MM-DD или MM/DD/YYYY. PDF/OCR пока не поддерживается.')}</Text>
       {!file?<>
         <TextInput accessibilityLabel={t('alias')} value={alias} onChangeText={setAlias} maxLength={60} style={styles.input} placeholder={t('aliasHint')}/>
-        <View style={styles.row}><Button label={t('upload')} disabled={loading||!alias.trim()} onPress={()=>void load(false)}/><Button label={say('Load DEMO statement','Открыть DEMO-выписку')} disabled={loading} onPress={()=>void load(true)}/></View>
+        <View style={styles.row}><Button label={t('upload')} disabled={loading||!alias.trim()} onPress={()=>void load()}/></View>
       </>:<>
-        <Text style={styles.h2}>{file.name}</Text><Text style={styles.text}>{file.sample?'DEMO · ':''}{file.preview.accountAlias} · {rows.length} {t('rows')}</Text>
+        <Text style={styles.h2}>{file.name}</Text><Text style={styles.text}>{file.preview.accountAlias} · {rows.length} {t('rows')}</Text>
         <Text selectable style={styles.muted}>SHA-256: {file.hash}</Text>
         <Button label={say('Discard file and all drafts','Удалить файл из просмотра и все черновики')} onPress={()=>{setFile(null);setOriginal(null);setArchiveHash(null);setArchiveEvidence(null);setGroups([]);resetSelection();setError(null);}}/>
       </>}
