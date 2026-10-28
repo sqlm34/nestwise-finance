@@ -31,7 +31,7 @@ export function LiveShell({children,access,selected,title,navigation,onSelect,on
       {access&&!wide&&<Pressable accessibilityRole="button" accessibilityLabel={t('menu')} onPress={()=>setMenu(true)} style={{padding:10}}><Menu size={23} color={colors.ink}/></Pressable>}
       <Text numberOfLines={1} style={[styles.muted,{flex:1}]}>{space?`${space.name} / ${title}`:'nestwise'}</Text>
      </View>
-     {access&&selected&&wide&&<Badge>{locale==='ru'?'Рабочий аккаунт':'Live account'}</Badge>}
+     {access&&selected&&wide&&<View><Badge>{locale==='ru'?'Рабочий аккаунт':'Live account'}</Badge></View>}
      {access&&selected&&wide&&<Button label={`${selected.name} ▾`} onPress={()=>setAccounts(true)}/>}
      <Button label={locale==='ru'?'Русский ▾':'English ▾'} onPress={()=>setLocale(locale==='ru'?'en':'ru')}/>
     </View>
