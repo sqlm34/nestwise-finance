@@ -51,7 +51,7 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
     {data&&metrics&&prior&&<>
       <Text style={styles.muted}>{data.current.from} — {data.current.to}</Text>
       <View style={{flexDirection:'row',flexWrap:'wrap',gap:width<=720?9:14}}>{primaryMetrics.map(metric=>{return <Pressable key={metric} accessibilityRole="button" accessibilityLabel={`${t(labels[metric])}: ${insightMoney(metrics[metric],locale)}. ${t('insightsShowLines')}`} onPress={()=>openJournal(data.current,journalCodes.includes(metric as JournalCode)?metric as JournalCode:'all')} style={{flexBasis:width<=1020?'44%':'22%',flexGrow:1,minWidth:130,gap:10,padding:width<=720?15:21,borderRadius:17,borderWidth:1,borderColor:colors.line,backgroundColor:'#fff'}}>
-        <Text style={[styles.muted,{color:colors.muted}]}>{t(compactLabels[metric])}</Text>
+        <Text style={[styles.muted,{color:colors.muted}]}>{metric==='recorded_difference'?(locale==='ru'?'Операционный результат':'Operating result'):t(compactLabels[metric])}</Text>
         <Text adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={1} style={{fontSize:width<=720?22:27,fontWeight:'800',letterSpacing:-1,fontVariant:['tabular-nums'],color:colors.ink}}>{insightMoney(metrics[metric],locale).replace(/ USD$/,'')}</Text>
         <Text style={{fontSize:11,color:'#81928a'}}>{currency}</Text>
       </Pressable>;})}</View>

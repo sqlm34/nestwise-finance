@@ -89,14 +89,14 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   }
   const navigation=(close:()=>void)=>access&&selected?(        <View style={{gap:0}}>
           <NavigationItem label={t('overview')} selected={section==='insights'} onPress={() => {setSection('insights');close();}}/>
-          <NavigationItem label={t('journalTitle')} selected={section==='journal'} onPress={() => {setSection('journal');close();}}/>
+          <NavigationItem label={locale==='ru'?'Операции':'Transactions'} selected={section==='journal'} onPress={() => {setSection('journal');close();}}/>
           <NavigationItem label={t('crm')} selected={section==='events'} onPress={() => {setSection('events');close();}}/>
           <NavigationItem label={locale==='ru'?'Возвраты и корректировки':'Refunds & Adjustments'} selected={section==='refunds'} onPress={()=>{setSection('refunds');close();}}/>
           <NavigationItem label={locale==='ru'?'Расходы бизнеса':'Business Expenses'} selected={section==='expenses'} onPress={()=>{setSection('expenses');close();}}/>
           <NavigationItem label={t('bank')+' / '+t('reconcile')} selected={section==='reconciliation'} onPress={() => {setSection('reconciliation');close();}}/>
-          {access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'&&<NavigationItem label="Financial Statement" selected={section==='reports'} onPress={() => {setSection('reports');close();}}/>}
-          <NavigationItem label={t('mapping')} selected={section==='mapping'} onPress={() => {setSection('mapping');close();}}/>
-          <NavigationItem label={t('settings')} selected={section==='settings'} onPress={() => {setSection('settings');close();}}/>
+          {access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'&&<NavigationItem label={locale==='ru'?'Налоговый центр / PDF':'Tax Center / PDF'} selected={section==='reports'} onPress={() => {setSection('reports');close();}}/>}
+          <NavigationItem label={locale==='ru'?'Налоговые категории':'Tax Categories'} selected={section==='mapping'} onPress={() => {setSection('mapping');close();}}/>
+          <NavigationItem label={locale==='ru'?'Язык и настройки':'Language & Settings'} selected={section==='settings'} onPress={() => {setSection('settings');close();}}/>
           <NavigationItem label={locale==='ru'?'Чеки':'Receipts'} selected={section==='receipts'} onPress={() => {setSection('receipts');close();}}/>
           {['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')&&<NavigationItem label={locale==='ru'?'Новая операция':'New operation'} selected={section==='operations'} onPress={() => {setSection('operations');close();}}/>}
         </View>):null;
