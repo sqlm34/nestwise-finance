@@ -57,10 +57,10 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
         <Text style={{fontSize:10,color:dark?'#a6d4b8':colors.muted}}>{currency}</Text>
       </Pressable>;})}</View>
       <Text style={[styles.muted,{fontSize:11}]}>{locale==='ru'?'По проведённым операциям. Результат — разница поступлений и учтённых расходов, не остаток банка.':'Posted transactions only. Result is receipts less recorded expenses, not a bank balance.'}</Text>
-      <Card><View style={styles.between}><Text style={styles.h2}>{t('journalTitle')}</Text><Button label={t('viewAll')} onPress={()=>openJournal(data.current)}/></View>
-       <Text style={styles.text}>{t('insightsTransactions')}: {data.current.transaction_count}</Text>
-       <View style={styles.row}><Button label={t('crm')} onPress={onEvents}/><Button label={t('insightsRefresh')} disabled={busy} onPress={()=>apply(request.period)}/></View>
-      </Card>
+      <View style={{flexDirection:width>=1200?'row':'column',gap:20}}>
+       <View style={{flex:1.7}}><AccountJournal compact key={`${request.period.from}:${request.period.to}:${request.revision}`} workspace={workspace} account={account} name={name} currency={currency} onSessionExpired={onSessionExpired} initialFilters={{...defaultJournalFilters,...request.period,basis:'paid'}} onViewAll={()=>openJournal(data.current)}/></View>
+       <View style={{flex:1}}><Card style={{backgroundColor:'#eef4ee'}}><Text style={styles.h2}>{t('crm')}</Text><Text style={styles.text}>{t('insightsTransactions')}: {data.current.transaction_count}</Text><Text style={styles.muted}>{t('provenanceWaiting')}: {data.attention.waiting} · {t('provenanceReview')}: {data.attention.needs_review}</Text><Button label={t('eventsTitle')} onPress={onEvents}/><Button label={t('insightsRefresh')} disabled={busy} onPress={()=>apply(request.period)}/></Card></View>
+      </View>
     </>}
     {busy&&<ActivityIndicator color={colors.green} accessibilityLabel={t('authLoading')}/>}
     {!busy&&result?.error&&<Notice error text={t(result.error)}/>}
