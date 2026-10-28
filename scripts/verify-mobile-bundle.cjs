@@ -7,7 +7,7 @@ function inspectSourceMap(map) {
     return map.sections.flatMap(section => inspectSourceMap(section.map));
   }
   if (!Array.isArray(map.sources) || !map.sources.length || map.sources.some(s => typeof s !== 'string')) throw new Error('Source map has no valid source evidence');
-  const forbidden = map.sources.filter(source => /(?:^|\/)node_modules\/(braces|node-forge|uuid)\//.test(source.replace(/\\/g, '/')));
+  const forbidden = map.sources.filter(source => /(?:^|\/)node_modules\/(braces|node-forge|uuid|deepmerge)\//.test(source.replace(/\\/g, '/')));
   if (forbidden.length) throw new Error('Reviewed build-tool packages entered a mobile bundle; reassess exposure');
   return map.sources;
 }

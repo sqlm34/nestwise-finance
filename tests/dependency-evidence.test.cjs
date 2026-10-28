@@ -27,7 +27,7 @@ test('clean audit remains distinct from production authorization', () => {
   assert.equal(result.auditClean,true); assert.equal(result.productionApproved,false);
 });
 test('source maps reject build-tool code on both path separators', () => {
-  for (const source of ['node_modules/braces/index.js','C:\\repo\\node_modules\\node-forge\\lib\\rsa.js','../node_modules/xcode/node_modules/uuid/index.js']) {
+  for (const source of ['node_modules/deepmerge/dist/cjs.js','node_modules/braces/index.js','C:\\repo\\node_modules\\node-forge\\lib\\rsa.js','../node_modules/xcode/node_modules/uuid/index.js']) {
     assert.throws(() => inspectSourceMap({version:3,sources:[source]}));
   }
 });
