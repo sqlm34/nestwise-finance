@@ -1,5 +1,6 @@
 import React,{useEffect,useState} from 'react';
-import {ActivityIndicator,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Pressable,Text,TextInput,View,useWindowDimensions} from 'react-native';
+import {ArrowDownLeft,Leaf,RotateCcw,Wrench} from 'lucide-react-native';
 import {Button,Card,Notice,styles,colors} from './ui';
 import {useApp} from '../state';
 import {authenticatedFetch} from '../auth/client';
@@ -9,9 +10,13 @@ import {metricKeys,periodPreset,validatePeriod,parsePeriodInsights,periodMetrics
 import {AccountJournal} from './AccountJournal';
 import type {MessageKey} from '../i18n';
 const labels:Record<Metric,MessageKey>={receipts:'insightsReceipts',refunds:'journalRefunds',net_receipts:'insightsNetReceipts',parts_cost:'insightsParts',fees:'journalFees',recorded_difference:'insightsDifference',clearing:'insightsClearing',parts_payable:'insightsPayable',expenses:'journalExpenses',transfers:'journalTransfers'};
-const primaryMetrics:Metric[]=['receipts','parts_cost','fees','recorded_difference'];
+const primaryMetrics=['receipts','refunds','parts_cost','recorded_difference'] as const;
+const compactLabels={receipts:'revenue',refunds:'refunds',parts_cost:'parts',recorded_difference:'result'} as const;
+const metricIcons={receipts:ArrowDownLeft,refunds:RotateCcw,parts_cost:Wrench,recorded_difference:Leaf};
 export function AccountInsights({workspace,account,name,currency,onSessionExpired,onEvents}:{workspace:string;account:string;name:string;currency:string;onSessionExpired:()=>void;onEvents:()=>void}){
   const {t,locale}=useApp();
+  const {width}=useWindowDimensions();
+  const [details,setDetails]=useState(false);
   const [period,setPeriod]=useState<Period>(()=>periodPreset('month'));
   const [request,setRequest]=useState(()=>({period,revision:0}));
   const [result,setResult]=useState<{request:typeof request;data:PeriodInsights|null;error:MessageKey|null}|null>(null);
@@ -40,18 +45,27 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
     <AccountJournal key={`${drill.from}:${drill.to}:${drill.code}`} workspace={workspace} account={account} name={name} currency={currency} initialFilters={drill} onSessionExpired={onSessionExpired}/>
   </>;
   const metrics=data?periodMetrics(data.current):null,prior=data?periodMetrics(data.previous):null;
-  return <Card>
-    <Text accessibilityRole="header" style={styles.h2}>{t('insightsTitle')}</Text>
-    <Text style={styles.text}>{name} · {currency}</Text>
+  return <View style={{gap:20}}>
+    <View style={styles.between}><Text style={styles.h2}>{name}</Text>
+      <View style={[styles.row,{gap:6}]}>{(['month','year'] as const).map(kind=><Button key={kind} label={t(kind)} disabled={busy} onPress={()=>{const next=periodPreset(kind);setPeriod(next);apply(next);}}/>)}</View></View>
     {data&&metrics&&prior&&<>
       <Text style={styles.muted}>{data.current.from} — {data.current.to}</Text>
-      <View style={{flexDirection:'row',flexWrap:'wrap',gap:14}}>{primaryMetrics.map(metric=><View key={metric} style={{flexBasis:220,flexGrow:1,gap:10,padding:18,borderRadius:14,backgroundColor:metric==='recorded_difference'?colors.ink:colors.pale}}>
-        <Text style={[styles.text,{color:metric==='recorded_difference'?'#fff':colors.ink}]}>{t(labels[metric])}</Text>
-        <Text style={[styles.title,{color:metric==='recorded_difference'?'#fff':colors.ink}]}>{insightMoney(metrics[metric],locale)}</Text>
-        <Text style={[styles.muted,{color:metric==='recorded_difference'?'#c8dfd0':colors.muted}]}>{t('insightsPrevious')}: {insightMoney(prior[metric],locale)} · {t('insightsChange')}: {insightMoney(metrics[metric]-prior[metric],locale)}</Text>
-        {journalCodes.includes(metric as JournalCode)&&<Button label={t('insightsShowLines')} onPress={()=>openJournal(data.current,metric as JournalCode)}/>}
-      </View>)}</View>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:14}}>{primaryMetrics.map(metric=>{const Icon=metricIcons[metric],dark=metric==='recorded_difference';return <Pressable key={metric} accessibilityRole="button" accessibilityLabel={`${t(labels[metric])}: ${insightMoney(metrics[metric],locale)}. ${t('insightsShowLines')}`} onPress={()=>openJournal(data.current,journalCodes.includes(metric as JournalCode)?metric as JournalCode:'all')} style={{flexBasis:width<550?'44%':190,flexGrow:1,minWidth:130,gap:10,padding:width<550?16:22,borderRadius:18,borderWidth:1,borderColor:dark?colors.ink:colors.line,backgroundColor:dark?colors.ink:'#fff'}}>
+        <Icon size={18} color={dark?'#a6d4b8':colors.green}/>
+        <Text style={[styles.muted,{color:dark?'#c8dfd0':colors.muted}]}>{t(compactLabels[metric])}</Text>
+        <Text adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={1} style={{fontSize:width<550?23:29,fontWeight:'600',letterSpacing:-1,fontVariant:['tabular-nums'],color:dark?'#fff':colors.ink}}>{insightMoney(metrics[metric],locale).replace(/ USD$/,'')}</Text>
+        <Text style={{fontSize:10,color:dark?'#a6d4b8':colors.muted}}>{currency}</Text>
+      </Pressable>;})}</View>
+      <Text style={[styles.muted,{fontSize:11}]}>{locale==='ru'?'По проведённым операциям. Результат — разница поступлений и учтённых расходов, не остаток банка.':'Posted transactions only. Result is receipts less recorded expenses, not a bank balance.'}</Text>
+      <View style={{flexDirection:width>=1200?'row':'column',gap:20}}>
+       <View style={{flex:1.7}}><AccountJournal compact key={`${request.period.from}:${request.period.to}:${request.revision}`} workspace={workspace} account={account} name={name} currency={currency} onSessionExpired={onSessionExpired} initialFilters={{...defaultJournalFilters,...request.period,basis:'paid'}} onViewAll={()=>openJournal(data.current)}/></View>
+       <View style={{flex:1}}><Card style={{backgroundColor:'#eef4ee'}}><Text style={styles.h2}>{t('crm')}</Text><Text style={styles.text}>{t('insightsTransactions')}: {data.current.transaction_count}</Text><Text style={styles.muted}>{t('provenanceWaiting')}: {data.attention.waiting} · {t('provenanceReview')}: {data.attention.needs_review}</Text><Button label={t('eventsTitle')} onPress={onEvents}/><Button label={t('insightsRefresh')} disabled={busy} onPress={()=>apply(request.period)}/></Card></View>
+      </View>
     </>}
+    {busy&&<ActivityIndicator color={colors.green} accessibilityLabel={t('authLoading')}/>}
+    {!busy&&result?.error&&<Notice error text={t(result.error)}/>}
+    <Button label={details?(locale==='ru'?'Скрыть подробности':'Hide details'):(locale==='ru'?'Подробности и свой период':'Details and custom dates')} selected={details} onPress={()=>setDetails(value=>!value)}/>
+    {details&&<Card>
     <Notice text={t('insightsScope')}/>
     <View style={styles.row}>{(['month','quarter','year'] as const).map(kind=><Button key={kind} label={t(({month:'insightsMonth',quarter:'insightsQuarter',year:'insightsYear'} as const)[kind])}
       disabled={busy} onPress={()=>{const next=periodPreset(kind);setPeriod(next);apply(next);}}/>)}</View>
@@ -82,7 +96,7 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
       <Text style={styles.muted}>{t('insightsAttentionScope')}</Text>
       <Text style={styles.text}>{t('insightsMissingPaid')}: {data.current.missing_paid_date}</Text>
       <Button label={t('eventsTitle')} onPress={onEvents}/>
-      <View style={{flexDirection:'row',flexWrap:'wrap',gap:14}}>{metricKeys.filter(metric=>!primaryMetrics.includes(metric)).map(metric=><View key={metric} style={{gap:8,padding:20,borderWidth:1,borderRadius:14,borderColor:colors.line,flexBasis:260,flexGrow:1,backgroundColor:metric==='recorded_difference'?colors.pale:'#fff'}}>
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:14}}>{metricKeys.filter(metric=>!(primaryMetrics as readonly Metric[]).includes(metric)).map(metric=><View key={metric} style={{gap:8,padding:20,borderWidth:1,borderRadius:14,borderColor:colors.line,flexBasis:260,flexGrow:1,backgroundColor:metric==='recorded_difference'?colors.pale:'#fff'}}>
         <Text style={styles.h2}>{t(labels[metric])}</Text><Text style={styles.title}>{insightMoney(metrics[metric],locale)}</Text>
         <Text style={styles.muted}>{t('insightsPrevious')}: {insightMoney(prior[metric],locale)} · {t('insightsChange')}: {insightMoney(metrics[metric]-prior[metric],locale)}</Text>
         {journalCodes.includes(metric as JournalCode)&&<Button label={t('insightsShowLines')} onPress={()=>openJournal(data.current,metric as JournalCode)}/>}
@@ -99,5 +113,6 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
       </View>;})}
       <Text style={styles.muted}>{t('insightsLive')}</Text>
     </>}
-  </Card>;
+    </Card>}
+  </View>;
 }

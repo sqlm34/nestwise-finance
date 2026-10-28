@@ -1,5 +1,5 @@
 import React,{useEffect,useState} from 'react';
-import {ActivityIndicator,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Pressable,Text,TextInput,View} from 'react-native';
 import {Card,Button,Notice,SearchField,styles,colors} from './ui';
 import {useApp} from '../state';
 import {journalCodes,journalDate,journalMoney,type JournalCode} from '../domain/journal';
@@ -13,9 +13,10 @@ const labels:Record<JournalCode,MessageKey>={
   parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',expenses:'journalExpenses',transfers:'journalTransfers',
 };
 type HistoryRequest={filters:JournalFilters;cursors:(string|null)[];revision:number};
-export function AccountJournal({name,currency,workspace,account,onSessionExpired,initialFilters=defaultJournalFilters}:{
+export function AccountJournal({name,currency,workspace,account,onSessionExpired,initialFilters=defaultJournalFilters,compact=false,onViewAll}:{
   name:string;currency:string;workspace:string;account:string;onSessionExpired:()=>void;
   initialFilters?:JournalFilters;
+  compact?:boolean;onViewAll?:()=>void;
 }) {
   const {t,locale}=useApp();
   const [filters,setFilters]=useState(initialFilters);
@@ -52,6 +53,17 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
   if(selectedTransaction)return <JournalDetail key={selectedTransaction} workspace={workspace} account={account}
     transaction={selectedTransaction} currency={currency} name={name} onOpen={setSelectedTransaction} onSessionExpired={onSessionExpired}
     onClose={()=>{setSelectedTransaction(null);setRequest(current=>({...current,revision:current.revision+1}));}}/>;
+  if(compact)return <Card>
+    <View style={styles.between}><Text style={styles.h2}>{t('recent')}</Text>{onViewAll&&<Button label={t('viewAll')} onPress={onViewAll}/>}</View>
+    {busy&&<ActivityIndicator color={colors.green} accessibilityLabel={t('authLoading')}/>}
+    {error&&<Notice error text={t(error)}/>}
+    {page?.entries.length===0&&<Text style={styles.muted}>{t('journalNoMatches')}</Text>}
+    {page?.entries.slice(0,5).map(row=>{const cash=row.entries.filter(line=>line.code==='clearing').reduce((sum,line)=>sum+BigInt(line.cents),0n);return <Pressable key={row.id} accessibilityRole="button" accessibilityLabel={`${t('journalOrder')} ${row.source_order_id}. ${journalMoney(cash.toString(),locale,currency)}`} onPress={()=>setSelectedTransaction(row.id)} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:12,borderTopWidth:1,borderColor:colors.line}}>
+      <View style={{flex:1,gap:3}}><Text numberOfLines={1} style={styles.text}>{row.source_order_id.startsWith('manual:')?(locale==='ru'?'Ручная операция':'Manual operation'):`${t('journalOrder')} ${row.source_order_id}`}</Text><Text style={styles.muted}>{row.paid_at?.slice(0,10)??t('journalNotPaid')}</Text></View>
+      <Text style={[styles.text,{fontWeight:'600',color:cash<0n?colors.red:colors.green}]}>{journalMoney(cash.toString(),locale,currency).replace(/ USD$/,'')}</Text>
+    </Pressable>;})}
+    <Text style={[styles.muted,{fontSize:11}]}>{locale==='ru'?'Изменение клиринга · USD · дата оплаты (UTC)':'Clearing movement · USD · payment date (UTC)'}</Text>
+  </Card>;
   return <Card>
     <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{t('journalTitle')}</Text>
       <Button label={t('journalRefresh')} disabled={busy} onPress={()=>restart(request.filters)}/></View>
