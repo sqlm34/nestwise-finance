@@ -15,7 +15,7 @@ import {SaveDraftButton,SavedReconciliations} from './SavedReconciliations';
 import {BankBooking} from './BankBooking';
 
 const kindLabels:Record<string,MessageKey>={'job.payment_recorded':'eventPayment','job.customer_refund_issued':'eventRefund','job.part_cost_recorded':'eventPart','job.supplier_credit_received':'eventCredit','job.processor_fee_recorded':'provenanceFee','job.processor_fee_refunded':'provenanceFeeRefund','manual.income':'manualIncome','manual.expense':'manualExpense','manual.transfer':'manualTransfer','manual.refund':'manualRefund'};
-export function AccountReconciliation({workspace,account,name,canWrite,onSessionExpired}:{workspace:string;account:string;name:string;canWrite:boolean;onSessionExpired:()=>void}){
+export function AccountReconciliation({workspace,account,name,canWrite,onSessionExpired,savedOnly=false}:{workspace:string;account:string;name:string;canWrite:boolean;savedOnly?:boolean;onSessionExpired:()=>void}){
   const {locale,t}=useApp(),ru=locale==='ru';
   const say=(en:string,ruText:string)=>ru?ruText:en;
   const [savedRevision,setSavedRevision]=useState(0),[savedLocal,setSavedLocal]=useState<string[]>([]);
@@ -90,6 +90,7 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
   if(detail)return <JournalDetail key={detail} workspace={workspace} account={account} name={name} transaction={detail} currency="USD" onSessionExpired={onSessionExpired} onClose={()=>setDetail(null)} onOpen={setDetail} backLabel="reconciliationBack"/>;
   const visible=rows.filter(row=>`${row.date} ${row.description} ${insightMoney(BigInt(row.amountCents),locale)}`.toLowerCase().includes(search.toLowerCase()));
   const maxPage=Math.max(0,Math.ceil(visible.length/25)-1),currentPage=Math.min(page,maxPage);
+  if(savedOnly)return <SavedReconciliations workspace={workspace} account={account} revision={savedRevision} onSessionExpired={onSessionExpired} onOpen={setDetail} onChanged={canceled=>{if(file?.hash===canceled.file_hash){const key=canceled.rows.map(row=>row.line).join(':');setGroups(current=>current.filter(group=>group.rows.join(':')!==key));setSavedLocal(current=>current.filter(value=>value!==key));resetSelection();}setSavedRevision(current=>current+1);}}/>;
   return <>
     <Card>
       <Text accessibilityRole="header" style={styles.h2}>{say('Draft bank reconciliation','Черновая сверка с банком')}</Text>

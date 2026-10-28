@@ -14,8 +14,7 @@ export function LiveShell({children,access,selected,title,navigation,onSelect,on
  const [menu,setMenu]=useState(false);const wide=width>720;
  const space=access?.workspaces.find(w=>w.id===selected?.workspace);
  const sidebar=<View style={{paddingHorizontal:13,paddingVertical:25,gap:8,flex:1,backgroundColor:'#fff'}}>
-  <View style={{flexDirection:'row',alignItems:'center',gap:9,marginHorizontal:10,marginBottom:24}}><View style={{width:36,height:36,borderRadius:11,backgroundColor:colors.green,alignItems:'center',justifyContent:'center'}}><Text style={{color:'#fff',fontSize:25,fontWeight:'800'}}>n</Text></View><Text style={{color:colors.ink,fontSize:25,fontWeight:'800',letterSpacing:-1.4}}>nestwise</Text></View>
-  {!wide&&<Button label={t('close')} icon={<X size={18}/>} onPress={()=>setMenu(false)}/>}
+  <View style={{flexDirection:'row',alignItems:'center',gap:9,marginHorizontal:10,marginBottom:24}}><View style={{width:36,height:36,borderRadius:11,backgroundColor:colors.green,alignItems:'center',justifyContent:'center'}}><Text style={{color:'#fff',fontSize:25,fontWeight:'800'}}>n</Text></View><Text style={{color:colors.ink,fontSize:25,fontWeight:'800',letterSpacing:-1.4}}>nestwise</Text>{!wide&&<Pressable accessibilityRole="button" accessibilityLabel={t('close')} onPress={()=>setMenu(false)} style={{marginLeft:'auto',padding:10}}><X size={20} color={colors.ink}/></Pressable>}</View>
   <Text style={styles.label}>{locale==='ru'?'МОИ ПРОСТРАНСТВА':'MY WORKSPACES'}</Text>
   {access?.workspaces.map(w=><View key={w.id} style={{gap:8}}>
    <Text style={{paddingHorizontal:12,paddingTop:8,color:colors.ink,fontSize:14,fontWeight:'600'}}>{w.name}</Text>
@@ -23,7 +22,7 @@ export function LiveShell({children,access,selected,title,navigation,onSelect,on
     selected={selected?.workspace===w.id&&selected?.account===a.id}
     onPress={()=>{onSelect({workspace:w.id,account:a.id,name:a.name,currency:a.currency});setMenu(false);}}/>)}
   </View>)}
-  {selected&&<View style={{gap:8}}>{navigation(()=>setMenu(false))}</View>}
+  {selected&&<View style={{gap:0,marginTop:14}}><Text style={[styles.label,{paddingHorizontal:12,marginBottom:8}]}>{locale==='ru'?'ФИНАНСЫ':'FINANCE'}</Text>{navigation(()=>setMenu(false))}</View>}
   {access&&<Button label={t('authSignOut')} disabled={busy} onPress={onSignOut}/>}
  </View>;
  return <SafeAreaView style={{flex:1,backgroundColor:colors.bg}}>
