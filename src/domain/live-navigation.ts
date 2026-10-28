@@ -32,3 +32,9 @@ export function resolveSelection(access:Access,stored:string|null):Selection|nul
     return space&&account?{workspace:space.id,account:account.id,name:account.name,currency:account.currency}:null;
   }catch{return null;}
 }
+
+// Presentation-only exclusion of the two acceptance fixtures the owner removed.
+// This does not revoke server permissions or delete any financial evidence.
+export function workingAccess(access:Access):Access {
+ return {...access,workspaces:access.workspaces.filter(w=>w.name!=='SYNTHETIC — production OCR').map(w=>({...w,accounts:w.accounts.filter(a=>a.name!=='SYNTHETIC OCR acceptance')})).sort((a,b)=>['family','personal','business'].indexOf(a.kind??'business')-['family','personal','business'].indexOf(b.kind??'business'))};
+}

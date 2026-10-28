@@ -15,7 +15,7 @@ import {WorkspaceAdministration} from '../components/WorkspaceAdministration';
 import {AccountReports} from '../components/AccountReports';
 import {AccountReceipts} from '../components/AccountReceipts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {resolveSelection, parseAccess, selectionKey, type Access, type Selection} from '../domain/live-navigation';
+import {resolveSelection, parseAccess, workingAccess, selectionKey, type Access, type Selection} from '../domain/live-navigation';
 import {defaultJournalFilters} from '../domain/journal-filters';
 import categories from '../data/accountant-categories.json';
 export type LiveSection='insights'|'journal'|'refunds'|'expenses'|'events'|'reconciliation'|'savedReconciliation'|'operations'|'receipts'|'mapping'|'settings'|'reports';
@@ -28,7 +28,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   const [expired,setExpired]=useState(false);
   const [administration,setAdministration]=useState<string|null|undefined>(undefined);
   const section=initialSection;
-  const sectionTitle={insights:t('insightsTitle'),journal:t('journalTitle'),refunds:locale==='ru'?'Возвраты и корректировки':'Refunds & Adjustments',expenses:locale==='ru'?'Расходы бизнеса':'Business Expenses',events:t('crm'),reconciliation:t('bank'),savedReconciliation:t('reconcile'),operations:locale==='ru'?'Новая операция':'New operation',receipts:locale==='ru'?'Чеки':'Receipts',mapping:t('mapping'),settings:t('settings'),reports:'Financial Statement'}[section];
+  const sectionTitle={insights:t('insightsTitle'),journal:locale==='ru'?'Операции':'Transactions',refunds:locale==='ru'?'Возвраты и корректировки':'Refunds & Adjustments',expenses:locale==='ru'?'Расходы бизнеса':'Business Expenses',events:t('crm'),reconciliation:t('bank'),savedReconciliation:t('reconcile'),operations:locale==='ru'?'Новая операция':'New operation',receipts:locale==='ru'?'Чеки':'Receipts',mapping:locale==='ru'?'Налоговые категории':'Tax Categories',settings:locale==='ru'?'Язык и настройки':'Language & Settings',reports:locale==='ru'?'Налоговый центр / PDF':'Tax Center / PDF'}[section];
   const setSection=(next:LiveSection)=>router.replace(routes[next] as '/');
   const [selectionError,setSelectionError]=useState(false);
   const [chooseAccount,setChooseAccount]=useState(false);
@@ -53,7 +53,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
         if(version!==requestVersion.current)return;
         if(response.status===401){setBusy(false);return;}
         if(!response.ok)throw new Error();
-        const value=parseAccess(await response.json());
+        const value=workingAccess(parseAccess(await response.json()));
         let stored:null|string=null;
         try{stored=await AsyncStorage.getItem(selectionKey(value.user.id));}catch{if(version===requestVersion.current)setSelectionError(true);}
         if(version!==requestVersion.current)return;
@@ -98,8 +98,6 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
           <NavigationItem label={locale==='ru'?'Налоговые категории':'Tax Categories'} selected={section==='mapping'} onPress={() => {setSection('mapping');close();}}/>
           {access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'&&<NavigationItem label={locale==='ru'?'Налоговый центр / PDF':'Tax Center / PDF'} selected={section==='reports'} onPress={() => {setSection('reports');close();}}/>}
           <NavigationItem label={locale==='ru'?'Язык и настройки':'Language & Settings'} selected={section==='settings'} onPress={() => {setSection('settings');close();}}/>
-          <NavigationItem label={locale==='ru'?'Чеки':'Receipts'} selected={section==='receipts'} onPress={() => {setSection('receipts');close();}}/>
-          {['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')&&<NavigationItem label={locale==='ru'?'Новая операция':'New operation'} selected={section==='operations'} onPress={() => {setSection('operations');close();}}/>}
         </View>):null;
   return <LiveShell access={access} selected={selected} title={access?(section==='insights'?t('overview'):sectionTitle):t('authSignIn')} navigation={navigation} onSelect={selectAccount} onSignOut={()=>void signOut()} onAccounts={()=>setChooseAccount(value=>!value)} busy={busy}>
 
@@ -137,10 +135,12 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
       </Card>}
       {access&&administration!==undefined&&<WorkspaceAdministration key={administration||'new'} workspace={administration} onChanged={refreshAccess} onSessionExpired={sessionExpired}/>}
       {access&&selected&&!busy&&<>
+        {section==='expenses'&&<View style={styles.row}><Button label={locale==='ru'?'Чеки и распознавание':'Receipts and scanning'} onPress={()=>setSection('receipts')}/>{['owner','accountant'].includes(access.workspaces.find(w=>w.id===selected.workspace)?.role||'')&&<Button primary label={locale==='ru'?'+ Добавить операцию':'+ Add operation'} onPress={()=>setSection('operations')}/>}</View>}
+
 
         {['insights','settings','journal'].includes(section)&&<OperationRecovery key={`${access.user.id}:${selected.workspace}:${selected.account}`} user={access.user.id} workspace={selected.workspace} account={selected.account} onOpen={()=>setSection('operations')}/>}
         {section==='reports'?(access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'?<AccountReports personalAccounts={access.workspaces.filter(w=>['personal','family'].includes(w.kind||'')&&['owner','accountant'].includes(w.role)).flatMap(w=>w.accounts.map(a=>({workspace:w.id,account:a.id,name:w.name+' · '+a.name})))} key={`${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account} canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} onSessionExpired={sessionExpired}/>:<Notice text={locale==='ru'?'Форма только для бизнеса Aksenov LLC.':'This form is for the Aksenov LLC business only.'}/>):section==='mapping'?<Card><Text accessibilityRole="header" style={styles.h2}>{t('mapping')}</Text><Notice text={t('mappingHint')}/><Notice text={locale==='ru'?'Категории используются для Statement. Они не определяют налоговые вычеты; согласование в приложении не требуется.':'Categories organize the Statement. They do not determine tax deductions; no in-app approval is required.'}/><ScrollView horizontal><View style={{minWidth:640}}><View style={{flexDirection:'row',padding:10,backgroundColor:'#f8faf9'}}><Text style={[styles.label,{width:220}]}>ID</Text><Text style={[styles.label,{width:400}]}>{locale==='ru'?'КАТЕГОРИЯ':'CATEGORY'}</Text></View>{categories.categories.map(row=><View key={row.id} style={{flexDirection:'row',paddingHorizontal:10,paddingVertical:13,borderBottomWidth:1,borderColor:'#edf1ef'}}><Text style={[styles.muted,{width:220,fontSize:12}]}>{row.id}</Text><View style={{width:400}}><Text style={[styles.text,{fontSize:12}]}>{row[locale]}</Text>{locale==='ru'&&<Text style={[styles.muted,{fontSize:11}]}>{row.en}</Text>}</View></View>)}</View></ScrollView></Card>:
-          section==='settings'?<Card><Text style={styles.h2}>{t('settings')}</Text><Text style={styles.muted}>{t('privacyHint')}</Text><Button label={locale==='ru'?'Обновить доступ':'Refresh access'} onPress={refreshAccess}/></Card>:
+          section==='settings'?<Card><Text style={styles.h2}>{t('settings')}</Text><View style={styles.row}><Button label={locale==='ru'?'Аккаунт и пространства':'Account and spaces'} onPress={()=>setChooseAccount(value=>!value)}/><Button label={locale==='ru'?'Чеки':'Receipts'} onPress={()=>setSection('receipts')}/></View><Text style={styles.muted}>{t('privacyHint')}</Text><Button label={locale==='ru'?'Обновить доступ':'Refresh access'} onPress={refreshAccess}/></Card>:
           section==='receipts'?<AccountReceipts business={access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'} key={`${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account} canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} onSessionExpired={sessionExpired}/>:
           section==='operations'&&!['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')?<Notice error text={t('journalAccessLost')}/>:section==='operations'?<ManualOperationForm user={access.user.id} key={`${access.user.id}:${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account} accounts={access.workspaces.find(space=>space.id===selected.workspace)?.accounts||[]} onSaved={()=>setSection('journal')} onSessionExpired={sessionExpired}/>:
           ['reconciliation','savedReconciliation'].includes(section)?<AccountReconciliation savedOnly={section==='savedReconciliation'} canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} key={`${selected.workspace}:${selected.account}`} name={selected.name} workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
