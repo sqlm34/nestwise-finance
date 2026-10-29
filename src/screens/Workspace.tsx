@@ -19,6 +19,7 @@ import {resolveSelection, parseAccess, workingAccess, selectionKey, type Access,
 import {defaultJournalFilters} from '../domain/journal-filters';
 import categories from '../data/accountant-categories.json';
 export type LiveSection='insights'|'journal'|'refunds'|'expenses'|'events'|'reconciliation'|'savedReconciliation'|'operations'|'receipts'|'mapping'|'settings'|'reports';
+const offlineContextKey='nestwise.offline-context.v1';
 const routes:Record<LiveSection,string>={insights:'/',journal:'/transactions',refunds:'/refunds',expenses:'/expenses',events:'/crm',reconciliation:'/bank',savedReconciliation:'/reconcile',operations:'/operations',receipts:'/receipts',mapping:'/mapping',settings:'/settings',reports:'/reports'};
 export default function Workspace({initialSection='insights'}:{initialSection?:LiveSection}) {
   const {t,locale,offline}=useApp();
@@ -36,7 +37,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   const requestVersion=useRef(0);
   const accessRef=useRef<Access|null>(null);
   const installAccess=useCallback((value:Access|null)=>{accessRef.current=value;setAccess(value);},[]);
-  const sessionExpired=useCallback(()=>{requestVersion.current++;installAccess(null);setSelected(null);setExpired(true);setBusy(false);},[installAccess]);
+  const sessionExpired=useCallback(()=>{requestVersion.current++;void AsyncStorage.removeItem(offlineContextKey);installAccess(null);setSelected(null);setExpired(true);setBusy(false);},[installAccess]);
   const selectAccount=(value:Selection)=>{
     setSelected(value);setAdministration(undefined);setChooseAccount(false);setSelectionError(false);
     const current=accessRef.current;if(!current)return;
@@ -51,14 +52,15 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
       try{
         const response=await authenticatedFetch('/v1/session',controller.signal);
         if(version!==requestVersion.current)return;
-        if(response.status===401){setBusy(false);return;}
+        if(response.status===401){await AsyncStorage.removeItem(offlineContextKey);setBusy(false);return;}
         if(!response.ok)throw new Error();
         const value=workingAccess(parseAccess(await response.json()));
+        await AsyncStorage.setItem(offlineContextKey,JSON.stringify({access:value,at:Date.now()}));
         let stored:null|string=null;
         try{stored=await AsyncStorage.getItem(selectionKey(value.user.id));}catch{if(version===requestVersion.current)setSelectionError(true);}
         if(version!==requestVersion.current)return;
         installAccess(value);setSelected(resolveSelection(value,stored));setExpired(false);
-      }catch{if(version===requestVersion.current)setError('authUnavailable');}
+      }catch{if(version===requestVersion.current){try{const raw=await AsyncStorage.getItem(offlineContextKey);const cached=raw?JSON.parse(raw):null;if(!cached||Date.now()-cached.at>86400000||cached.at>Date.now())throw Error();const value=workingAccess(parseAccess(cached.access));const stored=await AsyncStorage.getItem(selectionKey(value.user.id));if(version===requestVersion.current){installAccess(value);setSelected(resolveSelection(value,stored));setError('authUnavailable');}}catch{setError('authUnavailable');}}}
       finally{if(version===requestVersion.current)setBusy(false);}
     })();
   },[installAccess]);
@@ -79,6 +81,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
     const version=++requestVersion.current,current=accessRef.current;
     setBusy(true);setError('');setSelected(null);
     try {
+      await AsyncStorage.removeItem(offlineContextKey);
       const result=await authClient.signOut();
       if(version!==requestVersion.current)return;
       if(result.error)throw new Error();
@@ -135,6 +138,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
       </Card>}
       {access&&administration!==undefined&&<WorkspaceAdministration key={administration||'new'} workspace={administration} onChanged={refreshAccess} onSessionExpired={sessionExpired}/>}
       {access&&selected&&!busy&&<>
+        {error==='authUnavailable'&&<Notice text={locale==='ru'?'Локальный режим: сохраняйте документы на этом устройстве. Серверные данные и отправка требуют восстановления связи и действующего входа.':'Local mode: save documents on this device. Server data and sending require connection and valid sign-in.'}/>}
         {section==='expenses'&&<View style={styles.row}><Button label={locale==='ru'?'Чеки и распознавание':'Receipts and scanning'} onPress={()=>setSection('receipts')}/>{['owner','accountant'].includes(access.workspaces.find(w=>w.id===selected.workspace)?.role||'')&&<Button primary label={locale==='ru'?'+ Добавить операцию':'+ Add operation'} onPress={()=>setSection('operations')}/>}</View>}
 
 
@@ -143,7 +147,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
           section==='settings'?<Card><Text style={styles.h2}>{t('settings')}</Text><View style={styles.row}><Button label={locale==='ru'?'Аккаунт и пространства':'Account and spaces'} onPress={()=>setChooseAccount(value=>!value)}/><Button label={locale==='ru'?'Чеки':'Receipts'} onPress={()=>setSection('receipts')}/></View><Text style={styles.muted}>{locale==='ru'?'Данные относятся к выбранному рабочему пространству и счёту.':'Data belongs to the selected workspace and account.'}</Text><Button label={locale==='ru'?'Обновить доступ':'Refresh access'} onPress={refreshAccess}/></Card>:
           section==='receipts'?<AccountReceipts business={access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'} key={`${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account} canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} onSessionExpired={sessionExpired}/>:
           section==='operations'&&!['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')?<Notice error text={t('journalAccessLost')}/>:section==='operations'?<ManualOperationForm user={access.user.id} key={`${access.user.id}:${selected.workspace}:${selected.account}`} workspace={selected.workspace} account={selected.account} accounts={access.workspaces.find(space=>space.id===selected.workspace)?.accounts||[]} onSaved={()=>setSection('journal')} onSessionExpired={sessionExpired}/>:
-          ['reconciliation','savedReconciliation'].includes(section)?<AccountReconciliation savedOnly={section==='savedReconciliation'} canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} key={`${selected.workspace}:${selected.account}`} name={selected.name} workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
+          ['reconciliation','savedReconciliation'].includes(section)?<AccountReconciliation user={access.user.id} savedOnly={section==='savedReconciliation'} canWrite={['owner','accountant'].includes(access.workspaces.find(space=>space.id===selected.workspace)?.role||'')} key={`${selected.workspace}:${selected.account}`} name={selected.name} workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>:
           section==='insights'?<AccountInsights key={`${selected.workspace}:${selected.account}`} name={selected.name} currency={selected.currency}
           workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired} onEvents={()=>setSection('events')} onReports={()=>setSection('reports')} onBank={()=>setSection('reconciliation')} onReceipts={()=>setSection('receipts')}/>:
           ['journal','refunds','expenses'].includes(section)?<AccountJournal initialFilters={{...defaultJournalFilters,code:section==='refunds'?'refunds':section==='expenses'?'expenses':'all'}} key={`${selected.workspace}:${selected.account}:${section}`} name={selected.name} currency={selected.currency}

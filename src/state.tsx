@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Network from 'expo-network';
 import { Platform } from 'react-native';
 import { messages, type Locale, type MessageKey } from './i18n';
 import type { Workspace } from './data/demo';
@@ -27,7 +28,7 @@ export function Provider({ children }: { children: React.ReactNode }) {
     return () => { active = false; };
   }, []);
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (Platform.OS !== 'web') {const update=(v:Network.NetworkState)=>setOffline(v.isConnected===false||v.isInternetReachable===false);void Network.getNetworkStateAsync().then(update).catch(()=>{});const sub=Network.addNetworkStateListener(update);return()=>sub.remove();}
     const update = () => setOffline(!navigator.onLine);
     update(); window.addEventListener('online', update); window.addEventListener('offline', update);
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };

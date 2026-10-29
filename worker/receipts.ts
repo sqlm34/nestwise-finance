@@ -9,7 +9,7 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subject:string,workspace:string,account:string,hash?:string,mode?:string){
   const write=request.method==='POST';
   await db.documentAccess(subject,workspace,account,write);
-  if(mode==='ocr'&&!write){
+  if((mode==='ocr'||mode==='statement-ocr')&&!write){
     return Response.json({enabled:env.NESTWISE_OCR_ENABLED==='true'&&!!env.NESTWISE_OCR_API_KEY&&!!env.NESTWISE_OCR_MODEL&&!!env.STATEMENTS&&!!env.STATEMENTS_BACKUP,provider:'OpenAI',review_required:true});
   }
   if(mode==='original'){
@@ -39,7 +39,7 @@ export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subj
     return Response.json(await db.readReceipts(subject,workspace,account,hash||null,before));
   }
   let body:Record<string,unknown>;try{const value=await request.json();if(!value||typeof value!=='object'||Array.isArray(value))throw new Error();body=value;}catch{return Response.json({error:'invalid_receipt'},{status:400});}
-  if(mode==='ocr'){
+  if((mode==='ocr'||mode==='statement-ocr')){
     if(Object.keys(body).length!==1||body.consent!==true)return Response.json({error:'ocr_consent_required'},{status:400});
     if(env.NESTWISE_OCR_ENABLED!=='true'||!env.NESTWISE_OCR_API_KEY||!env.NESTWISE_OCR_MODEL||!env.STATEMENTS||!env.STATEMENTS_BACKUP)return Response.json({error:'ocr_not_configured'},{status:503});
     const rows=await db.readReceipts(subject,workspace,account,hash!) as {hash:string;bytes:number;archived:boolean;operation_id:string|null}[];
@@ -52,7 +52,7 @@ export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subj
       const code=(error as {code?:unknown})?.code;
       console.warn('receipt_ocr_quota_failure',{code:typeof code==='string'&&/^[A-Z0-9]{5}$/.test(code)?code:undefined});throw error;
     }
-    const data=await recognizeReceipt(bytes,env.NESTWISE_OCR_API_KEY,env.NESTWISE_OCR_MODEL);
+    const data=await recognizeReceipt(bytes,env.NESTWISE_OCR_API_KEY,env.NESTWISE_OCR_MODEL,fetch,mode==='statement-ocr');
     await db.documentAccess(subject,workspace,account,true);
     return Response.json({data,review_required:true});
   }

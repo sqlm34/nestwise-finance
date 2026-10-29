@@ -12,10 +12,11 @@ import {JournalDetail} from './JournalDetail';
 import {parseEvidenceReview,type EvidenceReview} from '../domain/statement-evidence';
 import {StatementArchive} from './StatementArchive';
 import {SaveDraftButton,SavedReconciliations} from './SavedReconciliations';
+import {StatementCapture} from './StatementCapture';
 import {BankBooking} from './BankBooking';
 
 const kindLabels:Record<string,MessageKey>={'job.payment_recorded':'eventPayment','job.customer_refund_issued':'eventRefund','job.part_cost_recorded':'eventPart','job.supplier_credit_received':'eventCredit','job.processor_fee_recorded':'provenanceFee','job.processor_fee_refunded':'provenanceFeeRefund','manual.income':'manualIncome','manual.expense':'manualExpense','manual.transfer':'manualTransfer','manual.refund':'manualRefund'};
-export function AccountReconciliation({workspace,account,name,canWrite,onSessionExpired,savedOnly=false}:{workspace:string;account:string;name:string;canWrite:boolean;savedOnly?:boolean;onSessionExpired:()=>void}){
+export function AccountReconciliation({user,workspace,account,name,canWrite,onSessionExpired,savedOnly=false}:{user:string;workspace:string;account:string;name:string;canWrite:boolean;savedOnly?:boolean;onSessionExpired:()=>void}){
   const {locale,t}=useApp(),ru=locale==='ru';
   const say=(en:string,ruText:string)=>ru?ruText:en;
   const [savedRevision,setSavedRevision]=useState(0),[savedLocal,setSavedLocal]=useState<string[]>([]);
@@ -92,11 +93,12 @@ export function AccountReconciliation({workspace,account,name,canWrite,onSession
   const maxPage=Math.max(0,Math.ceil(visible.length/25)-1),currentPage=Math.min(page,maxPage);
   if(savedOnly)return <SavedReconciliations workspace={workspace} account={account} revision={savedRevision} onSessionExpired={onSessionExpired} onOpen={setDetail} onChanged={canceled=>{if(file?.hash===canceled.file_hash){const key=canceled.rows.map(row=>row.line).join(':');setGroups(current=>current.filter(group=>group.rows.join(':')!==key));setSavedLocal(current=>current.filter(value=>value!==key));resetSelection();}setSavedRevision(current=>current+1);}}/>;
   return <>
+    {canWrite&&<StatementCapture key={`${user}:${workspace}:${account}`} user={user} workspace={workspace} account={account} name={name} onPrepared={loaded=>{setArchiveHash(null);setArchiveEvidence(null);setOriginal({hash:loaded.hash,bytes:loaded.bytes});setFile({name:loaded.name,hash:loaded.hash,preview:previewStatement(loaded.text,name.toLowerCase().includes('national')?'south-national':'chase',name),sample:false});setGroups([]);setSavedLocal([]);resetSelection();setSearch('');setPage(0);}}/>}
     <Card>
       <Text accessibilityRole="header" style={styles.h2}>{say('Draft bank reconciliation','Черновая сверка с банком')}</Text>
       <Text style={styles.text}>{name} · USD</Text>
-      <Notice text={say('Local drafts disappear when leaving this section. Save a group explicitly to retain its dates, amounts, hashes and journal links in account history. Originals stay on this device until you explicitly archive them below. No income or expense is created.','Локальные черновики исчезнут при выходе из раздела. Сохраните группу отдельно, чтобы записать даты, суммы, хеши и ссылки на проводки в историю счёта. Оригиналы остаются на устройстве, пока вы отдельно не сохраните их в архив ниже. Доходы и расходы не создаются.')}/>
-      <Text style={styles.muted}>{say('UTF-8 CSV, up to 2 MB / 5,000 rows. Date, Description, Amount or Debit/Credit columns. Dates: YYYY-MM-DD or MM/DD/YYYY. PDF/OCR is not supported.','CSV UTF-8, до 2 МБ / 5 000 строк. Колонки Date, Description, Amount либо Debit/Credit. Даты: YYYY-MM-DD или MM/DD/YYYY. PDF/OCR пока не поддерживается.')}</Text>
+      <Notice text={say('Unsaved matching groups reset when leaving this section; the photo/PDF drafts above are retained. Save a group explicitly to retain its dates, amounts, hashes and journal links in account history. Originals stay on this device until you explicitly archive them below. No income or expense is created.','Несохранённые группы сверки сбрасываются при выходе; черновики фото/PDF выше сохраняются. Сохраните группу отдельно, чтобы записать даты, суммы, хеши и ссылки на проводки в историю счёта. Оригиналы остаются на устройстве, пока вы отдельно не сохраните их в архив ниже. Доходы и расходы не создаются.')}/>
+      <Text style={styles.muted}>{say('UTF-8 CSV, up to 2 MB / 5,000 rows. Date, Description, Amount or Debit/Credit columns. Dates: YYYY-MM-DD or MM/DD/YYYY. Use the photo/PDF section above for scanned statements.','CSV UTF-8, до 2 МБ / 5 000 строк. Колонки Date, Description, Amount либо Debit/Credit. Даты: YYYY-MM-DD или MM/DD/YYYY. Для фото/PDF используйте раздел выше.')}</Text>
       {!file?<>
         <TextInput accessibilityLabel={t('alias')} value={alias} onChangeText={setAlias} maxLength={60} style={styles.input} placeholder={t('aliasHint')}/>
         <View style={styles.row}><Button label={t('upload')} disabled={loading||!alias.trim()} onPress={()=>void load()}/></View>
