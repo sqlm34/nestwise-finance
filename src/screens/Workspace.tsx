@@ -1,5 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, BackHandler, ScrollView, Text, TextInput, View } from 'react-native';
+import {BackStepsContext} from '../back-navigation';
+import {createBackSteps} from '../domain/back-steps';
 import {LiveShell} from '../components/LiveShell';
 import { router, useFocusEffect } from 'expo-router';
 import { apiURL, authClient, authenticatedFetch } from '../auth/client';
@@ -29,9 +31,21 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   const [administration,setAdministration]=useState<string|null|undefined>(undefined);
   const section=initialSection;
   const sectionTitle={insights:t('insightsTitle'),journal:locale==='ru'?'Операции':'Transactions',refunds:locale==='ru'?'Возвраты и корректировки':'Refunds & Adjustments',expenses:locale==='ru'?'Расходы бизнеса':'Business Expenses',events:t('crm'),reconciliation:t('bank'),savedReconciliation:t('reconcile'),operations:locale==='ru'?'Новая операция':'New operation',receipts:locale==='ru'?'Чеки':'Receipts',mapping:locale==='ru'?'Налоговые категории':'Tax Categories',settings:locale==='ru'?'Язык и настройки':'Language & Settings',reports:locale==='ru'?'Налоговый центр / PDF':'Tax Center / PDF'}[section];
-  const setSection=(next:LiveSection)=>router.replace(routes[next] as '/');
+  const setSection=(next:LiveSection)=>{if(next!==section)router.push(routes[next] as '/');};
   const [selectionError,setSelectionError]=useState(false);
   const [chooseAccount,setChooseAccount]=useState(false);
+  const [backSteps]=useState(createBackSteps);
+  useFocusEffect(useCallback(()=>{
+    const subscription=BackHandler.addEventListener('hardwareBackPress',()=>{
+      if(administration!==undefined){setAdministration(undefined);return true;}
+      if(chooseAccount){setChooseAccount(false);return true;}
+      if(backSteps.back())return true;
+      if(router.canGoBack()){router.back();return true;}
+      if(section!=='insights'){router.replace('/');return true;}
+      return busy||!!access;
+    });
+    return ()=>subscription.remove();
+  },[backSteps,administration,chooseAccount,section,access,busy]));
   const requestAbort=useRef<AbortController|null>(null);
   const requestVersion=useRef(0);
   const accessRef=useRef<Access|null>(null);
@@ -99,7 +113,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
           {access.workspaces.find(space=>space.id===selected.workspace)?.kind==='business'&&<NavigationItem label={locale==='ru'?'Налоговый центр / PDF':'Tax Center / PDF'} selected={section==='reports'} onPress={() => {setSection('reports');close();}}/>}
           <NavigationItem label={locale==='ru'?'Язык и настройки':'Language & Settings'} selected={section==='settings'} onPress={() => {setSection('settings');close();}}/>
         </View>):null;
-  return <LiveShell access={access} selected={selected} title={access?(section==='insights'?t('overview'):sectionTitle):t('authSignIn')} navigation={navigation} onSelect={selectAccount} onSignOut={()=>void signOut()} onAccounts={()=>setChooseAccount(value=>!value)} busy={busy}>
+  return <BackStepsContext.Provider value={backSteps}><LiveShell access={access} selected={selected} title={access?(section==='insights'?t('overview'):sectionTitle):t('authSignIn')} navigation={navigation} onSelect={selectAccount} onSignOut={()=>void signOut()} onAccounts={()=>setChooseAccount(value=>!value)} busy={busy}>
 
 
       {(!access||busy||!!error||offline||selectionError||expired)&&<Card>
@@ -152,5 +166,5 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
             workspace={selected.workspace} account={selected.account} onSessionExpired={sessionExpired}/>}
       </>}
 
-    </LiveShell>;
+    </LiveShell></BackStepsContext.Provider>;
 }

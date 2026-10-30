@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {useBackStep} from '../back-navigation';
 import {ActivityIndicator,Pressable,Text,TextInput,View} from 'react-native';
 import {Card,Button,Notice,SearchField,styles,colors} from './ui';
 import {useApp} from '../state';
@@ -32,6 +33,7 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
   const error=busy?null:result?.error;
   const filterError=validateHistoryFilters(filters);
   const dirty=JSON.stringify(filters)!==JSON.stringify(request.filters);
+  useBackStep(showFilters&&!selectedTransaction,()=>setShowFilters(false),20);
   useEffect(()=>{
     const controller=new AbortController();let active=true,loading=false;
     const load=async(silent=false)=>{

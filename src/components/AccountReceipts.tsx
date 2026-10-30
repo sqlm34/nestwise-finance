@@ -1,4 +1,5 @@
 import React,{useEffect,useRef,useState} from 'react';
+import {useBackStep} from '../back-navigation';
 import {Image,Platform,Text,TextInput,View} from 'react-native';
 import {randomUUID} from 'expo-crypto';
 import {authenticatedFetch,authenticatedPost,authenticatedUpload} from '../auth/client';
@@ -25,6 +26,7 @@ export function AccountReceipts({workspace,account,business,canWrite,onSessionEx
   const [pending,setPending]=useState<{mode:'review'|'post';body:unknown;summary?:string}|null>(null);
   const [upload,setUpload]=useState<ReceiptFile|null>(null);
   const [query,setQuery]=useState(''),[stage,setStage]=useState<ReceiptStage|'all'>('all'),[technical,setTechnical]=useState(false);
+  useBackStep(!!selected,()=>{if(!busy&&!pending)setSelected(null);},20);
   const alive=useRef(true),sending=useRef(false),path=`/v1/user/workspaces/${workspace}/accounts/${account}/receipts`;
   const loadKey=`${path}:${before}:${revision}:${ru}`,loading=loadedKey!==loadKey;
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);

@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {useBackStep} from '../back-navigation';
 import {ActivityIndicator,Pressable,Text,TextInput,View,useWindowDimensions} from 'react-native';
 import {Button,Card,Notice,styles,colors} from './ui';
 import {useApp} from '../state';
@@ -26,6 +27,8 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
   const dirty=period.from!==request.period.from||period.to!==request.period.to;
   const apply=(next:Period)=>setRequest(current=>({period:next,revision:current.revision+1}));
   const openJournal=(range:Period,code:JournalCode|'all'='all')=>setDrill({...defaultJournalFilters,...range,code,basis:'paid'});
+  useBackStep(!!drill,()=>{setDrill(null);apply(request.period);});
+  useBackStep(!drill&&details,()=>setDetails(false));
   useEffect(()=>{
     const controller=new AbortController();let active=true,loading=false;
     const load=async(silent=false)=>{if(loading)return;loading=true;try{
