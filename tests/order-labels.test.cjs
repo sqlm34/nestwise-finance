@@ -16,6 +16,9 @@ test('names are requested only for the authorized account connection and posted 
  assert.strictEqual(await orderLabels(page,[],env,fetcher),page);assert.equal(calls,0);
  const enriched=await orderLabels(page,connections,env,fetcher);assert.equal(enriched.entries[0].customer_name,'Synthetic Customer');assert.deepEqual(enriched.entries[0].entries,row.entries);assert.equal(page.entries[0].customer_name,undefined);
  assert.strictEqual(await orderLabels(page,connections,env,async()=>{throw Error('offline');}),page);
+ const bound={fetch:async function(url,init){assert.strictEqual(this,bound);return fetcher(url,init);}};
+ const viaBinding=await orderLabels(page,connections,{...env,CRM_LABEL_SOURCE:bound},async()=>{throw Error('public fetch must not be called');});
+ assert.equal(viaBinding.entries[0].customer_name,'Synthetic Customer');
 });
 test('simple operation labels preserve signs and distinguish income, refunds, parts and expenses',()=>{
  assert.equal(transactionLabel(row,'ru'),'Возврат клиенту');assert.equal(transactionAmount(row),-16500n);
