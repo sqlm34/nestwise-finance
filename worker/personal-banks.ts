@@ -3,6 +3,15 @@ export type BankEnv={NESTWISE_DATABASE_URL?:string;PLAID_PERSONAL_CONNECTIONS?:s
 type Connection={feed:string;access_token:string;account_id:string};
 type Transaction={transaction_id:string;account_id:string;date:string;name:string;merchant_name?:string|null;amount:number;pending:boolean;iso_currency_code:string;personal_finance_category?:{primary?:string}|null};
 type SyncPage={added:Transaction[];modified:Transaction[];removed:{transaction_id:string}[];next_cursor:string;has_more:boolean};
+export async function requestBankPage(env:BankEnv,connection:Connection,cursor:string,fetcher:typeof fetch=(input,init)=>globalThis.fetch(input,init)):Promise<SyncPage>{
+ const result=await fetcher(`https://${env.PLAID_ENVIRONMENT}.plaid.com/transactions/sync`,{method:'POST',redirect:'manual',
+  headers:{'Content-Type':'application/json','Plaid-Version':'2020-09-14'},signal:AbortSignal.timeout(25_000),
+  body:JSON.stringify({client_id:env.PLAID_CLIENT_ID,secret:env.PLAID_SECRET,access_token:connection.access_token,cursor,count:500})});
+ if(result.status>=300&&result.status<400){await result.body?.cancel();throw Error('bank_feed_redirect');}
+ const body=await result.json() as SyncPage&{error_code?:string};
+ if(!result.ok)throw Error(body.error_code==='ITEM_LOGIN_REQUIRED'||body.error_code==='TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION'?body.error_code:'bank_feed_unavailable');
+ return body;
+}
 export type BankRow={id:string;paid_on:string;name:string;cents:string;pending:boolean;category:string;currency:string};
 export function bankRow(t:Transaction):BankRow {
  if(!t.transaction_id||!/^\d{4}-\d{2}-\d{2}$/.test(t.date)||t.iso_currency_code!=='USD'||!Number.isFinite(t.amount))throw Error('invalid_bank_feed');
@@ -45,14 +54,7 @@ export async function syncPersonalBanks(env:BankEnv){
   const claim=(await sql`SELECT nestwise.claim_bank_feed(${connection.feed}::uuid,${lease}::uuid) result`)[0].result;
   if(!claim)continue;
   try{
-   const changes=await collectBankChanges(claim.cursor,connection.account_id,async cursor=>{
-    const result=await fetch(`https://${env.PLAID_ENVIRONMENT}.plaid.com/transactions/sync`,{method:'POST',redirect:'error',
-     headers:{'Content-Type':'application/json','Plaid-Version':'2020-09-14'},signal:AbortSignal.timeout(25_000),
-     body:JSON.stringify({client_id:env.PLAID_CLIENT_ID,secret:env.PLAID_SECRET,access_token:connection.access_token,cursor,count:500})});
-    const body=await result.json() as SyncPage&{error_code?:string};
-    if(!result.ok)throw Error(body.error_code==='ITEM_LOGIN_REQUIRED'||body.error_code==='TRANSACTIONS_SYNC_MUTATION_DURING_PAGINATION'?body.error_code:'bank_feed_unavailable');
-    return body;
-   });
+   const changes=await collectBankChanges(claim.cursor,connection.account_id,cursor=>requestBankPage(env,connection,cursor));
    await sql`SELECT nestwise.apply_bank_feed(${connection.feed}::uuid,${lease}::uuid,${claim.cursor},${changes.cursor},${JSON.stringify(changes.rows)}::jsonb,${JSON.stringify(changes.removed)}::jsonb,NULL)`;
   }catch(error){
    const code=error instanceof Error&&error.message==='ITEM_LOGIN_REQUIRED'?'ITEM_LOGIN_REQUIRED':'bank_feed_unavailable';
