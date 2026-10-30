@@ -7,11 +7,13 @@ import {journalDate,journalCodes,type JournalCode} from '../domain/journal';
 import {defaultJournalFilters,type JournalFilters} from '../domain/journal-filters';
 import {metricKeys,periodPreset,validatePeriod,parsePeriodInsights,periodMetrics,insightMoney,type Period,type PeriodInsights,type Metric} from '../domain/period-insights';
 import {AccountJournal} from './AccountJournal';
+import {onForegroundRefresh} from '../foreground-refresh';
+import {AutomaticUpdates} from './AutomaticUpdates';
 import type {MessageKey} from '../i18n';
 const labels:Record<Metric,MessageKey>={receipts:'insightsReceipts',refunds:'journalRefunds',net_receipts:'insightsNetReceipts',parts_cost:'insightsParts',fees:'journalFees',recorded_difference:'insightsDifference',clearing:'insightsClearing',parts_payable:'insightsPayable',expenses:'journalExpenses',transfers:'journalTransfers'};
 const primaryMetrics=['receipts','parts_cost','expenses','recorded_difference'] as const;
 const compactLabels={receipts:'revenue',expenses:'journalExpenses',parts_cost:'parts',recorded_difference:'result'} as const;
-export function AccountInsights({workspace,account,name,currency,onSessionExpired,onEvents,onReports,onBank,onReceipts}:{workspace:string;account:string;name:string;currency:string;onSessionExpired:()=>void;onEvents:()=>void;onReports:()=>void;onBank:()=>void;onReceipts:()=>void}){
+export function AccountInsights({workspace,account,name,currency,onSessionExpired,onEvents,onReports,onBank,onReceipts,allowAppUpdate=false}:{workspace:string;account:string;name:string;currency:string;onSessionExpired:()=>void;onEvents:()=>void;onReports:()=>void;onBank:()=>void;onReceipts:()=>void;allowAppUpdate?:boolean}){
   const {t,locale}=useApp();
   const {width}=useWindowDimensions();
   const [details,setDetails]=useState(false);
@@ -25,17 +27,18 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
   const apply=(next:Period)=>setRequest(current=>({period:next,revision:current.revision+1}));
   const openJournal=(range:Period,code:JournalCode|'all'='all')=>setDrill({...defaultJournalFilters,...range,code,basis:'paid'});
   useEffect(()=>{
-    const controller=new AbortController();let active=true;
-    (async()=>{try{
+    const controller=new AbortController();let active=true,loading=false;
+    const load=async(silent=false)=>{if(loading)return;loading=true;try{
       const response=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/cash-insights?${new URLSearchParams(request.period)}`,controller.signal);
       if(!active)return;
       if(response.status===401){onSessionExpired();return;}
-      if(!response.ok){setResult({request,data:null,error:response.status===404?'journalAccessLost':response.status===400?'insightsInvalidPeriod':'journalUnavailable'});return;}
+      if(!response.ok){if(silent&&response.status>=500){setResult(current=>current?.request===request?{...current,error:'journalUnavailable'}:current);return;}setResult({request,data:null,error:response.status===404?'journalAccessLost':response.status===400?'insightsInvalidPeriod':'journalUnavailable'});return;}
       const raw=await response.json();if(raw.basis!=='cash')throw new Error('invalid_basis');
       const loaded=parsePeriodInsights(raw,request.period);
       if(active)setResult({request,data:loaded,error:null});
-    }catch{if(active)setResult({request,data:null,error:'journalUnavailable'});}})();
-    return()=>{active=false;controller.abort();};
+    }catch{if(active)setResult(current=>silent?(current?.request===request?{...current,error:'journalUnavailable'}:current):{request,data:null,error:'journalUnavailable'});}finally{loading=false;}};
+    void load();const stop=onForegroundRefresh(()=>{void load(true);});
+    return()=>{active=false;stop();controller.abort();};
   },[workspace,account,request,onSessionExpired]);
   if(drill)return <>
     <Button label={t('insightsBack')} onPress={()=>{setDrill(null);apply(request.period);}}/>
@@ -44,6 +47,7 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
   </>;
   const metrics=data?periodMetrics(data.current):null,prior=data?periodMetrics(data.previous):null;
   return <View style={{gap:20}}>
+    <AutomaticUpdates canApply={allowAppUpdate&&!details&&!dirty&&!busy}/>
     <View style={[styles.row,{gap:8}]}>{(['month','year'] as const).map(kind=><Button key={kind} label={t(kind)} disabled={busy} onPress={()=>{const next=periodPreset(kind);setPeriod(next);apply(next);}}/>)}<Button label={locale==='ru'?'Отчёт для бухгалтера':'Accountant report'} onPress={onReports}/><Button primary label={locale==='ru'?'Импортировать выписку':'Import statement'} onPress={onBank}/></View>
     <View style={{padding:12,borderRadius:11,backgroundColor:'#fff6e7',borderWidth:1,borderColor:'#f0dec0'}}><Text style={{fontSize:12,color:'#976018'}}>{locale==='ru'?'Не учитывайте повторно доходы и расходы CRM при загрузке банковской выписки.':'Do not double count CRM revenue, expenses and bank evidence.'}</Text></View>
     {data&&metrics&&prior&&<>
