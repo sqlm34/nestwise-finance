@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {transactionLabel,transactionPerson,transactionAmount} from '../domain/transaction-label';
 import {ActivityIndicator,Text,View} from 'react-native';
 import {Button,Card,Notice,styles,colors} from './ui';
 import {useApp} from '../state';
@@ -37,6 +38,7 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
   const [request,setRequest]=useState<{cursors:(number|null)[];revision:number}>({cursors:[null],revision:0});
   const [result,setResult]=useState<{request:typeof request;data:Detail|EventDetail|null;manual?:ManualDetail;error:MessageKey|null}|null>(null);
   const [saving,setSaving]=useState(false),[saveError,setSaveError]=useState(false);
+  const [technical,setTechnical]=useState(!!event);
   const busy=result?.request!==request,data=busy?null:result?.data;
   useEffect(()=>{
     const controller=new AbortController();let active=true;
@@ -54,16 +56,15 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
     return ()=>{active=false;controller.abort();};
   },[workspace,account,transaction,event,request,onSessionExpired]);
   return <Card>
-    <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{t(event?'eventsDetailTitle':'provenanceTitle')}</Text>
+    <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{event?t('eventsDetailTitle'):(locale==='ru'?'Об операции':'About this transaction')}</Text>
       <Button label={t(backLabel)} onPress={onClose}/></View>
     <Text style={styles.text}>{name} · {currency}</Text>
-    <Notice text={t('provenanceScope')}/>
+    {technical&&<Notice text={t('provenanceScope')}/>}
     <Button label={t(event?'eventsRefresh':'journalRefresh')} disabled={busy} onPress={()=>setRequest(current=>({cursors:[null],revision:current.revision+1}))}/>
     {busy&&<ActivityIndicator color={colors.green} accessibilityLabel={t('authLoading')}/>}
     {!busy&&result?.error&&<Notice error text={t(result.error)}/>}
     {!busy&&result?.manual&&<>
-      <Text style={styles.h2}>{locale==='ru'?'Ручная операция':'Manual operation'} · {result.manual.manual.kind}</Text>
-      <Text selectable style={styles.text}>{result.manual.manual.id}</Text>
+      <Text style={styles.h2}>{transactionLabel(result.manual.transaction,locale)}</Text>
       <Text style={styles.text}>{journalMoney(result.manual.manual.amount_cents,locale,currency)} · {result.manual.manual.paid_on}</Text>
       <Text style={styles.text}>{result.manual.manual.note}</Text>
       <Text style={styles.muted}>{locale==='ru'?'Возвращено':'Refunded'}: {journalMoney(result.manual.refunded_cents,locale,currency)}</Text>
@@ -79,11 +80,23 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
         }catch{setSaveError(true);}finally{setSaving(false);}})();}}/>
         {saveError&&<Notice error text={locale==='ru'?'Не удалось сохранить оригинал. Повторите запрос.':'Could not save the original. Retry the request.'}/>}
       </>}
+      <Button label={technical?(locale==='ru'?'Скрыть технические подробности':'Hide technical details'):(locale==='ru'?'Технические подробности':'Technical details')} onPress={()=>setTechnical(value=>!value)}/>
+      {technical&&<>
+      <Text selectable style={styles.text}>{result.manual.manual.id}</Text>
       {result.manual.manual.reference_operation&&<Text selectable style={styles.text}>{locale==='ru'?'Исходная операция':'Original operation'}: {result.manual.manual.reference_operation}</Text>}
       {result.manual.manual.allocations.map(a=><Text key={a.category} style={styles.text}>{a.category} · {journalMoney(a.cents,locale,currency)}</Text>)}
       {result.manual.transaction.entries.map((line,index)=><Text key={index} style={styles.text}>{line.code} · {journalMoney(line.cents,locale,currency)}</Text>)}
+      </>}
     </>}
     {data&&<>
+      {data.transaction&&<View style={{gap:8,paddingVertical:12}}>
+        <Text style={styles.h2}>{transactionLabel(data.transaction,locale)}</Text>
+        <Text style={styles.text}>{transactionPerson(data.transaction,locale)}</Text>
+        <Text style={styles.h2}>{journalMoney(transactionAmount(data.transaction).toString(),locale,currency)}</Text>
+        <Text style={styles.muted}>{data.transaction.paid_at?.slice(0,10)??t('journalNotPaid')}</Text>
+      </View>}
+      <Button label={technical?(locale==='ru'?'Скрыть технические подробности':'Hide technical details'):(locale==='ru'?'Технические подробности':'Technical details')} onPress={()=>setTechnical(value=>!value)}/>
+      {technical&&<>
       <Text selectable style={styles.text}>{t('journalOrder')}: {data.source.order_id}</Text>
       {data.transaction?<Text selectable style={styles.muted}>{t('journalEntry')}: {data.transaction.id}</Text>:<Notice text={t('eventsNoPosting')}/>}
       {data.transaction?.entries.map((line,index)=><Text key={index} style={styles.text}>
@@ -102,10 +115,11 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
       <Text style={styles.muted}>{t('page')} {request.cursors.length} · {t('provenanceHistoryHint')}</Text>
       {data.history.map(event=><EventSummary key={event.id} event={event} onOpen={onOpen}/>)}
       <Text style={styles.muted}>{t(data.next_revision?'journalMore':'journalEnd')}</Text>
+      </>}
     </>}
-    <View style={styles.row}>
+    {technical&&<View style={styles.row}>
       <Button label={t('previous')} disabled={busy||request.cursors.length===1} onPress={()=>setRequest(current=>({...current,cursors:current.cursors.slice(0,-1)}))}/>
       <Button label={t('next')} disabled={busy||!data?.next_revision} onPress={()=>{if(data?.next_revision)setRequest(current=>({...current,cursors:[...current.cursors,data.next_revision]}));}}/>
-    </View>
+    </View>}
   </Card>;
 }
