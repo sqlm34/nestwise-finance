@@ -1,3 +1,4 @@
+import {localToday} from '../domain/local-time';
 import React,{useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,Text,TextInput,View} from 'react-native';
 import {randomUUID} from 'expo-crypto';
@@ -13,7 +14,7 @@ export function PartsRegister({workspace,account,accounts,canWrite,onSessionExpi
  const [filter,setFilter]=useState(''),[page,setPage]=useState(0);
  const [parts,setParts]=useState<Part[]|null>(null),[reload,setReload]=useState(0),[error,setError]=useState(''),[busy,setBusy]=useState(false);
  const [name,setName]=useState(''),[quantity,setQuantity]=useState('1'),[cost,setCost]=useState(''),[paid,setPaid]=useState(''),[note,setNote]=useState('');
- const [selected,setSelected]=useState<Part|null>(null),[job,setJob]=useState(''),[usedOn,setUsedOn]=useState(new Date().toISOString().slice(0,10)),[useQuantity,setUseQuantity]=useState('1');
+ const [selected,setSelected]=useState<Part|null>(null),[job,setJob]=useState(''),[usedOn,setUsedOn]=useState(localToday()),[useQuantity,setUseQuantity]=useState('1');
  const [transaction,setTransaction]=useState<string|null>(null),[paymentLabel,setPaymentLabel]=useState('');
  const [pending,setPending]=useState<Record<string,unknown>|null>(null),[uncertain,setUncertain]=useState(false);
  const alive=useRef(true),lock=useRef(false),base=`/v1/user/workspaces/${workspace}/accounts/${account}/parts`;
@@ -36,7 +37,7 @@ export function PartsRegister({workspace,account,accounts,canWrite,onSessionExpi
  {canWrite&&!selected&&<><Text style={styles.h2}>{tr('Add existing stock','Добавить имеющиеся запчасти')}</Text>{field(tr('Part name','Название запчасти'),name,setName)}{field(tr('Quantity','Количество'),quantity,setQuantity)}{field(tr('Unit purchase cost, USD','Стоимость покупки одной штуки, USD'),cost,setCost)}{field(tr('Payment date YYYY-MM-DD, blank if unknown','Дата оплаты YYYY-MM-DD, пусто если неизвестна'),paid,setPaid)}{field(tr('Purchase note / merchant','Заметка о покупке / продавец'),note,setNote)}<Button label={tr('Review stock entry','Проверить запись')} disabled={!!pending||busy} onPress={()=>{try{prepare({kind:'create',name,quantity:Number(quantity),unit_cents:cents(cost).toString(),paid_on:paid.trim()||null,note});}catch{setError(tr('Invalid cost','Неверная стоимость'));}}}/></>}
  {canWrite&&selected&&<><Text style={styles.h2}>{selected.state.name}</Text>
  <Text style={styles.text}>{tr('Purchase evidence','Сведения о покупке')}</Text>{field(tr('Payment date YYYY-MM-DD, blank if unknown','Дата оплаты YYYY-MM-DD, пусто если неизвестна'),paid,setPaid)}{field(tr('Purchase note / merchant','Заметка о покупке / продавец'),note,setNote)}
- <ReportPaymentPicker accounts={accounts} from="" to={new Date().toISOString().slice(0,10)} disabled={!!pending||busy} onSessionExpired={onSessionExpired} onSelect={(id,label)=>{setTransaction(id);setPaymentLabel(label);setPaid(label.slice(0,10));}}/>
+ <ReportPaymentPicker accounts={accounts} from="" to={localToday()} disabled={!!pending||busy} onSessionExpired={onSessionExpired} onSelect={(id,label)=>{setTransaction(id);setPaymentLabel(label);setPaid(label.slice(0,10));}}/>
  <Text selectable>{paymentLabel||tr('No payment selected','Оплата не выбрана')}</Text><Button label={tr('Clear payment link','Снять связь с оплатой')} disabled={!!pending||busy} onPress={()=>{setTransaction(null);setPaymentLabel('');}}/>
  <Button label={tr('Review evidence update','Проверить сведения')} disabled={!!pending||busy} onPress={()=>prepare({kind:'evidence',transaction,paid_on:paid.trim()||null,note})}/>
  <Text style={styles.text}>{tr('Job consumption / return to stock','Использование в заказе / возврат в запас')}</Text>{field(tr('Job reference','Номер заказа'),job,setJob)}{field(tr('Usage date YYYY-MM-DD','Дата использования YYYY-MM-DD'),usedOn,setUsedOn)}{field(tr('Units','Штук'),useQuantity,setUseQuantity)}

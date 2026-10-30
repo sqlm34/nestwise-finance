@@ -1,3 +1,4 @@
+import {localDateTime} from '../domain/local-time';
 import React,{useEffect,useState} from 'react';
 import {ActivityIndicator,Text,View} from 'react-native';
 import {authenticatedFetch} from '../auth/client';
@@ -27,7 +28,7 @@ export function StatementEvidence({workspace,account,hash,revision,onSessionExpi
     <Notice text={ru?'Сопоставлено означает совпадение с сохранённым решением. Учтено по выписке означает, что операция уже создана в журнале: отмена сверки не удаляет её и не разрешает повторное списание. Это не утверждённый отчёт бухгалтера.':'Matched means the original agrees with the saved decision. Posted from bank means a journal entry already exists: canceling reconciliation does not delete it or permit duplicate booking. This is not accountant approval.'}/>
     <Button label={ru?'Обновить проверку':'Refresh evidence review'} disabled={busy} onPress={()=>setReload(value=>value+1)}/>
     {busy?<ActivityIndicator/>:!data?<Notice error text={ru?'Не удалось проверить оригинал. Доступность строк не подтверждена.':'Could not verify original. Row availability is unconfirmed.'}/>:<>
-      <Text style={styles.muted}>{ru?'Проверено':'Checked'}: {new Date(data.checked_at).toLocaleString(locale)} · {data.copy==='primary'?(ru?'основная копия':'primary copy'):(ru?'резервная копия':'backup copy')} · {ru?'отменённых решений':'canceled decisions'}: {data.canceled}</Text>
+      <Text style={styles.muted}>{ru?'Проверено':'Checked'}: {localDateTime(data.checked_at,locale)} · {data.copy==='primary'?(ru?'основная копия':'primary copy'):(ru?'резервная копия':'backup copy')} · {ru?'отменённых решений':'canceled decisions'}: {data.canceled}</Text>
       {(Object.keys(labels) as EvidenceStatus[]).map(status=><Text key={status} style={styles.text}>{labels[status]}: {data.totals[status].count} · +{insightMoney(BigInt(data.totals[status].credits),locale)} / −{insightMoney(BigInt(data.totals[status].debits),locale)}</Text>)}
       {data.groups.some(group=>!group.valid)&&<Notice error text={ru?'Есть решения, не совпадающие с оригиналом. Проверьте их в истории; исправление выполняется отменой и новой сверкой.':'Some decisions disagree with the original. Review history; correct them by cancellation and a new reconciliation.'}/>}
       <View style={styles.row}>{(['all',...Object.keys(labels)] as ('all'|EvidenceStatus)[]).map(value=><Button key={value} selected={filter===value} label={value==='all'?(ru?'Все строки':'All rows'):labels[value]} onPress={()=>{setFilter(value);setPage(0);}}/>)}</View>

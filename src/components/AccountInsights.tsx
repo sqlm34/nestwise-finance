@@ -9,7 +9,6 @@ import {metricKeys,periodPreset,validatePeriod,parsePeriodInsights,periodMetrics
 import {AccountJournal} from './AccountJournal';
 import {onForegroundRefresh} from '../foreground-refresh';
 import {AutomaticUpdates} from './AutomaticUpdates';
-import {recordDataRefresh} from '../data-refresh';
 import type {MessageKey} from '../i18n';
 const labels:Record<Metric,MessageKey>={receipts:'insightsReceipts',refunds:'journalRefunds',net_receipts:'insightsNetReceipts',parts_cost:'insightsParts',fees:'journalFees',recorded_difference:'insightsDifference',clearing:'insightsClearing',parts_payable:'insightsPayable',expenses:'journalExpenses',transfers:'journalTransfers'};
 const primaryMetrics=['receipts','parts_cost','expenses','recorded_difference'] as const;
@@ -36,7 +35,7 @@ export function AccountInsights({workspace,account,name,currency,onSessionExpire
       if(!response.ok){if(silent&&response.status>=500){setResult(current=>current?.request===request?{...current,error:'journalUnavailable'}:current);return;}setResult({request,data:null,error:response.status===404?'journalAccessLost':response.status===400?'insightsInvalidPeriod':'journalUnavailable'});return;}
       const raw=await response.json();if(raw.basis!=='cash')throw new Error('invalid_basis');
       const loaded=parsePeriodInsights(raw,request.period);
-      if(active){setResult({request,data:loaded,error:null});recordDataRefresh(workspace,account);}
+      if(active)setResult({request,data:loaded,error:null});
     }catch{if(active)setResult(current=>silent?(current?.request===request?{...current,error:'journalUnavailable'}:current):{request,data:null,error:'journalUnavailable'});}finally{loading=false;}};
     void load();const stop=onForegroundRefresh(()=>{void load(true);});
     return()=>{active=false;stop();controller.abort();};

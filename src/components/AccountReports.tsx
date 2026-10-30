@@ -1,3 +1,4 @@
+import {localToday} from '../domain/local-time';
 import {PartsRegister} from './PartsRegister';
 import React,{useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,Platform,Text,TextInput,View} from 'react-native';
@@ -91,6 +92,6 @@ SHA-256: {report.hash}</Text>
  {l.settlements.map(s=><View key={s.id}><Text selectable style={styles.muted}>{tr('Reimbursement','Возмещение')}: {s.transaction} · {reportMoney(s.cents)}</Text>{!report.id&&canWrite&&<Button label={tr('Cancel reimbursement link','Отменить связь возмещения')} disabled={!!pending||sending||cancelReason.trim().length<3||cancelReason.length>500} onPress={()=>setPending({path:'/cancellations',body:{id:randomUUID(),target:s.id,kind:'reimbursement',reason:cancelReason},summary:tr('Restore this payment to ordinary report processing: ','Вернуть эту оплату в обычную обработку отчёта: ')+s.transaction+' · '+cancelReason})}/>}</View>)}
  </View>)}</Card>}
  {!report?.id&&<PartsRegister key={workspace+account} workspace={workspace} account={account} canWrite={canWrite} onSessionExpired={onSessionExpired} accounts={[{workspace,account,name:report?.data.account_name??account},...personalAccounts]}/>}
- <Card><Text style={styles.h2}>{tr('Saved Statements','Сохранённые Statement')}</Text>{saved.map(s=><Button key={s.id} label={`${s.from} — ${s.to} · ${s.created_at.slice(0,10)} · ${s.id.slice(0,8)}`} disabled={sending||!!pending} onPress={()=>{setError('');setEdit(null);setPage(0);setRequest(r=>({...r,id:s.id,revision:r.revision+1}));}}/>)}</Card>
+ <Card><Text style={styles.h2}>{tr('Saved Statements','Сохранённые Statement')}</Text>{saved.map(s=><Button key={s.id} label={`${s.from} — ${s.to} · ${localToday(new Date(s.created_at))} · ${s.id.slice(0,8)}`} disabled={sending||!!pending} onPress={()=>{setError('');setEdit(null);setPage(0);setRequest(r=>({...r,id:s.id,revision:r.revision+1}));}}/>)}</Card>
  </>;
 }
