@@ -92,7 +92,7 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
       {data.transaction&&<View style={{gap:8,paddingVertical:12}}>
         <Text style={styles.h2}>{transactionLabel(data.transaction,locale)}</Text>
         <Text style={styles.text}>{transactionPerson(data.transaction,locale)}</Text>
-        <Text style={styles.h2}>{journalMoney(transactionAmount(data.transaction).toString(),locale,currency)}</Text>
+        <Text style={[styles.h2,{color:transactionAmount(data.transaction)<0n?colors.red:colors.green}]}>{transactionAmount(data.transaction)>0n?'+':''}{journalMoney(transactionAmount(data.transaction).toString(),locale,currency)}</Text>
         <Text style={styles.muted}>{data.transaction.paid_at?.slice(0,10)??t('journalNotPaid')}</Text>
       </View>}
       <Button label={technical?(locale==='ru'?'Скрыть технические подробности':'Hide technical details'):(locale==='ru'?'Технические подробности':'Technical details')} onPress={()=>setTechnical(value=>!value)}/>
