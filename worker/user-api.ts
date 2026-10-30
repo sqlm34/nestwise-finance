@@ -19,6 +19,7 @@ import {nativeAppOrigin,trustedNativeOrigin} from './auth-origins';
 import {productionReady} from './production-policy';
 
 export type UserEnv = DocumentEnv & ReceiptEnv & {
+  CRM_LABEL_SOURCE?:{fetch(input:string,init?:RequestInit):Promise<Response>};
   FINANCIAL_INGESTION_ENABLED?:string;CRM_SERVICE_KEYS?:string;PRODUCTION_CRM_APPROVED?:string;
   ENVIRONMENT: string; AUTH_ENABLED?: string; AUTH_DATABASE_URL?: string;
   AUTH_SECRET?: string; AUTH_BASE_URL?: string; AUTH_WEB_ORIGIN?: string;

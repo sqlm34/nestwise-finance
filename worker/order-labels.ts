@@ -16,8 +16,9 @@ export async function orderLabels<T>(page:T,connections:unknown,env:UserEnv,fetc
     const canonical=['nestwise-order-labels-v1','POST',path,key.connectionId,keyId,timestamp,await sha256(raw)].join('\n');
     const cryptoKey=await crypto.subtle.importKey('raw',Uint8Array.from(key.secret.match(/../g)!,h=>parseInt(h,16)),{name:'HMAC',hash:'SHA-256'},false,['sign']);
     const signature=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',cryptoKey,new TextEncoder().encode(canonical))),n=>n.toString(16).padStart(2,'0')).join('');
-    const result=await fetcher('https://alex-crm-api.alexeasyrepair.workers.dev'+path,{method:'POST',redirect:'error',signal:AbortSignal.timeout(4000),headers:{'content-type':'application/json','x-nw-connection':key.connectionId,'x-nw-key-id':keyId,'x-nw-timestamp':timestamp,'x-nw-signature':signature},body:raw});
-    if(!result.ok)return page;
+    const transport=env.CRM_LABEL_SOURCE?(input:string,init:RequestInit)=>env.CRM_LABEL_SOURCE!.fetch(input,init):fetcher;
+    const result=await transport('https://alex-crm-api.alexeasyrepair.workers.dev'+path,{method:'POST',redirect:'error',signal:AbortSignal.timeout(4000),headers:{'content-type':'application/json','x-nw-connection':key.connectionId,'x-nw-key-id':keyId,'x-nw-timestamp':timestamp,'x-nw-signature':signature},body:raw});
+    if(!result.ok){console.warn('CRM labels unavailable',result.status);return page;}
     const data=JSON.parse(await limitedText(result,100000));
     if(!Array.isArray(data.labels)||data.labels.length>100)return page;
     const names=new Map<string,string>();

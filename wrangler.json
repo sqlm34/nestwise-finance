@@ -51,6 +51,7 @@
     },
     "production": {
       "name": "nestwise-production",
+      "services": [{"binding":"CRM_LABEL_SOURCE","service":"alex-crm-api"}],
       "workers_dev": false,
       "routes": [{"pattern": "nestwise.universestitch.com", "custom_domain": true}],
       "observability": {
