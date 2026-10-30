@@ -10,7 +10,7 @@ import {Button,Card,Notice,colors,styles} from './ui';
 import {AutomaticUpdates} from './AutomaticUpdates';
 type Feed={connection:null|{institution:string;name:string;mask:string;enabled:boolean;checked_at:string|null;changed_at:string|null;error:string|null};
  rows:{id:string;paid_on:string;name:string;cents:string;pending:boolean;category:string;currency:string}[];count?:number};
-export function PersonalBankFeed({workspace,account,onSessionExpired,allowAppUpdate=false}:{workspace:string;account:string;onSessionExpired:()=>void;allowAppUpdate?:boolean}){
+export function PersonalBankFeed({workspace,account,onSessionExpired,allowAppUpdate=false,fallback}:{workspace:string;account:string;onSessionExpired:()=>void;allowAppUpdate?:boolean;fallback?:React.ReactNode}){
  const {locale}=useApp(),ru=locale==='ru';const [period,setPeriod]=useState(()=>periodPreset('month'));
  const [feed,setFeed]=useState<Feed|null>(null),[error,setError]=useState(false),[revision,setRevision]=useState(0);
  useEffect(()=>{
@@ -30,6 +30,7 @@ export function PersonalBankFeed({workspace,account,onSessionExpired,allowAppUpd
  },[workspace,account,period.from,period.to,revision,onSessionExpired]);
  const shift=(amount:number)=>{setFeed(null);const date=new Date(period.from+'T12:00:00Z');date.setUTCMonth(date.getUTCMonth()+amount);setPeriod(periodPreset('month',date));};
  const connection=feed?.connection;
+ if(feed&&!connection&&fallback)return <>{fallback}</>;
  return <Card>
   <AutomaticUpdates canApply={allowAppUpdate}/>
   <Text style={styles.h2}>{ru?'Личные банковские операции':'Personal bank transactions'}</Text>
