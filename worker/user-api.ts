@@ -73,6 +73,7 @@ export async function userApi(request: Request, env: UserEnv,
     preflight.headers.set('Access-Control-Allow-Headers','Content-Type, Expo-Origin');
     return preflight;
   }
+  const bankMatch=request.method==='GET'?/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/bank-feed$/i.exec(url.pathname):null;
   const purchaseMatch=request.method==='GET'?/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/purchase-candidates$/i.exec(url.pathname):null;
   const partsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/parts$/i.exec(url.pathname);
   const partsRoute=!!partsMatch&&!url.search&&['GET','POST'].includes(request.method);
@@ -105,7 +106,7 @@ export async function userApi(request: Request, env: UserEnv,
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&!purchaseMatch&&(!reportRoute||reportWrite||!!reportMatch?.[3])&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(purchaseMatch || partsRoute || reportRoute || periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
+  if ((url.search&&!bankMatch&&!purchaseMatch&&(!reportRoute||reportWrite||!!reportMatch?.[3])&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(bankMatch || purchaseMatch || partsRoute || reportRoute || periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || crmMatch || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
   if((partsRoute&&request.method==='POST'||reportWrite||receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!trustedNativeOrigin(request.headers.get('expo-origin'),config.origins))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
@@ -132,6 +133,7 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
+    if(bankMatch){const period=parsePeriodParams(url.searchParams);return finish(response(await db.readBankFeed(subject,bankMatch[1],bankMatch[2],period.from,period.to)));}
     if(crmMatch)return finish(response(crmStatus(await db.userCrmStatus(subject,crmMatch[1],crmMatch[2]),env)));
     if(receiptRoute&&receiptMatch)return finish(await receiptApi(receiptUpload?request:safeRequest,env,db,subject,receiptMatch[1],receiptMatch[2],receiptMatch[3]?.toLowerCase(),receiptMatch[4]));
     if(purchaseMatch){
