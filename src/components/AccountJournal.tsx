@@ -9,6 +9,7 @@ import {authenticatedFetch} from '../auth/client';
 import type {MessageKey} from '../i18n';
 import {JournalDetail} from './JournalDetail';
 import {transactionLabel,transactionPerson,transactionAmount} from '../domain/transaction-label';
+import {onForegroundRefresh} from '../foreground-refresh';
 const labels:Record<JournalCode,MessageKey>={
   clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',
   parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',expenses:'journalExpenses',transfers:'journalTransfers',
@@ -31,24 +32,29 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
   const filterError=validateHistoryFilters(filters);
   const dirty=JSON.stringify(filters)!==JSON.stringify(request.filters);
   useEffect(()=>{
-    const controller=new AbortController();let active=true;
-    (async()=>{
+    const controller=new AbortController();let active=true,loading=false;
+    const load=async(silent=false)=>{
+      if(loading)return;loading=true;
       try {
         const response=await authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/journal${
           historyParams(request.filters,request.cursors.at(-1)!)}`,controller.signal);
         if(!active)return;
         if(response.status===401){onSessionExpired();return;}
         if(!response.ok){
+          if(silent&&response.status>=500){setResult(current=>current?.request===request?{...current,error:'journalUnavailable'}:current);return;}
           setResult({request,page:null,error:response.status===404?'journalAccessLost':response.status===400?'journalRestart':'journalUnavailable'});
           return;
         }
         const loaded=parseHistoryPage(await response.json());
         if(active)setResult({request,page:loaded,error:null});
       } catch {
-        if(active)setResult({request,page:null,error:'journalUnavailable'});
-      }
-    })();
-    return ()=>{active=false;controller.abort();};
+        if(active)setResult(current=>silent?(current?.request===request?{...current,error:'journalUnavailable'}:current):{request,page:null,error:'journalUnavailable'});
+      }finally{loading=false;}
+    };
+    void load();
+    // Keep the current cursor and filters; do not jump back while browsing history.
+    const stop=onForegroundRefresh(()=>{void load(true);});
+    return ()=>{active=false;stop();controller.abort();};
   },[workspace,account,request,onSessionExpired]);
   const restart=(next:JournalFilters)=>setRequest(current=>({filters:next,cursors:[null],revision:current.revision+1}));
   const emptyFiltered=!!(request.filters.query||request.filters.from||request.filters.to||request.filters.code!=='all');
