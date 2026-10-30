@@ -22,6 +22,8 @@ async function createAuthFixture() {
   const {authConfiguration,userApi}=require('../.test-build/worker/user-api.js');
   const auth=await createAuth(authConfiguration(env),pool);
   const ledger=()=>({
+    personalDocument:async(subject,workspace,account,hash,action,data)=>(await db.query('SELECT nestwise.personal_document($1,$2,$3,$4,$5,$6) result',[subject,workspace,account,hash,action,JSON.stringify(data)])).rows[0].result,
+    readBankFeed:async(...args)=>(await db.query('SELECT nestwise.read_bank_feed($1,$2,$3,$4,$5) result',args)).rows[0].result,
     purchaseCandidates:async(...args)=>(await db.query('SELECT nestwise.purchase_candidates($1,$2,$3,$4,$5,$6,$7) result',args)).rows[0].result,
     readParts:async(...args)=>(await db.query('SELECT nestwise.read_parts($1,$2,$3) result',args)).rows[0].result,
     partsCommand:async(subject,workspace,account,data)=>(await db.query('SELECT nestwise.parts_command($1,$2,$3,$4) result',[subject,workspace,account,JSON.stringify(data)])).rows[0].result,

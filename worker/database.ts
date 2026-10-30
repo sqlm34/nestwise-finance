@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import type {JournalFilters} from '../src/domain/journal-filters';
 export type Database = {
+  personalDocument(subject:string,workspace:string,account:string,hash:string|null,action:string,data:unknown):Promise<unknown>;
   readBankFeed(subject:string,workspace:string,account:string,from:string,to:string):Promise<unknown>;
   purchaseCandidates(subject:string,workspace:string,account:string,query:string,from:string|null,to:string|null,min:string):Promise<unknown>;
   readParts(subject:string,workspace:string,account:string):Promise<unknown>;
@@ -49,6 +50,7 @@ export type Database = {
 export function database(url: string): Database {
   const sql = neon(url);
   return {
+    async personalDocument(subject,workspace,account,hash,action,data){return (await sql`SELECT nestwise.personal_document(${subject},${workspace}::uuid,${account}::uuid,${hash},${action},${JSON.stringify(data)}::jsonb) result`)[0].result;},
     async userCrmStatus(subject,workspace,account) { return (await sql`SELECT nestwise.user_crm_status(${subject},${workspace}::uuid,${account}::uuid) result`)[0].result; },
     async cancelOwnerExpense(subject,workspace,account,data){return (await sql`SELECT nestwise.cancel_owner_expense(${subject},${workspace}::uuid,${account}::uuid,${JSON.stringify(data)}::jsonb) result`)[0].result;},
     async purchaseCandidates(subject,workspace,account,query,from,to,min){return (await sql`SELECT nestwise.purchase_candidates(${subject},${workspace}::uuid,${account}::uuid,${query},${from}::date,${to}::date,${min}::bigint) result`)[0].result;},

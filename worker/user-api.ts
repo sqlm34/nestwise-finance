@@ -1,3 +1,4 @@
+import {personalDocumentApi} from './personal-documents';
 import {crmStatus} from './crm-status';
 import {orderLabels} from './order-labels';
 import {parsePartsCommand} from '../src/domain/parts';
@@ -73,6 +74,10 @@ export async function userApi(request: Request, env: UserEnv,
     preflight.headers.set('Access-Control-Allow-Headers','Content-Type, Expo-Origin');
     return preflight;
   }
+  const personalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/(personal-statements|personal-expenses)(?:\/([0-9a-f]{64})(?:\/(original|ocr|review))?)?$/i.exec(url.pathname);
+  const personalRoute=!!personalMatch&&!url.search&&(request.method==='GET'&&(!personalMatch[5]||personalMatch[5]==='original')||request.method==='POST'&&!!personalMatch[4]&&(personalMatch[3]==='personal-expenses'&&!personalMatch[5]||personalMatch[3]==='personal-statements'&&!!personalMatch[5]));
+  const personalWrite=personalRoute&&request.method==='POST';
+  const personalUpload=personalWrite&&personalMatch?.[5]==='original';
   const bankMatch=request.method==='GET'?/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/bank-feed$/i.exec(url.pathname):null;
   const purchaseMatch=request.method==='GET'?/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/purchase-candidates$/i.exec(url.pathname):null;
   const partsMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/parts$/i.exec(url.pathname);
@@ -106,15 +111,15 @@ export async function userApi(request: Request, env: UserEnv,
   const eventDetailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/events\/([0-9a-f-]{36})$/i.exec(url.pathname);
   const journalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal$/i.exec(url.pathname);
   const detailMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/journal\/([0-9a-f-]{36})$/i.exec(url.pathname);
-  if ((url.search&&!bankMatch&&!purchaseMatch&&(!reportRoute||reportWrite||!!reportMatch?.[3])&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(bankMatch || purchaseMatch || partsRoute || reportRoute || periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
+  if ((url.search&&!bankMatch&&!purchaseMatch&&(!reportRoute||reportWrite||!!reportMatch?.[3])&&(reconciliationWrite||!receiptList&&!journalMatch&&!detailMatch&&!eventsMatch&&!eventDetailMatch&&!insightsMatch&&!reconciliationMatch&&!savedMatch)) || !(personalRoute || bankMatch || purchaseMatch || partsRoute || reportRoute || periodsMatch || receiptRoute || adminRoute || manualWrite || documentRoute || invitationRoute || reconciliationWrite || authPaths.get(url.pathname) === request.method ||
     request.method === 'GET' && (url.pathname === '/v1/session' || crmMatch || journalMatch || detailMatch || eventsMatch || eventDetailMatch || insightsMatch || reconciliationMatch || savedMatch))) return finish(response({error:'not_found'},404));
-  if((partsRoute&&request.method==='POST'||reportWrite||receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!trustedNativeOrigin(request.headers.get('expo-origin'),config.origins))return finish(response({error:'forbidden_origin'},403));
+  if((personalWrite||partsRoute&&request.method==='POST'||reportWrite||receiptWrite||adminWrite||manualWrite||reconciliationWrite||documentWrite)&&!origin&&!trustedNativeOrigin(request.headers.get('expo-origin'),config.origins))return finish(response({error:'forbidden_origin'},403));
   // Cap credential bodies before the auth library parses JSON.
   let safeRequest=request;
-  if (request.method==='POST'&&!documentWrite&&!receiptUpload) {
+  if (request.method==='POST'&&!documentWrite&&!receiptUpload&&!personalUpload) {
     if (request.headers.get('content-type')?.split(';')[0] !== 'application/json') return finish(response({error:'invalid_body'},415));
     let raw: string;
-    try {const limit=reportWrite?16384:receiptWrite?65536:manualWrite||reconciliationWrite?16384:4096;raw=await limitedText(request,limit);}
+    try {const limit=personalWrite?250000:reportWrite?16384:receiptWrite?65536:manualWrite||reconciliationWrite?16384:4096;raw=await limitedText(request,limit);}
     catch {return finish(response({error:'invalid_body'},413));}
     safeRequest=new Request(request.url,{method:request.method,headers:request.headers,body:raw});
   }
@@ -133,6 +138,7 @@ export async function userApi(request: Request, env: UserEnv,
     if(!session) return finish(response({error:'unauthorized'},401));
     const db=ledger(env.NESTWISE_DATABASE_URL!);
     const subject=`better-auth:${session.user.id}`;
+    if(personalRoute&&personalMatch)return finish(await personalDocumentApi(personalUpload?request:safeRequest,env,db,subject,personalMatch[1],personalMatch[2],personalMatch[3],personalMatch[4]?.toLowerCase(),personalMatch[5]));
     if(bankMatch){const period=parsePeriodParams(url.searchParams);return finish(response(await db.readBankFeed(subject,bankMatch[1],bankMatch[2],period.from,period.to)));}
     if(crmMatch)return finish(response(crmStatus(await db.userCrmStatus(subject,crmMatch[1],crmMatch[2]),env)));
     if(receiptRoute&&receiptMatch)return finish(await receiptApi(receiptUpload?request:safeRequest,env,db,subject,receiptMatch[1],receiptMatch[2],receiptMatch[3]?.toLowerCase(),receiptMatch[4]));
@@ -236,7 +242,7 @@ export async function userApi(request: Request, env: UserEnv,
     if(error instanceof Error&&error.message==='invalid_bank_booking')return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='ocr_rate_limited')return finish(response({error:error.message},429));
     if(error instanceof Error&&['ocr_not_configured','ocr_incomplete','ocr_unavailable'].includes(error.message))return finish(response({error:error.message},503));
-    if(error instanceof Error&&['receipt_conflict','receipt_already_posted','receipt_limit','member_unavailable'].includes(error.message))return finish(response({error:error.message},409));
+    if(error instanceof Error&&['receipt_conflict','receipt_already_posted','receipt_limit','member_unavailable','bank_match_conflict'].includes(error.message))return finish(response({error:error.message},409));
     if(error instanceof Error&&error.message==='invalid_receipt')return finish(response({error:error.message},400));
     if(error instanceof Error&&['workspace_command_conflict','workspace_limit','last_workspace_owner'].includes(error.message))return finish(response({error:error.message},409));
     if(error instanceof Error&&error.message==='invalid_workspace_command')return finish(response({error:error.message},400));
@@ -244,7 +250,7 @@ export async function userApi(request: Request, env: UserEnv,
     if(error instanceof Error&&error.message==='invalid_manual_operation')return finish(response({error:error.message},400));
     if(error instanceof Error&&error.message==='archive_full')return finish(response({error:'archive_full'},409));
     if(error instanceof Error&&['reconciliation_conflict','reconciliation_mismatch'].includes(error.message))return finish(response({error:error.message},409));
-    if(error instanceof Error&&['invalid_reconciliation','invalid_document'].includes(error.message))return finish(response({error:error.message},400));
+    if(error instanceof Error&&['invalid_reconciliation','invalid_document','invalid_personal_document'].includes(error.message))return finish(response({error:error.message},400));
     if(error instanceof Error && error.message==='forbidden') return finish(response({error:'not_found'},404));
     if(error instanceof Error && ['invalid_cursor','invalid_filters'].includes(error.message))return finish(response({error:error.message},400));
     return finish(response({error:'temporarily_unavailable'},503));
