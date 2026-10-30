@@ -16,15 +16,17 @@ export function LiveShell({children,access,selected,title,navigation,onSelect,on
  const space=access?.workspaces.find(w=>w.id===selected?.workspace);
  const sidebar=<View style={{paddingHorizontal:13,paddingVertical:25,gap:0,flex:1,backgroundColor:'#fff'}}>
   <View style={{flexDirection:'row',alignItems:'center',gap:9,marginHorizontal:10,marginBottom:32}}><View style={{width:36,height:36,borderRadius:11,backgroundColor:colors.green,alignItems:'center',justifyContent:'center'}}><Text style={{color:'#fff',fontSize:25,fontWeight:'800'}}>n</Text></View><Text style={{color:colors.ink,fontSize:25,fontWeight:'800',letterSpacing:-1.4}}>nestwise</Text>{!wide&&<Pressable accessibilityRole="button" accessibilityLabel={t('close')} onPress={()=>setMenu(false)} style={{marginLeft:'auto',padding:10}}><X size={20} color={colors.ink}/></Pressable>}</View>
+  <ScrollView style={{flex:1}} contentContainerStyle={{paddingBottom:24}}>
   <Text style={[styles.label,{marginHorizontal:10,marginBottom:8,color:'#9aaca4'}]}>{locale==='ru'?'ПРОСТРАНСТВА':'SPACES'}</Text>
   {access?.workspaces.map(w=><NavigationItem key={w.id} label={w.name} disabled={busy} selected={selected?.workspace===w.id}
    onPress={()=>{const a=w.accounts.find(a=>a.id===selected?.account)||w.accounts[0];if(a)onSelect({workspace:w.id,account:a.id,name:a.name,currency:a.currency});setMenu(false);}}/>)}
   {selected&&<View style={{gap:0,marginTop:14}}><Text style={[styles.label,{paddingHorizontal:12,marginBottom:8}]}>{locale==='ru'?'РАБОЧЕЕ ПРОСТРАНСТВО':'WORKSPACE'}</Text>{navigation(()=>setMenu(false))}</View>}
-  {access&&<Button label={t('authSignOut')} disabled={busy} onPress={onSignOut}/>}
+  </ScrollView>
+  {access&&<View style={{paddingTop:18,borderTopWidth:1,borderTopColor:colors.line}}><Button label={t('authSignOut')} disabled={busy} onPress={onSignOut}/></View>}
  </View>;
  return <SafeAreaView style={{flex:1,backgroundColor:colors.bg}}>
   <View style={{flex:1,flexDirection:'row'}}>
-   {access&&wide&&<View style={{width:248,borderRightWidth:1,borderColor:colors.line}}><ScrollView>{sidebar}</ScrollView></View>}
+   {access&&wide&&<View style={{width:248,borderRightWidth:1,borderColor:colors.line}}>{sidebar}</View>}
    <View style={{flex:1}}>
     <View style={{minHeight:wide?72:62,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:'#fff',paddingHorizontal:wide?30:15,borderBottomWidth:1,borderColor:colors.line}}>
      <View style={{flexDirection:'row',alignItems:'center',gap:12,flex:1}}>
@@ -53,7 +55,7 @@ export function LiveShell({children,access,selected,title,navigation,onSelect,on
    </View></View>
   </Modal>
   <Modal visible={!!access&&!wide&&menu} animationType="slide" onRequestClose={()=>setMenu(false)}>
-   <SafeAreaView style={{flex:1}}><ScrollView>{sidebar}</ScrollView></SafeAreaView>
+   <SafeAreaView style={{flex:1,backgroundColor:'#fff'}}>{sidebar}</SafeAreaView>
   </Modal>
  </SafeAreaView>;
 }
