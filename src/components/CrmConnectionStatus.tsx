@@ -2,8 +2,10 @@ import React,{useEffect,useState} from 'react';
 import {AppState,Pressable,Text,View} from 'react-native';
 import {authenticatedFetch} from '../auth/client';
 import {useApp} from '../state';
+import {useLastDataRefresh} from '../data-refresh';
 export function CrmConnectionStatus({workspace,account}:{workspace:string;account:string}){
  const {locale}=useApp(),ru=locale==='ru';
+ const refreshedAt=useLastDataRefresh(workspace,account);
  const [revision,setRevision]=useState(0);
  const [result,setResult]=useState<{revision:number;status:{connected:boolean;reason:string;last:string|null}}|null>(null);
  const status=result?.revision===revision?result.status:null;
@@ -22,7 +24,8 @@ export function CrmConnectionStatus({workspace,account}:{workspace:string;accoun
  const title=!status?(ru?'Проверяем связь с CRM…':'Checking CRM connection…'):green?(ru?'CRM подключена':'CRM connected'):status.reason==='unavailable'?(ru?'Связь с CRM не подтверждена':'CRM connection could not be verified'):(ru?'CRM не подключена':'CRM disconnected');
  return <Pressable accessibilityRole="button" accessibilityLabel={`${title}. ${ru?'Проверить снова':'Check again'}`} onPress={()=>setRevision(value=>value+1)} style={{padding:12,borderRadius:11,borderWidth:1,borderColor:!status?'#dfe9e3':green?'#c5dfd0':'#f1caca',backgroundColor:!status?'#f4f7f5':green?'#e4f5ec':'#fceeee',gap:5}}>
   <View style={{flexDirection:'row',alignItems:'center',gap:8}}><View style={{width:8,height:8,borderRadius:4,backgroundColor:color}}/><Text accessibilityLiveRegion="polite" style={{fontSize:12,fontWeight:'700',color}}>{title}</Text></View>
-  {status?.last&&<Text style={{fontSize:11,color}}>{ru?'Последнее событие: ':'Last event: '}{new Date(status.last).toLocaleString(ru?'ru-RU':'en-US')}</Text>}
+  {refreshedAt!==null&&<Text style={{fontSize:12,fontWeight:'600',color}}>{ru?'Данные обновлены: ':'Data refreshed: '}{new Date(refreshedAt).toLocaleTimeString(ru?'ru-RU':'en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</Text>}
+  {status?.last&&<Text style={{fontSize:11,color}}>{ru?'Последняя операция из CRM: ':'Last CRM event: '}{new Date(status.last).toLocaleString(ru?'ru-RU':'en-US')}</Text>}
   {status?.reason==='key_unavailable'&&<Text style={{fontSize:11,color}}>{ru?'Ключ подключения недоступен или срок действия истёк.':'Connection key is unavailable or expired.'}</Text>}
   {green&&<Text style={{fontSize:11,color}}>{ru?'Приём событий включён. Нажмите для повторной проверки.':'Event reception enabled. Tap to check again.'}</Text>}
  </Pressable>;
