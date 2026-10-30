@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {useBackStep} from '../back-navigation';
 import {transactionLabel,transactionPerson,transactionAmount} from '../domain/transaction-label';
 import {ActivityIndicator,Text,View} from 'react-native';
 import {Button,Card,Notice,styles,colors} from './ui';
@@ -39,6 +40,7 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
   const [result,setResult]=useState<{request:typeof request;data:Detail|EventDetail|null;manual?:ManualDetail;error:MessageKey|null}|null>(null);
   const [saving,setSaving]=useState(false),[saveError,setSaveError]=useState(false);
   const [technical,setTechnical]=useState(!!event);
+  useBackStep(true,onClose,30);
   const busy=result?.request!==request,data=busy?null:result?.data;
   useEffect(()=>{
     const controller=new AbortController();let active=true;
