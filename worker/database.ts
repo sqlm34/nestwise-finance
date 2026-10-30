@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import type {JournalFilters} from '../src/domain/journal-filters';
 export type Database = {
+  readBankFeed(subject:string,workspace:string,account:string,from:string,to:string):Promise<unknown>;
   purchaseCandidates(subject:string,workspace:string,account:string,query:string,from:string|null,to:string|null,min:string):Promise<unknown>;
   readParts(subject:string,workspace:string,account:string):Promise<unknown>;
   partsCommand(subject:string,workspace:string,account:string,data:unknown):Promise<unknown>;
@@ -102,6 +103,7 @@ export function database(url: string): Database {
       const rows = await sql`SELECT nestwise.read_journal(${hash},${workspace}::uuid,${account}::uuid) result`;
       return rows[0].result;
     },
+    async readBankFeed(subject,workspace,account,from,to) { return (await sql`SELECT nestwise.read_bank_feed(${subject},${workspace}::uuid,${account}::uuid,${from}::date,${to}::date) result`)[0].result; },
     async processPending() { await sql`SELECT nestwise.process_pending()`; },
     async userAccess(subject) {
       return (await sql`SELECT nestwise.user_access(${subject}) result`)[0].result;

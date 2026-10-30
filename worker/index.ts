@@ -1,10 +1,11 @@
+import {syncPersonalBanks,type BankEnv} from './personal-banks';
 import { validateEvent, uuid } from './contract';
 import { authenticateEvent, limitedText, sha256 } from './security';
 import { database, type Database } from './database';
 import { userApi, type UserEnv } from './user-api';
 import {productionReady} from './production-policy';
 import {observeRequest} from './observability';
-export type Env = UserEnv & {
+export type Env = UserEnv & BankEnv & {
   ENVIRONMENT: 'development' | 'staging' | 'production';
   FINANCIAL_INGESTION_ENABLED?: string;
   NESTWISE_DATABASE_URL?: string;
@@ -68,6 +69,7 @@ export function createWorker(connect: (url: string) => Database = database) {
     },
     async scheduled(_event: unknown, env: Env): Promise<void> {
       if (enabled(env)) await connect(env.NESTWISE_DATABASE_URL!).processPending();
+      if (productionReady(env)) await syncPersonalBanks(env);
     },
   };
 }
