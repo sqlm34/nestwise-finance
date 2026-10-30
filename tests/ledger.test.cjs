@@ -62,12 +62,12 @@ before(async () => {
     await db.exec(readFileSync('db/migrations/0018_statement_periods.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0019_cash_basis_reads.sql','utf8'));
     await db.exec(readFileSync('db/migrations/0020_accountant_reports.sql','utf8'));
-    for(const name of ['0021_parts_register.sql','0022_statement_handoff.sql','0023_purchase_search.sql','0024_receipt_statement_categories.sql','0025_crm_status.sql'])await db.exec(readFileSync('db/migrations/'+name,'utf8'));
+    for(const name of ['0021_parts_register.sql','0022_statement_handoff.sql','0023_purchase_search.sql','0024_receipt_statement_categories.sql','0025_crm_status.sql','0026_personal_bank_feed.sql'])await db.exec(readFileSync('db/migrations/'+name,'utf8'));
   }
   else {
     const { migrate }=require('../scripts/migrate.cjs');
     await migrate(db); await migrate(db);
-    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,25);
+    assert.equal((await sql('SELECT count(*)::int n FROM public.nestwise_schema_migrations'))[0].n,26);
   }
   await sql('INSERT INTO nestwise.workspaces VALUES ($1,$2,$3),($4,$5,$6)', [workspace,'LLC test','business',otherWorkspace,'Family test','family']);
   await sql('INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES ($1,$2,$3),($4,$5,$6)', [account,workspace,'Clearing test',otherAccount,otherWorkspace,'Private test']);
