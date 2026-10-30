@@ -11,15 +11,15 @@ async function receiptFile(name:string,bytes:Uint8Array):Promise<ReceiptFile>{
   const digest=await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256,Uint8Array.from(bytes));
   return {name,bytes,mime,hash:Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('')};
 }
-export async function readReceiptFile(){
+export async function readReceiptFile(pdfOnly=false){
   let cached:File|undefined;
   try{
-    const result=await DocumentPicker.getDocumentAsync({type:['image/jpeg','image/png','image/webp','application/pdf'],copyToCacheDirectory:true,base64:false});
+    const result=await DocumentPicker.getDocumentAsync({type:pdfOnly?['application/pdf']:['image/jpeg','image/png','image/webp','application/pdf'],copyToCacheDirectory:true,base64:false});
     if(result.canceled)return null;const asset=result.assets[0];
     if(Platform.OS!=='web')cached=new File(asset.uri);
     if((asset.size??0)>5_000_000)throw new Error('fileTooLarge');
     const bytes=asset.file?new Uint8Array(await asset.file.arrayBuffer()):await cached!.bytes();
-    return await receiptFile(asset.name,bytes);
+    const file=await receiptFile(asset.name,bytes);if(pdfOnly&&file.mime!=='application/pdf')throw new Error('unsupportedFormat');return file;
   }finally{if(cached?.exists)try{cached.delete();}catch{/* Picker cache only. */}}
 }
 export async function captureReceipt(recover=false):Promise<ReceiptFile|null>{
