@@ -18,7 +18,7 @@ import expo.modules.kotlin.views.ExpoView
 
 // Only Android's actual autofill callback can request automatic submission.
 // Typing, pasting, focus changes and cancelled authentication never do so.
-private class CredentialField(context: Context) : EditText(context) {
+internal class CredentialField(context: Context) : EditText(context) {
   var filling = false
   var filled: (() -> Unit)? = null
   override fun autofill(value: AutofillValue) {
