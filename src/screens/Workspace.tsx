@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, BackHandler, ScrollView, Text, View } from 'react-native';
+import {LoginFields,type Credentials} from '../components/LoginFields';
 import {BackStepsContext} from '../back-navigation';
 import {createBackSteps} from '../domain/back-steps';
 import {LiveShell} from '../components/LiveShell';
@@ -25,6 +26,8 @@ const routes:Record<LiveSection,string>={insights:'/',journal:'/transactions',re
 export default function Workspace({initialSection='insights'}:{initialSection?:LiveSection}) {
   const {t,locale,offline}=useApp();
   const [email,setEmail]=useState(''),[password,setPassword]=useState('');
+  const [passwordReset,setPasswordReset]=useState(0);
+  const signingIn=useRef(false);
   const [access,setAccess]=useState<Access|null>(null),[busy,setBusy]=useState(!!apiURL),[error,setError]=useState('');
   const [selected,setSelected]=useState<Selection|null>(null);
   const [expired,setExpired]=useState(false);
@@ -77,17 +80,19 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
     })();
   },[installAccess]);
   useFocusEffect(useCallback(()=>{refreshAccess();return()=>{requestVersion.current++;requestAbort.current?.abort();installAccess(null);setSelected(null);setPassword('');};},[refreshAccess,installAccess]));
-  async function signIn() {
+  async function signIn(credentials:Credentials={email,password}) {
+    if(signingIn.current||busy||!apiURL||!credentials.email.trim()||!credentials.password)return;
+    signingIn.current=true;
     const version=++requestVersion.current;
     setBusy(true);setError('');setExpired(false);setSelected(null);
     try {
-      const result=await authClient.signIn.email({email:email.trim(),password});
+      const result=await authClient.signIn.email({email:credentials.email.trim(),password:credentials.password});
       if(version!==requestVersion.current)return;
-      setPassword('');
+      setPassword('');setPasswordReset(value=>value+1);
       if(result.error){setError(result.error.status===429?t('authRateLimit'):t('authInvalid'));return;}
       refreshAccess();
     } catch {if(version===requestVersion.current)setError(t('authUnavailable'));}
-    finally {if(version===requestVersion.current)setBusy(false);}
+    finally {signingIn.current=false;if(version===requestVersion.current)setBusy(false);}
   }
   async function signOut() {
     const version=++requestVersion.current,current=accessRef.current;
@@ -129,10 +134,8 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
           <Text style={styles.h2}>{access.user.name}</Text><Text style={styles.muted}>{access.user.email}</Text>
           <Button label={t('authSignOut')} disabled={busy} onPress={()=>void signOut()}/>
         </> : <>
-          <Text style={styles.text}>{t('authEmail')}</Text>
-          <TextInput accessibilityLabel={t('authEmail')} style={styles.input} value={email} onChangeText={setEmail} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" autoComplete="email" editable={!busy}/>
-          <Text style={styles.text}>{t('authPassword')}</Text>
-          <TextInput accessibilityLabel={t('authPassword')} style={styles.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" editable={!busy} onSubmitEditing={()=>{if(apiURL&&email&&password&&!busy)void signIn();}}/>
+          <LoginFields email={email} password={password} emailLabel={t('authEmail')} passwordLabel={t('authPassword')} editable={!busy} passwordReset={passwordReset}
+            onChange={value=>{setEmail(value.email);setPassword(value.password);}} onSubmit={value=>void signIn(value)}/>
           <Button label={t('authSignIn')} primary disabled={busy||!apiURL||!email||!password} onPress={()=>void signIn()}/>
           <Button label={t('inviteTitle')} disabled={busy} onPress={()=>router.push('/activate')}/>
         </>}
