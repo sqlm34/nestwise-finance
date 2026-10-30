@@ -1,3 +1,4 @@
+import {localDateTime} from '../domain/local-time';
 import React,{useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,Text,View} from 'react-native';
 import * as Crypto from 'expo-crypto';
@@ -63,7 +64,7 @@ export function StatementArchive({workspace,account,canWrite,file,onSessionExpir
     {busy&&<ActivityIndicator/>}{!!error&&<Notice error text={error}/>} {!!notice&&<Notice text={notice}/>}
     {!documents&&!error&&<ActivityIndicator/>}{documents?.length===0&&<Text style={styles.muted}>{ru?'Архив пока пуст.':'Archive is empty.'}</Text>}
     {documents?.map(doc=><View key={doc.hash} style={{gap:8,borderTopWidth:1,borderColor:'#dfe9e3',paddingTop:12}}>
-      <Text style={styles.text}>{doc.archived?(ru?'Сохранён':'Archived'):(ru?'Загрузка не завершена — выберите тот же файл и повторите':'Upload pending — select the same file and retry')} · {doc.bytes} bytes · {new Date(doc.created_at).toLocaleString(locale)}</Text>
+      <Text style={styles.text}>{doc.archived?(ru?'Сохранён':'Archived'):(ru?'Загрузка не завершена — выберите тот же файл и повторите':'Upload pending — select the same file and retry')} · {doc.bytes} bytes · {localDateTime(doc.created_at,locale)}</Text>
       <Text selectable style={styles.muted}>SHA-256: {doc.hash}</Text>
       <Text style={styles.muted}>{ru?'Связанных сверок, включая отменённые':'Linked reconciliations, including canceled'}: {doc.linked_groups}</Text>
       {doc.archived&&<View style={styles.row}><Button label={ru?'Открыть оригинал':'Open original'} disabled={busy} onPress={()=>void action('open',doc.hash)}/><Button label={ru?'Проверить обе копии':'Verify both copies'} disabled={busy} onPress={()=>void action('verify',doc.hash)}/><Button label={ru?'Проверить сверки':'Review evidence'} disabled={busy} onPress={()=>setReviewHash(doc.hash)}/></View>}

@@ -1,4 +1,5 @@
 import {exactUsd} from './exact-money';
+import {localToday} from './local-time';
 import {journalCodes,type JournalCode} from './journal';
 export type Period={from:string;to:string};
 export type PeriodSummary=Period & {transaction_count:string;missing_paid_date:string;totals:Record<JournalCode,string>};
@@ -15,7 +16,7 @@ export function previousPeriod(period:Period):Period{
   return {from:iso(new Date(+from-(+to-+from+dayMs))),to:iso(new Date(+from-dayMs))};
 }
 export function periodPreset(kind:'month'|'quarter'|'year',now=new Date()):Period{
-  const start=new Date(now);start.setUTCHours(0,0,0,0);start.setUTCDate(1);
+  const start=new Date(localToday(now)+'T00:00:00Z');start.setUTCDate(1);
   if(kind==='year')start.setUTCMonth(0);if(kind==='quarter')start.setUTCMonth(Math.floor(start.getUTCMonth()/3)*3);
   const end=new Date(start);end.setUTCMonth(end.getUTCMonth()+(kind==='year'?12:kind==='quarter'?3:1));end.setUTCDate(0);
   return {from:iso(start),to:iso(end)};

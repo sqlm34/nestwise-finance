@@ -1,4 +1,5 @@
 import {exactUsd} from './exact-money';
+import {localDateTime} from './local-time';
 export const journalCodes=['clearing','receipts','refunds','parts_cost','parts_payable','fees','expenses','transfers'] as const;
 export type JournalCode=typeof journalCodes[number];
 export type JournalTransaction={
@@ -56,8 +57,6 @@ export function journalMoney(cents:string,locale:'en'|'ru',currency:string):stri
 }
 export function journalDate(value:string,locale:'en'|'ru'):string {
   timestamp(value);
-  return new Intl.DateTimeFormat(locale==='ru'?'ru-RU':'en-US',{
-    year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'UTC',hour12:false,
-  }).format(new Date(value))+' UTC';
+  return localDateTime(value,locale);
 }
 

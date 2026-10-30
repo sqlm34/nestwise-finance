@@ -1,3 +1,4 @@
+import {localDateTime} from '../domain/local-time';
 import React,{useEffect,useRef,useState} from 'react';
 import {ActivityIndicator,Text,TextInput,View} from 'react-native';
 import * as Crypto from 'expo-crypto';
@@ -62,6 +63,6 @@ export function StatementPeriod({workspace,account,hash,canWrite,onSessionExpire
       <Button primary label={pending?(ru?'Повторить сохранение':'Retry save'):(ru?'Сохранить новую версию':'Save new revision')} disabled={busy||!confirmed||history.length>=100} onPress={()=>void save()}/>
     </>}
     {busy&&<ActivityIndicator/>}
-    {history?.map(item=><Text key={item.id} selectable style={styles.muted}>v{item.revision} · {item.data.from} — {item.data.to} · {insightMoney(BigInt(item.data.opening_cents),locale)} → {insightMoney(BigInt(item.data.closing_cents),locale)} · {new Date(item.created_at).toLocaleString(locale)}</Text>)}
+    {history?.map(item=><Text key={item.id} selectable style={styles.muted}>v{item.revision} · {item.data.from} — {item.data.to} · {insightMoney(BigInt(item.data.opening_cents),locale)} → {insightMoney(BigInt(item.data.closing_cents),locale)} · {localDateTime(item.created_at,locale)}</Text>)}
   </View>;
 }

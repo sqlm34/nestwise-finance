@@ -10,7 +10,7 @@ import type {MessageKey} from '../i18n';
 import {JournalDetail} from './JournalDetail';
 import {transactionLabel,transactionPerson,transactionAmount} from '../domain/transaction-label';
 import {onForegroundRefresh} from '../foreground-refresh';
-import {recordDataRefresh} from '../data-refresh';
+import {recordJournalChange} from '../domain/journal-change';
 const labels:Record<JournalCode,MessageKey>={
   clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',
   parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',expenses:'journalExpenses',transfers:'journalTransfers',
@@ -47,7 +47,7 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
           return;
         }
         const loaded=parseHistoryPage(await response.json());
-        if(active){setResult({request,page:loaded,error:null});recordDataRefresh(workspace,account);}
+        if(active){setResult({request,page:loaded,error:null});recordJournalChange(workspace,account,loaded.entries.map(row=>`${row.id}:${row.source_event_id}`).join('|'));}
       } catch {
         if(active)setResult(current=>silent?(current?.request===request?{...current,error:'journalUnavailable'}:current):{request,page:null,error:'journalUnavailable'});
       }finally{loading=false;}

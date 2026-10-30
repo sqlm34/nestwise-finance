@@ -28,7 +28,7 @@ test('journal money preserves bigint cents beyond Number precision in both langu
   assert.throws(()=>journalMoney('1.5','en','USD'),/invalid_journal/);
   assert.throws(()=>journalMoney('100','en','EUR'),/invalid_journal/);
 });
-test('journal dates use explicit UTC instead of silently moving a payment to the previous local day',()=>{
-  assert.match(journalDate('2026-10-20T00:30:00Z','en'),/Oct 20, 2026.*00:30 UTC/);
+test('timestamp details show Indianapolis time with explicit daylight offset',()=>{
+  assert.match(journalDate('2026-10-20T00:30:00Z','en'),/Oct 19, 2026.*20:30:00 EDT/);
   assert.throws(()=>journalDate('2026-10-20T00:30:00','en'),/invalid_journal/);
 });

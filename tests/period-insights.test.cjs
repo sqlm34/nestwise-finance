@@ -2,10 +2,10 @@ const {test}=require('node:test');const assert=require('node:assert/strict');
 const {periodPreset,previousPeriod,parsePeriodParams,parsePeriodInsights,periodMetrics,insightMoney}=require('../.test-build/src/domain/period-insights.js');
 const totals={clearing:'0',receipts:'0',refunds:'0',parts_cost:'0',parts_payable:'0',fees:'0',expenses:'0',transfers:'0'};
 const summary=(from,to)=>({from,to,transaction_count:'0',missing_paid_date:'0',totals:{...totals}});
-test('period presets and equal-length comparisons use UTC and handle leap years and year changes',()=>{
+test('period presets use the Indianapolis calendar and comparisons handle leap years and year changes',()=>{
   assert.deepEqual(periodPreset('month',new Date('2024-02-29T23:30:00Z')),{from:'2024-02-01',to:'2024-02-29'});
   assert.deepEqual(periodPreset('quarter',new Date('2026-12-31T23:00:00Z')),{from:'2026-10-01',to:'2026-12-31'});
-  assert.deepEqual(periodPreset('year',new Date('2024-01-01T00:00:00Z')),{from:'2024-01-01',to:'2024-12-31'});
+  assert.deepEqual(periodPreset('year',new Date('2024-01-01T00:00:00Z')),{from:'2023-01-01',to:'2023-12-31'});
   assert.deepEqual(previousPeriod({from:'2026-01-01',to:'2026-01-31'}),{from:'2025-12-01',to:'2025-12-31'});
   assert.deepEqual(previousPeriod({from:'2024-03-01',to:'2024-03-01'}),{from:'2024-02-29',to:'2024-02-29'});
 });

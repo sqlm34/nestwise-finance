@@ -1,3 +1,4 @@
+import {localToday} from '../domain/local-time';
 import React,{useEffect,useRef,useState} from 'react';
 import {Text,TextInput,View} from 'react-native';
 import {randomUUID} from 'expo-crypto';
@@ -16,7 +17,7 @@ export function ManualOperationForm({user,workspace,account,accounts,onSaved,onS
   accounts:{id:string;name:string}[];onSaved:()=>void;onSessionExpired:()=>void}){
   const {locale,offline}=useApp(),ru=locale==='ru';
   const scope=React.useMemo(()=>({origin:apiURL,user,workspace,account}),[user,workspace,account]);
-  const [kind,setKind]=useState<ManualOperation['kind']>('expense'),[amount,setAmount]=useState(''),[paid,setPaid]=useState(()=>new Date().toISOString().slice(0,10));
+  const [kind,setKind]=useState<ManualOperation['kind']>('expense'),[amount,setAmount]=useState(''),[paid,setPaid]=useState(()=>localToday());
   const [note,setNote]=useState(''),[destination,setDestination]=useState(''),[reference,setReference]=useState('');
   const [splits,setSplits]=useState<{key:string;category:keyof typeof categories;amount:string}[]>([]);
   const [draft,setDraft]=useState<ManualOperation|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState('');
