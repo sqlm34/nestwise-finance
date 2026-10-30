@@ -1,7 +1,7 @@
 export const APP_TIME_ZONE='America/Indiana/Indianapolis';
 type Locale='en'|'ru';
 export function localDateTime(value:string|number|Date,locale:Locale){
-  return new Intl.DateTimeFormat(locale==='ru'?'ru-RU':'en-US',{timeZone:APP_TIME_ZONE,year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZoneName:'short'}).format(new Date(value));
+  return new Intl.DateTimeFormat(locale==='ru'?'ru-RU':'en-US',{timeZone:APP_TIME_ZONE,year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZoneName:'short'}).format(new Date(value));
 }
 /** Calendar date in Indianapolis. Date-only business/document fields are already dates and are not converted. */
 export function localToday(now=new Date()){

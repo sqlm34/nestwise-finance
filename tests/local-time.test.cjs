@@ -9,6 +9,7 @@ test('Indianapolis timestamps use the right DST offset across both clock changes
  assert.match(localDateTime('2026-11-01T06:30:00Z','en'),/01:30:00 EST/);
  assert.equal(localToday(new Date('2026-11-01T03:59:00Z')),'2026-10-31');
  assert.equal(localToday(new Date('2026-11-01T04:00:00Z')),'2026-11-01');
+ assert.match(localDateTime('2026-11-01T04:00:00Z','en'),/00:00:00 EDT/);
 });
 test('unchanged financial polling does not notify the banner; a new payment/refund notifies only its account',()=>{
  let a=0,b=0;const stopA=subscribeJournalChanges('test','a',()=>a++),stopB=subscribeJournalChanges('test','b',()=>b++);
