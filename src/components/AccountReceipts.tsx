@@ -30,6 +30,7 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
   useBackStep(!!selected,()=>{if(!busy&&!pending)setSelected(null);},20);
   const alive=useRef(true),sending=useRef(false),path=`/v1/user/workspaces/${workspace}/accounts/${account}/receipts`;
   const [personalSaved,setPersonalSaved]=useState(false),[personalChecked,setPersonalChecked]=useState(false);
+  const stageLabel=(value:ReceiptStage)=>personal&&value==='payment'?(ru?'Проверен · категории и оплата внутри':'Reviewed · open for categories and payment'):receiptStageLabel(value,ru);
   useEffect(()=>{if(!personal||!selected)return;let active=true;const controller=new AbortController();
     void authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/personal-expenses/${selected.hash}`,controller.signal).then(async r=>{if(r.status===401){onSessionExpired();return;}if(!r.ok)throw Error();const v=await r.json();if(active){setPersonalSaved(!!v);setPersonalChecked(true);}}).catch(()=>{if(active)setError(ru?'Не удалось проверить, учтён ли чек. Откройте его ещё раз.':'Could not check receipt status. Open it again.');});return()=>{active=false;controller.abort();};
   },[personal,selected,workspace,account,onSessionExpired,ru]);
@@ -75,9 +76,9 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
     {!selected?<>
       <TextInput accessibilityLabel={ru?'Поиск чеков на странице':'Search receipts on this page'} placeholder={ru?'Продавец, дата, сумма или позиция':'Supplier, date, amount or item'} style={styles.input} value={query} onChangeText={setQuery}/>
       <Text style={styles.muted}>{ru?'Поиск и фильтры относятся к загруженной странице (до 100 чеков).':'Search and filters cover the loaded page (up to 100 receipts).'}</Text>
-      {(['all','upload','review','payment','posted'] as const).map(value=><Button key={value} label={`${stage===value?'✓ ':''}${value==='all'?(ru?'Все чеки':'All receipts'):receiptStageLabel(value,ru)} (${rows.filter(row=>value==='all'||receiptStage(row)===value).length})`} disabled={busy||loading} onPress={()=>setStage(value)}/>)}
+      {(['all','upload','review','payment','posted'] as const).map(value=><Button key={value} label={`${stage===value?'✓ ':''}${value==='all'?(ru?'Все чеки':'All receipts'):stageLabel(value)} (${rows.filter(row=>value==='all'||receiptStage(row)===value).length})`} disabled={busy||loading} onPress={()=>setStage(value)}/>)}
       <Button label={ru?'Обновить список':'Refresh list'} disabled={busy||loading} onPress={()=>setRevision(v=>v+1)}/>
-      {rows.filter(row=>receiptMatches(row,query,stage)).map(row=><Button key={row.hash} label={[receiptTitle(row,ru),row.review?.data.date,receiptAmount(row.review?.data.total_cents),receiptStageLabel(receiptStage(row),ru)].filter(Boolean).join(' · ')} disabled={busy||loading} onPress={()=>open(row)}/>)}
+      {rows.filter(row=>receiptMatches(row,query,stage)).map(row=><Button key={row.hash} label={[receiptTitle(row,ru),row.review?.data.date,receiptAmount(row.review?.data.total_cents),stageLabel(receiptStage(row))].filter(Boolean).join(' · ')} disabled={busy||loading} onPress={()=>open(row)}/>)}
       {!loading&&rows.length>0&&!rows.some(row=>receiptMatches(row,query,stage))&&<Notice text={ru?'На этой странице совпадений нет. Измените поиск или откройте другую страницу.':'No matches on this page. Change the search or open another page.'}/>}
       {loading&&<Text style={styles.muted}>{ru?'Загрузка…':'Loading…'}</Text>}
       {!!before&&<Button label={ru?'К новым чекам':'Newest receipts'} disabled={busy||loading} onPress={()=>setBefore(null)}/>}
@@ -86,7 +87,7 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
     </>:<>
       <Button label={ru?'К списку':'Back to list'} disabled={busy||!!pending} onPress={()=>setSelected(null)}/>
       <Text style={styles.h2}>{receiptTitle(selected,ru)}</Text>
-      <Notice text={receiptStageLabel(receiptStage(selected),ru)}/>
+      <Notice text={personalSaved?receiptStageLabel('posted',ru):stageLabel(receiptStage(selected))}/>
       <Button label={technical?(ru?'Скрыть технические сведения':'Hide technical details'):(ru?'Технические сведения':'Technical details')} onPress={()=>setTechnical(v=>!v)}/>
       {technical&&<Text selectable style={styles.muted}>{ru?'Идентификатор оригинала SHA-256 (не содержимое чека)':'Original SHA-256 identifier (not receipt contents)'}: {selected.hash}{'\n'}{selected.mime} · {selected.bytes} {ru?'байт':'bytes'}{selected.operation_id?`\n${ru?'Операция журнала':'Journal operation'}: ${selected.operation_id}`:''}</Text>}
       <Button label={ru?'Сохранить оригинал / открыть в приложении':'Save original / open in app'} disabled={busy||!selected.archived} onPress={()=>void action(async()=>{
