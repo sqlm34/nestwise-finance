@@ -4,6 +4,7 @@ export type JournalCode=typeof journalCodes[number];
 export type JournalTransaction={
   id:string;occurred_at:string;paid_at:string|null;posted_at:string;
   source_event_id:string;source_order_id:string;
+  customer_name?:string;
   entries:{code:JournalCode;cents:string}[];
 };
 export type JournalPage={entries:JournalTransaction[];limit:number};
@@ -44,7 +45,7 @@ export function parseJournal(value:unknown):JournalPage {
       source_order_id:(()=>{
         if(typeof row.source_order_id!=='string'||!/^[A-Za-z0-9_.:-]{1,128}$/.test(row.source_order_id))throw new Error('invalid_journal');
         return row.source_order_id;
-      })(),entries:lines};
+      })(),...(typeof row.customer_name==='string'&&row.customer_name.trim()&&row.customer_name.length<=200?{customer_name:row.customer_name.trim()}:{}),entries:lines};
   });
   return {entries,limit:100};
 }

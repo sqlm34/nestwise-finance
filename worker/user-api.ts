@@ -1,4 +1,5 @@
 import {crmStatus} from './crm-status';
+import {orderLabels} from './order-labels';
 import {parsePartsCommand} from '../src/domain/parts';
 import { connectAuth, type AuthService, type AuthConfig } from './auth';
 import {documentApi,type DocumentEnv} from './documents';
@@ -203,13 +204,23 @@ export async function userApi(request: Request, env: UserEnv,
     }
     if(detailMatch){
       let before;try{before=detailBefore(url.searchParams);}catch{return finish(response({error:'invalid_filters'},400));}
-      return finish(response(await db.userJournalDetail(subject,detailMatch[1],detailMatch[2],detailMatch[3],before)));
+      const detail=await db.userJournalDetail(subject,detailMatch[1],detailMatch[2],detailMatch[3],before);
+      if(detail&&typeof detail==='object'&&'transaction' in detail&&detail.transaction&&env.ENVIRONMENT==='production'&&env.FINANCIAL_INGESTION_ENABLED==='true') {
+        try{const enriched=await orderLabels({entries:[detail.transaction]},await db.userCrmStatus(subject,detailMatch[1],detailMatch[2]),env);return finish(response({...detail,transaction:enriched.entries[0]}));}catch{/* Preserve the original detail when CRM is unavailable. */}
+      }
+      return finish(response(detail));
     }
     if(journalMatch) {
       let query;
       try {query=parseHistoryParams(url.searchParams);}
       catch {return finish(response({error:'invalid_filters'},400));}
-      return finish(response(await db.userJournalPage(subject,journalMatch[1],journalMatch[2],query.filters,query.cursor)));
+      const page=await db.userJournalPage(subject,journalMatch[1],journalMatch[2],query.filters,query.cursor);
+      // Authorization and account filtering happen in the journal function first.
+      let enriched=page;
+      if(env.ENVIRONMENT==='production'&&env.FINANCIAL_INGESTION_ENABLED==='true') {
+        try{enriched=await orderLabels(page,await db.userCrmStatus(subject,journalMatch[1],journalMatch[2]),env);}catch{/* Names must never hide financial entries. */}
+      }
+      return finish(response(enriched));
     }
     return finish(response({user:{id:session.user.id,name:session.user.name,email:session.user.email},
       workspaces:await db.userAccess(subject)}));

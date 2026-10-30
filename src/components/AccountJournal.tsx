@@ -1,5 +1,5 @@
 import React,{useEffect,useState} from 'react';
-import {ActivityIndicator,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
+import {ActivityIndicator,Pressable,Text,TextInput,View} from 'react-native';
 import {Card,Button,Notice,SearchField,styles,colors} from './ui';
 import {useApp} from '../state';
 import {journalCodes,journalMoney,type JournalCode} from '../domain/journal';
@@ -8,6 +8,7 @@ import {historyParams,parseHistoryPage,validateHistoryFilters,type HistoryPage} 
 import {authenticatedFetch} from '../auth/client';
 import type {MessageKey} from '../i18n';
 import {JournalDetail} from './JournalDetail';
+import {transactionLabel,transactionPerson,transactionAmount} from '../domain/transaction-label';
 const labels:Record<JournalCode,MessageKey>={
   clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',
   parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',expenses:'journalExpenses',transfers:'journalTransfers',
@@ -59,12 +60,12 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
     {busy&&<ActivityIndicator color={colors.green} accessibilityLabel={t('authLoading')}/>}
     {error&&<Notice error text={t(error)}/>}
     {page?.entries.length===0&&<Text style={styles.muted}>{t('journalNoMatches')}</Text>}
-    <View style={{flexDirection:'row',justifyContent:'space-between',padding:10,backgroundColor:'#f8faf9'}}><Text style={styles.label}>{locale==='ru'?'ИСТОЧНИК':'SOURCE'}</Text><Text style={styles.label}>{locale==='ru'?'СУММА':'AMOUNT'}</Text></View>
-    {page?.entries.slice(0,5).map(row=>{const cash=row.entries.filter(line=>line.code==='clearing').reduce((sum,line)=>sum+BigInt(line.cents),0n);return <Pressable key={row.id} accessibilityRole="button" accessibilityLabel={`${t('journalOrder')} ${row.source_order_id}. ${journalMoney(cash.toString(),locale,currency)}`} onPress={()=>setSelectedTransaction(row.id)} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:12,borderTopWidth:1,borderColor:colors.line}}>
-      <View style={{flex:1,gap:3}}><Text numberOfLines={1} style={styles.text}>{row.source_order_id.startsWith('manual:')?(locale==='ru'?'Ручная операция':'Manual operation'):`${t('journalOrder')} ${row.source_order_id}`}</Text><Text style={styles.muted}>{row.paid_at?.slice(0,10)??t('journalNotPaid')}</Text></View>
+    <View style={{flexDirection:'row',justifyContent:'space-between',padding:10,backgroundColor:'#f8faf9'}}><Text style={styles.label}>{locale==='ru'?'ОПЕРАЦИЯ / КЛИЕНТ':'TRANSACTION / CUSTOMER'}</Text><Text style={styles.label}>{locale==='ru'?'СУММА':'AMOUNT'}</Text></View>
+    {page?.entries.slice(0,5).map(row=>{const cash=transactionAmount(row);return <Pressable key={row.id} accessibilityRole="button" accessibilityLabel={`${transactionLabel(row,locale)}. ${transactionPerson(row,locale)}. ${journalMoney(cash.toString(),locale,currency)}`} onPress={()=>setSelectedTransaction(row.id)} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:12,borderTopWidth:1,borderColor:colors.line}}>
+      <View style={{flex:1,gap:3}}><Text style={styles.text}>{transactionLabel(row,locale)}</Text><Text style={styles.text}>{transactionPerson(row,locale)}</Text><Text style={styles.muted}>{row.paid_at?.slice(0,10)??t('journalNotPaid')}</Text></View>
       <Text style={[styles.text,{fontWeight:'600',color:cash<0n?colors.red:colors.green}]}>{journalMoney(cash.toString(),locale,currency).replace(/ USD$/,'')}</Text>
     </Pressable>;})}
-    <Text style={[styles.muted,{fontSize:11}]}>{locale==='ru'?'Изменение клиринга · USD · дата оплаты (UTC)':'Clearing movement · USD · payment date (UTC)'}</Text>
+    <Text style={[styles.muted,{fontSize:11}]}>{locale==='ru'?'Плюс — деньги пришли, минус — деньги ушли.':'Plus means money received; minus means money spent.'}</Text>
   </Card>;
   return <Card>
     <View style={styles.between}><Text accessibilityRole="header" style={styles.h2}>{t('journalTitle')}</Text>
@@ -108,15 +109,12 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
     {page&&<>
       <Text style={styles.muted}>{t('page')} {request.cursors.length} · {t('journalShown')} {page.entries.length} · {t('journalLimit')}</Text>
       {page.entries.length===0&&<Notice text={t(emptyFiltered?'journalNoMatches':'journalEmpty')}/>}
-      <ScrollView horizontal><View style={{minWidth:640,flex:1}}>
-       <View style={{flexDirection:'row',backgroundColor:'#f8faf9',padding:10}}>{[locale==='ru'?'ИСТОЧНИК':'SOURCE',locale==='ru'?'ДАТА ОПЛАТЫ':'PAID DATE',locale==='ru'?'СТАТУС':'STATUS',locale==='ru'?'КЛИРИНГ':'CLEARING'].map((heading,index)=><Text key={heading} style={[styles.label,{width:index===0?250:120,textAlign:index===3?'right':'left'}]}>{heading}</Text>)}</View>
-       {page.entries.map(transaction=>{const cash=transaction.entries.filter(line=>line.code==='clearing').reduce((total,line)=>total+BigInt(line.cents),0n);return <Pressable key={transaction.id} accessibilityRole="button" accessibilityLabel={`${transaction.source_order_id}. ${t('provenanceOpen')}`} onPress={()=>setSelectedTransaction(transaction.id)} style={{flexDirection:'row',alignItems:'center',paddingHorizontal:10,paddingVertical:13,borderBottomWidth:1,borderColor:'#edf1ef'}}>
-        <Text numberOfLines={2} style={[styles.text,{width:250,fontSize:12}]}>{transaction.source_order_id.startsWith('manual:')?(locale==='ru'?'Ручная операция':'Manual operation'):`CRM · ${transaction.source_order_id}`}</Text>
-        <Text style={[styles.muted,{width:120,fontSize:12}]}>{transaction.paid_at?.slice(0,10)??t('journalNotPaid')}</Text>
-        <Text style={[styles.muted,{width:120,fontSize:12}]}>{locale==='ru'?'Проведено':'Posted'}</Text>
-        <Text style={[styles.text,{width:120,textAlign:'right',fontSize:12,fontVariant:['tabular-nums']}]}>{journalMoney(cash.toString(),locale,currency).replace(/ USD$/,'')}</Text>
+      <View>
+       {page.entries.map(transaction=>{const cash=transactionAmount(transaction);return <Pressable key={transaction.id} accessibilityRole="button" accessibilityLabel={`${transactionLabel(transaction,locale)}. ${transactionPerson(transaction,locale)}. ${journalMoney(cash.toString(),locale,currency)}`} onPress={()=>setSelectedTransaction(transaction.id)} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:16,borderBottomWidth:1,borderColor:colors.line}}>
+        <View style={{flex:1,gap:4}}><Text style={[styles.text,{fontWeight:'600'}]}>{transactionLabel(transaction,locale)}</Text><Text style={styles.text}>{transactionPerson(transaction,locale)}</Text><Text style={[styles.muted,{fontSize:12}]}>{transaction.paid_at?.slice(0,10)??t('journalNotPaid')}</Text></View>
+        <Text style={[styles.text,{textAlign:'right',fontWeight:'700',color:cash<0n?colors.red:colors.green,fontVariant:['tabular-nums']}]}>{cash>0n?'+':''}{journalMoney(cash.toString(),locale,currency).replace(/ USD$/,'')}</Text>
        </Pressable>;})}
-      </View></ScrollView>
+      </View>
       <Text style={styles.muted}>{t(page.next_cursor?'journalMore':'journalEnd')}</Text>
     </>}
     <View style={styles.row}>
