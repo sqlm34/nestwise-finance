@@ -43,6 +43,12 @@ test('personal PDFs and categorized receipts remain scoped, recoverable, idempot
   const rid=randomUUID();await db.query('SELECT nestwise.review_receipt($1,$2,$3,$4,$5,0,$6)',[subject,f.workspace,f.account,rh,rid,JSON.stringify(receipt)]);
   await db.query("INSERT INTO nestwise.bank_feed_rows VALUES($1,'bank-one','2026-10-30','Synthetic',-1535,false,'OTHER','USD')",[feed]);
   const exp={id:randomUUID(),review:rid,paid_on:'2026-10-30',bank_id:'bank-one',categories:['groceries','household'],extra:'household'};
+  assert.equal((await f.fetch(req(base+'/personal-expenses/'+rh,{...exp,categories:['unknown','household']}))).status,400);
+  assert.equal((await f.fetch(req(base+'/personal-expenses/'+rh,{...exp,bank_id:'another-account-or-missing'}))).status,409);
+  assert.equal((await f.fetch(req(base+'/personal-expenses/'+rh,{...exp,paid_on:'2026-09-01'}))).status,409);
+  await db.query("UPDATE nestwise.bank_feed_rows SET pending=true WHERE id='bank-one'");
+  assert.equal((await f.fetch(req(base+'/personal-expenses/'+rh,exp))).status,409);
+  await db.query("UPDATE nestwise.bank_feed_rows SET pending=false WHERE id='bank-one'");
   for(let i=0;i<2;i++){const r=await f.fetch(req(base+'/personal-expenses/'+rh,exp));assert.equal(r.status,200,await r.clone().text());}
   assert.equal((await db.query('SELECT count(*)::int n FROM nestwise.journal_transactions')).rows[0].n,0);
   await db.query('SELECT nestwise.personal_document($1,$2,$3,NULL,\'expenses\',\'{}\')',[subject,f.workspace,f.account]);const expensesResponse=await f.fetch(req(base+'/personal-expenses'));assert.equal(expensesResponse.status,200,await expensesResponse.clone().text());assert.equal((await expensesResponse.json()).length,1);
