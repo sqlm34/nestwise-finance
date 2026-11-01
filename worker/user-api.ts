@@ -74,7 +74,7 @@ export async function userApi(request: Request, env: UserEnv,
     preflight.headers.set('Access-Control-Allow-Headers','Content-Type, Expo-Origin');
     return preflight;
   }
-  const personalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/(personal-statements|personal-expenses)(?:\/([0-9a-f]{64})(?:\/(original|ocr|review))?)?$/i.exec(url.pathname);
+  const personalMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/(personal-statements|personal-expenses)(?:\/([0-9a-f]{64})(?:\/(original|ocr|review|process))?)?$/i.exec(url.pathname);
   const personalRoute=!!personalMatch&&!url.search&&(request.method==='GET'&&(!personalMatch[5]||personalMatch[5]==='original')||request.method==='POST'&&!!personalMatch[4]&&(personalMatch[3]==='personal-expenses'&&!personalMatch[5]||personalMatch[3]==='personal-statements'&&!!personalMatch[5]));
   const personalWrite=personalRoute&&request.method==='POST';
   const personalUpload=personalWrite&&personalMatch?.[5]==='original';

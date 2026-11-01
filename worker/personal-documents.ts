@@ -4,6 +4,7 @@ import {boundedBody,sha256,verified} from './documents';
 import {receiptMime,parseReceipt} from '../src/domain/receipt';
 import {parsePdfStatement,statementChecks,receiptCategoryTotals,documentDate} from '../src/domain/personal-documents';
 import {recognizeStatement} from './statement-ocr';
+import {processStatement} from './process-statement';
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 type Stored={hash:string;bytes:number;archived:boolean;revision:number;data:unknown};
 export async function personalDocumentApi(request:Request,env:ReceiptEnv,db:Database,subject:string,workspace:string,account:string,kind:string,hash?:string,mode?:string){
@@ -46,10 +47,23 @@ export async function personalDocumentApi(request:Request,env:ReceiptEnv,db:Data
  const bytes=await verified(env.STATEMENTS,key,hash,stored.bytes,5_000_000)??await verified(env.STATEMENTS_BACKUP,key,hash,stored.bytes,5_000_000);
  if(!bytes)throw Error('archive_integrity_error');
  await db.documentAccess(subject,workspace,account,request.method==='POST');
- if(mode==='ocr'&&request.method==='POST'){
+ if((mode==='ocr'||mode==='process')&&request.method==='POST'){
   const body=await request.json();if(!body||Object.keys(body).length!==1||body.consent!==true)return Response.json({error:'ocr_consent_required'},{status:400});
-  if(env.NESTWISE_OCR_ENABLED!=='true'||!env.NESTWISE_OCR_API_KEY||!env.NESTWISE_OCR_MODEL)throw Error('ocr_not_configured');
-  await call('claim_ocr');const data=await recognizeStatement(bytes,env.NESTWISE_OCR_API_KEY,env.NESTWISE_OCR_MODEL);
+  const recognize=async()=>{
+   if(env.NESTWISE_OCR_ENABLED!=='true'||!env.NESTWISE_OCR_API_KEY||!env.NESTWISE_OCR_MODEL)throw Error('ocr_not_configured');
+   await call('claim_ocr');return recognizeStatement(bytes,env.NESTWISE_OCR_API_KEY,env.NESTWISE_OCR_MODEL);
+  };
+  if(mode==='process')return Response.json(await processStatement(db,subject,workspace,account,hash,recognize,async target=>{
+   const targetCall=(action:string,data:unknown={})=>db.personalDocument(subject,workspace,target,hash,action,data);
+   await targetCall('prepare',{bytes:bytes.length});
+   const targetKey=`personal-statements/v1/${workspace.toLowerCase()}/${target.toLowerCase()}/${hash}`;
+   for(const bucket of [env.STATEMENTS!,env.STATEMENTS_BACKUP!]){
+    await bucket.put(targetKey,bytes,{onlyIf:{etagDoesNotMatch:'*'},httpMetadata:{contentType:'application/octet-stream'}});
+    if(!await verified(bucket,targetKey,hash,bytes.length,5_000_000))throw Error('archive_integrity_error');
+   }
+   await targetCall('complete');
+  }));
+  const data=await recognize();
   await db.documentAccess(subject,workspace,account,true);return Response.json({data,review_required:true});
  }
  return new Response(Uint8Array.from(bytes),{headers:{'Content-Type':'application/octet-stream','Content-Disposition':`attachment; filename="statement-${hash.slice(0,12)}.pdf"`,'Content-Security-Policy':"sandbox; default-src 'none'"}});
