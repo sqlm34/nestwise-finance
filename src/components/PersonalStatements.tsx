@@ -8,7 +8,7 @@ import {cents} from '../domain/money';
 import {exactUsd} from '../domain/exact-money';
 import {useApp} from '../state';
 import {useBackStep} from '../back-navigation';
-import {Button,Card,Notice,styles} from './ui';
+import {Button,Card,Notice,styles,colors} from './ui';
 type Stored={hash:string;bytes:number;archived:boolean;revision:number;data:PdfStatement|null};
 export type StatementResult={account:string;document:Stored;data:PdfStatement;review_required:boolean};
 const decimal=(s:string|null)=>{if(s===null)return '';const n=BigInt(s),a=n<0n?-n:n;return `${n<0n?'-':''}${a/100n}.${String(a%100n).padStart(2,'0')}`;};
@@ -63,7 +63,7 @@ export function PersonalStatements({workspace,account,name,canWrite,onSessionExp
    {!recognized&&!busy&&<Notice text={ru?'PDF сохранён и ожидает обработки. Нажмите «Обработать PDF» — остальное приложение сделает само.':'PDF saved and awaiting processing. Select Process PDF and the app will handle the rest.'}/>}
    {recognized&&<>
    <Text style={styles.h2}>{draft.bank||name} · {draft.mask?`••${draft.mask}`:''}</Text><Text style={styles.text}>{draft.from} — {draft.to} · {draft.rows.length} {ru?'операций':'transactions'}</Text>
-   {!editing&&<><Text style={styles.text}>{ru?'Начальный баланс':'Opening balance'}: {draft.opening_cents===null?'—':exactUsd(BigInt(draft.opening_cents),locale)} · {ru?'Конечный баланс':'Closing balance'}: {draft.closing_cents===null?'—':exactUsd(BigInt(draft.closing_cents),locale)}</Text>{draft.rows.slice(page*20,page*20+20).map((r,i)=><View key={page*20+i} style={{paddingVertical:8,gap:4}}><Text style={styles.muted}>{r.date}</Text><Text style={styles.text}>{r.description}</Text><Text style={styles.text}>{r.cents===null?'—':exactUsd(BigInt(r.cents),locale)}</Text></View>)}{canWrite&&<Button label={ru?'Исправить данные':'Edit details'} disabled={busy} onPress={()=>setEditing(true)}/>}</>}
+   {!editing&&<><Text style={styles.text}>{ru?'Начальный баланс':'Opening balance'}: {draft.opening_cents===null?'—':exactUsd(BigInt(draft.opening_cents),locale)} · {ru?'Конечный баланс':'Closing balance'}: {draft.closing_cents===null?'—':exactUsd(BigInt(draft.closing_cents),locale)}</Text>{draft.rows.slice(page*20,page*20+20).map((r,i)=><View key={page*20+i} style={{paddingVertical:8,gap:4}}><Text style={styles.muted}>{r.date}</Text><Text style={styles.text}>{r.description}</Text><Text style={[styles.text,{fontWeight:'700',color:r.cents!==null&&BigInt(r.cents)>0n?colors.green:colors.ink}]}>{r.cents!==null&&BigInt(r.cents)>0n?'+':''}{r.cents===null?'—':exactUsd(BigInt(r.cents),locale)}</Text></View>)}{canWrite&&<Button label={ru?'Исправить данные':'Edit details'} disabled={busy} onPress={()=>setEditing(true)}/>}</>}
    {editing&&<>
    <Text style={styles.muted}>{ru?'Поступления — положительные суммы, списания — отрицательные.':'Money in is positive; money out is negative.'}</Text>
    {(['bank','mask','from','to'] as const).map(k=><TextInput key={k} accessibilityLabel={{bank:ru?'Банк':'Bank',mask:ru?'Последние 4 цифры':'Last 4 digits',from:ru?'Начало периода':'Period start',to:ru?'Конец периода':'Period end'}[k]} placeholder={{bank:ru?'Банк':'Bank',mask:'5599',from:'YYYY-MM-DD',to:'YYYY-MM-DD'}[k]} style={styles.input} value={draft[k]} editable={canWrite&&!busy&&!pending} onChangeText={v=>setDraft(d=>({...d,[k]:v}))}/>)}

@@ -1,7 +1,21 @@
 // Staging regression boundary, not a production risk acceptance or audit waiver.
 const {spawnSync} = require('node:child_process');
 const {mkdirSync, writeFileSync} = require('node:fs');
+// Build-only reachability review: docs/DEPENDENCY_REVIEW.txt (2026-11-01).
 const reviewed = new Map([
+  ['glob|https://github.com/advisories/GHSA-3g3m-2fjr-6pw4', 'moderate'],
+  ['node-forge|https://github.com/advisories/GHSA-4487-j8r4-4g2f', 'low'],
+  ['node-forge|https://github.com/advisories/GHSA-4642-5mcj-2rqw', 'low'],
+  ['node-forge|https://github.com/advisories/GHSA-525v-9gp9-w22h', 'moderate'],
+  ['node-forge|https://github.com/advisories/GHSA-5cwg-6vw7-rj6p', 'moderate'],
+  ['node-forge|https://github.com/advisories/GHSA-5x38-2vff-x55p', 'high'],
+  ['node-forge|https://github.com/advisories/GHSA-6wvx-3r32-xmcg', 'moderate'],
+  ['node-forge|https://github.com/advisories/GHSA-7wch-p9px-956x', 'high'],
+  ['node-forge|https://github.com/advisories/GHSA-8hrf-8g6f-7xwp', 'high'],
+  ['minimatch|https://github.com/advisories/GHSA-g3hv-75wg-m249', 'moderate'],
+  ['node-forge|https://github.com/advisories/GHSA-h6cr-wjv9-3cpp', 'low'],
+  ['node-forge|https://github.com/advisories/GHSA-hqq3-7jhf-c5jx', 'high'],
+  ['node-forge|https://github.com/advisories/GHSA-jc66-7q78-782g', 'high'],
   ['deepmerge|https://github.com/advisories/GHSA-gcqx-w48m-w2h4', 'low'],
   ['braces|https://github.com/advisories/GHSA-vfj7-8cjw-p6xm', 'high'],
   ['node-forge|https://github.com/advisories/GHSA-86w9-cpqp-85rv', 'high'],
