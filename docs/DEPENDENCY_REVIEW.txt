@@ -127,3 +127,36 @@ a clean dependency audit. If untrusted config/plugin inputs or a development
 server are introduced, reassess before enabling them. Native artifacts still
 require normal signature and device checks.
 Source: https://github.com/advisories/GHSA-gcqx-w48m-w2h4
+
+2026-11-01 — unchanged Expo build-tool advisory drift
+The lockfile is unchanged. Fresh npm audit --omit=dev reports 16 affected nodes
+and 16 distinct advisories (0 critical). The new advisories affect installed
+node-forge 1.4.0, glob 13.0.6 and minimatch 10.2.6; npm explain places them in
+Expo CLI/config/fingerprint/prebuild tools. None is used by statement parsing.
+
+Glob GHSA-3g3m-2fjr-6pw4 concerns continued filesystem traversal after
+AbortSignal cancellation. Minimatch GHSA-g3hv-75wg-m249 concerns attacker-
+controlled pattern amplification. Builds use committed paths/configuration;
+bank PDF bytes and uploaded filenames never enter glob patterns or build jobs.
+Patched glob 14.0.2 and minimatch 11.0.1 are outside the installed major lines;
+blind npm audit --force proposes incompatible Expo downgrades, not a safe fix.
+
+The additional Forge advisories cover ASN.1 encoding, HTTP cookie handling,
+TLS/PEM parsing, modular inversion, certificate-chain mutation/validation,
+AES-GCM tag validation and PKCS#12 processing. The production application uses
+platform TLS/crypto, does not import Forge, and does not accept user-supplied
+keys/certificates for build tooling. Expo tooling on controlled build runners
+remains affected; do not expose a development server or introduce untrusted
+config, keys, certificates or source inputs under this disposition.
+
+Exact advisory IDs/severity ceilings remain recorded in dependency-audit.cjs;
+new, escalated, critical, malformed or unavailable audit evidence still fails.
+Worker input and web/Android/iOS source-map guards now also reject glob and
+minimatch; tests cover both additions. Forge was already rejected. This is an
+explicit build-only reachability review, not remediation, a clean audit, or
+permission to ship these packages in the runtime. Supported tooling upgrades
+and native rebuild verification remain separate follow-up work.
+Sources (individual Forge advisory URLs are enumerated in the audit script):
+https://github.com/advisories/GHSA-3g3m-2fjr-6pw4
+https://github.com/advisories/GHSA-g3hv-75wg-m249
+https://github.com/digitalbazaar/forge/security/advisories

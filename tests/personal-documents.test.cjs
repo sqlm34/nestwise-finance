@@ -60,7 +60,36 @@ test('personal PDFs and categorized receipts remain scoped, recoverable, idempot
   assert.equal((await db.query('SELECT count(*)::int n FROM nestwise.journal_transactions')).rows[0].n,1);
   const other=randomUUID();await db.query("INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES($1,$2,'Other bank')",[other,f.workspace]);
   assert.equal((await f.fetch(req(path.replace(f.account,other)+'/original'))).status,404);
+  const otherPath=path.replace(f.account,other);
+  assert.equal((await f.fetch(req(otherPath+'/original',pdf,true))).status,200);
+  assert.equal((await f.fetch(req(otherPath+'/process',{}))).status,400);
+  // Even without an OCR key, a copy uploaded to the wrong bank finds its saved result.
+  const reused=await f.fetch(req(otherPath+'/process',{consent:true}));assert.equal(reused.status,200,await reused.clone().text());
+  const result=await reused.json();assert.equal(result.account,f.account);assert.equal(result.review_required,false);assert.deepEqual(result.data,statement);
+  assert.equal((await db.query('SELECT ocr_count FROM nestwise.personal_statements WHERE account_id=$1',[other])).rows[0].ocr_count,0);
   await db.query("UPDATE nestwise.memberships SET role='reviewer' WHERE workspace_id=$1",[f.workspace]);
   assert.equal((await f.fetch(req(path+'/review',review))).status,404);
+  assert.equal((await f.fetch(req(otherPath+'/process',{consent:true}))).status,404);
  }finally{await db.close();}
+});
+
+test('automatic PDF processing routes only unique personal accounts and saves only complete reconciled evidence',async()=>{
+ const {processStatement}=require('../.test-build/worker/process-statement.js');
+ async function run(data,options={}){
+  const docs=new Map([['old',{hash:'h',bytes:123,archived:true,revision:0,data:null}]]),writes=[];
+  const db={
+   userAccess:async()=>([{id:'personal',kind:'personal',role:options.role||'owner',accounts:[{id:'old'},{id:'chase'},...(options.ambiguous?[{id:'other-chase'}]:[])]},{id:'business',kind:'business',role:'owner',accounts:[{id:'business-bank'}]}]),
+   readBankFeed:async(s,w,a)=>({connection:{mask:a==='old'?'0190':'5599'}}),
+   documentAccess:async(s,w,a)=>{assert.equal(w,'personal');assert.notEqual(a,'business-bank');},
+   personalDocument:async(s,w,a,h,action,payload)=>{if(action==='get')return docs.get(a)||null;assert.equal(action,'review');writes.push(a);assert.equal(payload.expected,0);const d={...docs.get(a),data:payload.data,revision:1};docs.set(a,d);return d;},
+  };
+  let recognized=0;const recognize=async()=>{recognized++;return data;};
+  const archive=async target=>{docs.set(target,{hash:'h',bytes:123,archived:true,revision:0,data:null});};
+  const result=await processStatement(db,'s','personal','old','h',recognize,archive);
+  return {result,writes,recognized,again:()=>processStatement(db,'s','personal','old','h',()=>{throw Error('must reuse');},archive)};
+ }
+ const good=await run(statement);assert.equal(good.result.account,'chase');assert.equal(good.result.review_required,false);assert.deepEqual(good.writes,['chase']);assert.equal((await good.again()).account,'chase');
+ for(const changed of [{complete:false},{closing_cents:'1'},{opening_cents:null},{mask:''}]){const r=await run({...statement,...changed});assert.equal(r.result.review_required,true);assert.deepEqual(r.writes,[]);}
+ const ambiguous=await run(statement,{ambiguous:true});assert.equal(ambiguous.result.account,'old');assert.deepEqual(ambiguous.writes,[]);
+ await assert.rejects(run(statement,{role:'reviewer'}),/forbidden/);
 });
