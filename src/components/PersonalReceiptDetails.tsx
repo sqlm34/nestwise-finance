@@ -33,9 +33,9 @@ export function PersonalReceiptDetails({workspace,account,hash,review,data,canWr
  const options=(scope==='business'?businessReceiptCategories:personalCategories).filter(c=>`${c.en} ${c.ru}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
  return <View style={{gap:14}}>
   <DigitalReceipt data={data} categories={categories} ru={ru} disabled={!canWrite||busy||!state||!split||!!retry} onCategory={canWrite?index=>{setChoosing(index);setQuery('');setScope(isBusinessCategory(categories[index])?'business':categories[index]?'personal':'business');}:undefined}/>
-  {!!notice&&<Text accessibilityRole="status" style={styles.muted}>{notice}</Text>}
+  {!!notice&&<Text accessibilityLiveRegion="polite" style={styles.muted}>{notice}</Text>}
   {!!error&&<><Notice error text={error}/>{retry&&<Button label={ru?'Повторить сохранение':'Retry save'} disabled={busy} onPress={()=>void save(retry)}/>}<Button label={ru?'Загрузить сохранённые данные':'Reload saved details'} disabled={busy} onPress={()=>{setRetry(null);setChoosing(null);setReload(n=>n+1);}}/></>}
-  {busy&&<Text accessibilityRole="status" style={styles.muted}>{ru?'Сохраняем категорию…':'Saving category…'}</Text>}
+  {busy&&<Text accessibilityLiveRegion="polite" style={styles.muted}>{ru?'Сохраняем категорию…':'Saving category…'}</Text>}
   {!split&&<Notice text={ru?'Для назначения категорий проверьте дату, позиции и итог. Неизвестные суммы показаны знаком «—».':'Check the date, items and total before assigning categories. Unknown amounts are shown as —.'}/>}
   {canWrite&&!state?.payment&&<Button label={ru?'Исправить распознанные данные':'Edit recognized details'} disabled={busy||!!retry} onPress={onEdit}/>}
   {split&&<><Text style={styles.text}>{ru?'Личное':'Personal'}: {money(split.personal_cents)} · Aksenov LLC: {money(split.business_cents)}</Text><Text style={styles.muted}>{ru?'Налог, общие сборы и скидка распределяются между позициями пропорционально их стоимости, точно до цента. Названия и цены позиций сохранены как в чеке.':'Tax, shared charges and discount are allocated proportionally by item price to the cent. Item names and prices remain as printed.'}</Text></>}
