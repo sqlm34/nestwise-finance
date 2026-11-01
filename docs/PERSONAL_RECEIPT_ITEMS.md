@@ -1,0 +1,11 @@
+# Personal receipt items and business Statement
+
+Personal camera/file capture archives the original, then recognizes and saves the receipt. The electronic receipt preserves item names and prices; each item's menu chooses from Personal categories or the existing Statement cost categories. Category selection is immediately persisted as an immutable, revision-checked annotation. Existing saved recognition is reused without another provider call. Missing ancillary charges are zero-filled only when the known item/charge values already equal the printed total exactly.
+
+The owner explicitly requested that business items paid personally belong to Aksenov LLC. The UI uses the available writable business account, requiring selection if there is more than one. PostgreSQL checks permissions on both accounts independently. A category annotation alone does not establish payment: an invoice must first be matched to a posted bank withdrawal or explicitly recorded as paid. Payment date determines the report period.
+
+Migration 0029 adds receipt classifications and report format statement-handoff-v3. Business shares are distinct receipt evidence, not fabricated bank or journal entries. Shared taxes, charges and discounts are allocated proportionally with largest-remainder integer cents. Personal items remain excluded from the business report and PDF. Existing manual owner-expense links cannot coexist with item attribution. Changed bank withdrawals, later receipt reviews and cash refunds exclude the affected share and show a review count. Refund allocation and reimbursement of these item shares are not inferred.
+
+Live Statement, CSV and printable PDF use current item annotations; saved report snapshots retain their historical totals. Receipt archives and Personal expense details display the saved item labels. No mail is sent automatically.
+
+Validation covers exact cent allocation, saved/reloaded categories, idempotency, conflicts, source and destination permissions, bank and cash payment, duplicate owner-link rejection, refunds and changed bank amounts, historical snapshots, CSV/PDF content and personal-item exclusion. Production cutover requires a fresh snapshot, separate restored-copy migration rehearsal, CI and the existing binding-preserving release. Retain the additive schema and financial history on application rollback.

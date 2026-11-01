@@ -4,11 +4,28 @@ import {parseManualOperation} from '../src/domain/manual-operation';
 import {boundedBody,sha256,verified,type DocumentEnv} from './documents';
 import type {Database} from './database';
 import {recognizeReceipt} from './receipt-ocr';
+import {classifyReceipt,completeAbsentCharges} from '../src/domain/receipt-classification';
+import type {Access} from '../src/domain/live-navigation';
 export type ReceiptEnv=DocumentEnv&{NESTWISE_OCR_ENABLED?:string;NESTWISE_OCR_API_KEY?:string;NESTWISE_OCR_MODEL?:string};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subject:string,workspace:string,account:string,hash?:string,mode?:string){
   const write=request.method==='POST';
   await db.documentAccess(subject,workspace,account,write);
+  if(mode==='classification'){
+    if(!write){
+      const state=await db.classifyReceipt(subject,workspace,account,hash!,null) as object;
+      const spaces=await db.userAccess(subject) as Access['workspaces'];
+      const targets=spaces.filter(w=>w.kind==='business'&&['owner','accountant'].includes(w.role)).flatMap(w=>w.accounts.filter(a=>a.currency==='USD').map(a=>({workspace:w.id,account:a.id,name:w.name+' · '+a.name})));
+      return Response.json({...state,targets});
+    }
+    const body=await request.json();
+    if(!body||Object.keys(body).sort().join(',')!=='business_account,business_workspace,categories,expected,id,review'||!uuid.test(body.id)||!uuid.test(body.review)||!Number.isInteger(body.expected)||body.expected<0||body.expected>998||!Array.isArray(body.categories)
+      ||(body.business_workspace===null)!==(body.business_account===null)||body.business_account!==null&&(!uuid.test(body.business_account)||!uuid.test(body.business_workspace)))throw Error('invalid_receipt_classification');
+    const rows=await db.readReceipts(subject,workspace,account,hash!) as {review:{id:string;data:unknown}|null}[];
+    const review=rows.find(r=>r.review?.id===body.review)?.review;if(!review)throw Error('receipt_classification_conflict');
+    classifyReceipt(parseReceipt(review.data,true),body.categories);
+    return Response.json(await db.classifyReceipt(subject,workspace,account,hash!,body));
+  }
   if(mode==='ocr'&&!write){
     return Response.json({enabled:env.NESTWISE_OCR_ENABLED==='true'&&!!env.NESTWISE_OCR_API_KEY&&!!env.NESTWISE_OCR_MODEL&&!!env.STATEMENTS&&!!env.STATEMENTS_BACKUP,provider:'OpenAI',review_required:true});
   }
@@ -39,11 +56,12 @@ export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subj
     return Response.json(await db.readReceipts(subject,workspace,account,hash||null,before));
   }
   let body:Record<string,unknown>;try{const value=await request.json();if(!value||typeof value!=='object'||Array.isArray(value))throw new Error();body=value;}catch{return Response.json({error:'invalid_receipt'},{status:400});}
-  if(mode==='ocr'){
+  if(mode==='ocr'||mode==='process'){
     if(Object.keys(body).length!==1||body.consent!==true)return Response.json({error:'ocr_consent_required'},{status:400});
-    if(env.NESTWISE_OCR_ENABLED!=='true'||!env.NESTWISE_OCR_API_KEY||!env.NESTWISE_OCR_MODEL||!env.STATEMENTS||!env.STATEMENTS_BACKUP)return Response.json({error:'ocr_not_configured'},{status:503});
-    const rows=await db.readReceipts(subject,workspace,account,hash!) as {hash:string;bytes:number;archived:boolean;operation_id:string|null}[];
+    const rows=await db.readReceipts(subject,workspace,account,hash!) as {hash:string;bytes:number;archived:boolean;operation_id:string|null;review:{id:string;revision:number;data:unknown}|null}[];
     const doc=rows.find(r=>r.hash===hash&&r.archived);if(!doc)return Response.json({error:'not_found'},{status:404});
+    if(mode==='process'&&doc.review)return Response.json(doc);
+    if(env.NESTWISE_OCR_ENABLED!=='true'||!env.NESTWISE_OCR_API_KEY||!env.NESTWISE_OCR_MODEL||!env.STATEMENTS||!env.STATEMENTS_BACKUP)return Response.json({error:'ocr_not_configured'},{status:503});
     if(doc.operation_id)return Response.json({error:'receipt_already_posted'},{status:409});
     const key=`receipts/v1/${workspace.toLowerCase()}/${account.toLowerCase()}/${hash}`;
     const bytes=await verified(env.STATEMENTS,key,hash!,doc.bytes,5_000_000)??await verified(env.STATEMENTS_BACKUP,key,hash!,doc.bytes,5_000_000);
@@ -54,6 +72,12 @@ export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subj
     }
     const data=await recognizeReceipt(bytes,env.NESTWISE_OCR_API_KEY,env.NESTWISE_OCR_MODEL);
     await db.documentAccess(subject,workspace,account,true);
+    if(mode==='process'){
+      try{await db.reviewReceipt(subject,workspace,account,hash!,crypto.randomUUID(),0,completeAbsentCharges(data));}
+      catch(error){if(!(error instanceof Error)||error.message!=='receipt_conflict')throw error;}
+      const saved=await db.readReceipts(subject,workspace,account,hash!) as {review:unknown}[];
+      if(!saved[0]?.review)throw Error('ocr_incomplete');return Response.json(saved[0]);
+    }
     return Response.json({data,review_required:true});
   }
   if(mode==='review'){
