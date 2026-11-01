@@ -4,6 +4,16 @@ const {classifyReceipt,completeAbsentCharges}=require('../.test-build/src/domain
 const {parseReport,reportTotals,reportHTML,reportCSV}=require('../.test-build/src/domain/accountant-report.js');
 const receipt={supplier:'SYNTHETIC HOME STORE',date:'2026-09-15',currency:'USD',items:[{description:'CORDLESS DRILL 18V',cents:'10000'},{description:'HOME PLANT',cents:'3000'},{description:'CLEANER',cents:'2000'},{description:'PAINT BRUSH',cents:'1000'},{description:'LIGHT BULB',cents:'4000'}],tax_cents:'1400',tip_cents:'0',shipping_cents:'0',discount_cents:'0',total_cents:'21400'};
 const categories=['tax_37','household',null,'household','household'];
+test('receipt category targets hide only retired acceptance fixtures and retain writable real businesses',async()=>{
+ const {receiptApi}=require('../.test-build/worker/receipts.js');
+ const account=name=>({id:randomUUID(),name,currency:'USD'});
+ const real={id:randomUUID(),name:'Aksenov LLC',kind:'business',role:'owner',accounts:[account('Chase Business'),account('SYNTHETIC OCR acceptance')]};
+ const other={...real,id:randomUUID(),name:'Synthetic Materials LLC',accounts:[account('Checking')]};
+ const retired={...real,id:randomUUID(),name:'SYNTHETIC — production OCR',accounts:[account('Archived fixture')]};
+ const db={documentAccess:async()=>{},classifyReceipt:async()=>({classification:null,payment:null}),userAccess:async()=>[real,other,retired,{...real,id:randomUUID(),role:'reviewer'}]};
+ const r=await receiptApi(new Request('http://localhost/receipt/classification'),{},db,'subject',randomUUID(),randomUUID(),'a'.repeat(64),'classification');
+ assert.deepEqual((await r.json()).targets.map(t=>t.name),['Aksenov LLC · Chase Business','Synthetic Materials LLC · Checking']);
+});
 test('mixed receipts preserve printed item names and allocate shared charges exactly',()=>{
  const r=classifyReceipt(receipt,categories);assert.equal(r.business_cents,'10700');assert.equal(r.personal_cents,'10700');assert.equal(r.items[0].description,receipt.items[0].description);assert.deepEqual(r.allocations,[{category:'tax_37',cents:'10700'}]);
  const pennies={...receipt,items:[{description:'A',cents:'1'},{description:'B',cents:'1'},{description:'C',cents:'1'}],tax_cents:'2',total_cents:'5'};

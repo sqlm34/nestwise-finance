@@ -15,7 +15,7 @@ export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subj
     if(!write){
       const state=await db.classifyReceipt(subject,workspace,account,hash!,null) as object;
       const spaces=await db.userAccess(subject) as Access['workspaces'];
-      const targets=spaces.filter(w=>w.kind==='business'&&['owner','accountant'].includes(w.role)).flatMap(w=>w.accounts.filter(a=>a.currency==='USD').map(a=>({workspace:w.id,account:a.id,name:w.name+' · '+a.name})));
+      const targets=spaces.filter(w=>w.kind==='business'&&w.name!=='SYNTHETIC — production OCR'&&['owner','accountant'].includes(w.role)).flatMap(w=>w.accounts.filter(a=>a.currency==='USD'&&a.name!=='SYNTHETIC OCR acceptance').map(a=>({workspace:w.id,account:a.id,name:w.name+' · '+a.name})));
       return Response.json({...state,targets});
     }
     const body=await request.json();
