@@ -7,8 +7,8 @@ import {personalCategories,receiptCategoryTotals,documentDate} from '../domain/p
 import {exactUsd} from '../domain/exact-money';
 import {Button,Notice,styles} from './ui';
 type BankRow={id:string;paid_on:string;name:string;cents:string;pending:boolean};
-export function PersonalReceiptPosting({workspace,account,hash,review,data,disabled,ru,onSessionExpired,onSaved}:{workspace:string;account:string;hash:string;review:string;data:ReceiptData;disabled:boolean;ru:boolean;onSessionExpired:()=>void;onSaved:()=>void}){
- const [categories,setCategories]=useState(data.items.map(()=> 'groceries')),[extra,setExtra]=useState('groceries');
+export function PersonalReceiptPosting({workspace,account,hash,review,data,disabled,ru,hideCategories=false,onSessionExpired,onSaved}:{workspace:string;account:string;hash:string;review:string;data:ReceiptData;disabled:boolean;ru:boolean;hideCategories?:boolean;onSessionExpired:()=>void;onSaved:()=>void}){
+ const [categories,setCategories]=useState<string[]>(data.items.map(()=> hideCategories?'other':'groceries')),[extra,setExtra]=useState(hideCategories?'other':'groceries');
  const [choosing,setChoosing]=useState<number|null>(null),[paid,setPaid]=useState(data.date),[bank,setBank]=useState<BankRow[]>([]);
  const [selected,setSelected]=useState<string|null|undefined>(undefined),[loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
  const [confirmation,setConfirmation]=useState(false);const command=useRef(randomUUID()),sending=useRef(false),alive=useRef(true);
@@ -31,17 +31,19 @@ export function PersonalReceiptPosting({workspace,account,hash,review,data,disab
  }
  if(saved)return <Notice text={ru?'Расход сохранён с категориями позиций.':'Expense saved with item categories.'}/>;
  return <View style={{gap:10}}>
-  <Text style={styles.h2}>{ru?'Категории и оплата':'Categories and payment'}</Text>
+  <Text style={styles.h2}>{ru?'Оплата чека':'Receipt payment'}</Text>
+  {!hideCategories&&<>
   <Button label={`${ru?'Весь чек':'Whole receipt'}: ${label(extra)}`} disabled={disabled||busy||confirmation} onPress={()=>setChoosing(-1)}/>
   {data.items.map((item,i)=><View key={i} style={{gap:4,paddingVertical:6}}><Text style={styles.text}>{i+1}. {item.description} · {money(item.cents)}</Text><Button label={label(categories[i])} disabled={disabled||busy||confirmation} onPress={()=>setChoosing(i)}/></View>)}
   <Button label={`${ru?'Налог, чаевые, доставка и скидка':'Tax, tip, shipping and discount'}: ${label(extra)}`} disabled={disabled||busy||confirmation} onPress={()=>setChoosing(-2)}/>
   {choosing!==null&&<View style={{gap:6}}>{personalCategories.map(c=><Button key={c.id} label={c[ru?'ru':'en']} onPress={()=>{if(choosing===-1){setCategories(data.items.map(()=>c.id));setExtra(c.id);}else if(choosing===-2)setExtra(c.id);else setCategories(v=>v.map((value,i)=>i===choosing?c.id:value));setChoosing(null);}}/>)}<Button label={ru?'Закрыть категории':'Close categories'} onPress={()=>setChoosing(null)}/></View>}
   {totals.map(t=><Text key={t.category} style={styles.text}>{label(t.category)}: {money(t.cents)}</Text>)}
+  </>}
   <TextInput accessibilityLabel={ru?'Дата оплаты':'Payment date'} placeholder="YYYY-MM-DD" style={styles.input} value={paid} editable={!disabled&&!busy&&!confirmation} onChangeText={v=>{setPaid(v);setLoaded(false);setSelected(undefined);}}/>
   <Button label={ru?'Найти списание в этом банке':'Find withdrawal in this bank'} disabled={disabled||busy||!valid||confirmation} onPress={()=>void find()}/>
   {loaded&&<>
    <Notice text={ru?'Показаны совпадения суммы в пределах 7 дней. Проверьте продавца и дату. Связанный чек не создаёт второе списание.':'Matching amounts within 7 days. Check the merchant and date. Linking a receipt does not create another withdrawal.'}/>
-   {bank.map(row=><Button key={row.id} label={`${row.paid_on} · ${row.name} · ${money(row.cents)}${row.pending?(ru?' · Ожидает подтверждения банком':' · Pending'):''}`} selected={selected===row.id} disabled={row.pending||busy||confirmation} onPress={()=>setSelected(row.id)}/>)}
+   {bank.map(row=><Button key={row.id} label={`${row.paid_on} · ${row.name} · ${money(row.cents)}${row.pending?(ru?' · Ожидает подтверждения банком':' · Pending'):''}`} selected={selected===row.id} disabled={row.pending||busy||confirmation} onPress={()=>{setSelected(row.id);setPaid(row.paid_on.slice(0,10));}}/>)}
    {!bank.length&&<Text style={styles.muted}>{ru?'Совпадений пока нет. Если платили картой, сохранённый чек можно сопоставить позже, когда банк передаст списание.':'No matches yet. For card payments, match this saved receipt later when the bank provides the withdrawal.'}</Text>}
    <Button label={ru?'Оплачено наличными — отдельный расход':'Paid in cash — separate expense'} selected={selected===null} disabled={busy||confirmation} onPress={()=>setSelected(null)}/>
   </>}

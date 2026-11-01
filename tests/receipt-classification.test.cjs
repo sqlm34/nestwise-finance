@@ -1,0 +1,68 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');
+const {readFileSync,writeFileSync,mkdirSync}=require('node:fs');const {randomUUID}=require('node:crypto');
+const {classifyReceipt,completeAbsentCharges}=require('../.test-build/src/domain/receipt-classification.js');
+const {parseReport,reportTotals,reportHTML,reportCSV}=require('../.test-build/src/domain/accountant-report.js');
+const receipt={supplier:'SYNTHETIC HOME STORE',date:'2026-09-15',currency:'USD',items:[{description:'CORDLESS DRILL 18V',cents:'10000'},{description:'HOME PLANT',cents:'3000'},{description:'CLEANER',cents:'2000'},{description:'PAINT BRUSH',cents:'1000'},{description:'LIGHT BULB',cents:'4000'}],tax_cents:'1400',tip_cents:'0',shipping_cents:'0',discount_cents:'0',total_cents:'21400'};
+const categories=['tax_37','household',null,'household','household'];
+test('mixed receipts preserve printed item names and allocate shared charges exactly',()=>{
+ const r=classifyReceipt(receipt,categories);assert.equal(r.business_cents,'10700');assert.equal(r.personal_cents,'10700');assert.equal(r.items[0].description,receipt.items[0].description);assert.deepEqual(r.allocations,[{category:'tax_37',cents:'10700'}]);
+ const pennies={...receipt,items:[{description:'A',cents:'1'},{description:'B',cents:'1'},{description:'C',cents:'1'}],tax_cents:'2',total_cents:'5'};
+ assert.deepEqual(classifyReceipt(pennies,['tax_37',null,null]).items.map(i=>i.gross_cents),['2','2','1']);
+ assert.deepEqual(classifyReceipt({...pennies,tax_cents:'0',discount_cents:'1',total_cents:'2'},[null,null,null]).items.map(i=>i.gross_cents),['1','1','0']);
+ assert.throws(()=>classifyReceipt(receipt,['tax_00',...categories.slice(1)]));assert.throws(()=>classifyReceipt(receipt,categories.slice(1)));
+ assert.equal(completeAbsentCharges({...receipt,tip_cents:null,shipping_cents:null,discount_cents:null}).tip_cents,'0');
+ assert.equal(completeAbsentCharges({...receipt,tax_cents:null}).tax_cents,null);
+});
+test('saved item categories survive reopening and flow once into paid-period Statement, CSV and PDF',async()=>{
+ const f=await require('../scripts/auth-fixture.cjs').createAuthFixture(),db=f.db;
+ try{
+  for(const name of ['0026_personal_bank_feed.sql','0027_bank_sync_cadence.sql','0028_personal_documents.sql','0029_receipt_item_classifications.sql'])await db.exec(readFileSync('db/migrations/'+name,'utf8'));
+  const subject=`better-auth:${f.id}`,personal=randomUUID(),account=randomUUID(),user=(await db.query('SELECT id FROM nestwise.users WHERE subject=$1',[subject])).rows[0].id;
+  await db.query("INSERT INTO nestwise.workspaces VALUES($1,'Personal','personal')",[personal]);await db.query("INSERT INTO nestwise.financial_accounts(id,workspace_id,name) VALUES($1,$2,'Personal checking')",[account,personal]);await db.query("INSERT INTO nestwise.memberships VALUES($1,$2,'owner',true)",[personal,user]);
+  const hash='d'.repeat(64),review=randomUUID();await db.query("SELECT nestwise.prepare_receipt($1,$2,$3,$4,100,'image/jpeg')",[subject,personal,account,hash]);await db.query('SELECT nestwise.complete_receipt($1,$2,$3,$4)',[subject,personal,account,hash]);await db.query('SELECT nestwise.review_receipt($1,$2,$3,$4,$5,0,$6)',[subject,personal,account,hash,review,JSON.stringify(receipt)]);
+  const command={id:randomUUID(),expected:0,review,categories,business_workspace:f.workspace,business_account:f.account};
+  const classify=async body=>(await db.query('SELECT nestwise.classify_receipt($1,$2,$3,$4,$5) result',[subject,personal,account,hash,body===null?null:JSON.stringify(body)])).rows[0].result;
+  const report=async(from='2026-09-01',to='2026-09-30')=>parseReport((await db.query('SELECT nestwise.report_input($1,$2,$3,$4,$5) result',[subject,f.workspace,f.account,from,to])).rows[0].result);
+  const first=await classify(command);assert.equal(first.business_cents,10700);assert.deepEqual(first.items,classifyReceipt(receipt,categories).items);
+  assert.deepEqual(await classify(command),first);assert.deepEqual((await classify(null)).classification.categories,categories);
+  let r=await report();assert.equal(r.data.receipt_pending,'1');assert.equal(reportTotals(r).totals.tax_37,0n);
+  await assert.rejects(classify({...command,id:randomUUID(),categories:['tax_00',...categories.slice(1)]}),/receipt_classification_conflict|invalid_receipt_classification/);
+  await assert.rejects(classify({...command,id:randomUUID(),expected:1,categories:['tax_00',...categories.slice(1)]}),/invalid_receipt_classification/);
+  const feed=randomUUID();await db.query("INSERT INTO nestwise.bank_feeds(id,workspace_id,account_id,institution,label,mask) VALUES($1,$2,$3,'Synthetic','Checking','0190')",[feed,personal,account]);await db.query("INSERT INTO nestwise.bank_feed_rows VALUES($1,'bank-receipt','2026-09-16','SYNTHETIC HOME STORE',-21400,false,'OTHER','USD')",[feed]);
+  const payment={id:randomUUID(),review,paid_on:'2026-09-16',bank_id:'bank-receipt',categories:receipt.items.map(()=>'other'),extra:'other'};
+  for(let i=0;i<2;i++)await db.query("SELECT nestwise.personal_document($1,$2,$3,$4,'expense_save',$5)",[subject,personal,account,hash,JSON.stringify(payment)]);
+  assert.equal((await db.query('SELECT count(*)::int n FROM nestwise.journal_transactions')).rows[0].n,0);
+  r=await report();assert.equal(r.data.receipt_pending,'0');assert.equal(r.data.receipt_expenses.length,1);assert.equal(r.data.receipt_expenses[0].paid_on,'2026-09-16');assert.equal(r.data.receipt_expenses[0].items.length,1);assert.equal(reportTotals(r).totals.tax_37,10700n);assert.equal(reportTotals(r).expense,10700n);
+  assert.equal(reportTotals(await report('2026-10-01','2026-10-31')).expense,0n);
+  assert.match(reportCSV(r),/tax_37/);const html=reportHTML(r);assert.match(html,/CORDLESS DRILL 18V/);assert.match(html,/107\.00/);assert.doesNotMatch(html,/HOME PLANT/);
+  const snapshotId=randomUUID();const saved=(await db.query('SELECT nestwise.save_report_snapshot($1,$2,$3,$4,$5,$6,$7) result',[subject,f.workspace,f.account,snapshotId,'2026-09-01','2026-09-30',r.hash])).rows[0].result;
+  await classify({...command,id:randomUUID(),expected:1,categories:['tax_04',...categories.slice(1)]});
+  const updated=await report();assert.equal(reportTotals(updated).totals.tax_37,0n);assert.equal(reportTotals(updated).totals.tax_04,10700n);assert.equal(reportTotals(parseReport(saved)).totals.tax_37,10700n);assert.notEqual(updated.hash,r.hash);
+  const list=(await db.query("SELECT nestwise.personal_document($1,$2,$3,NULL,'expenses','{}') result",[subject,personal,account])).rows[0].result;assert.equal(list[0].classification.categories[0],'tax_04');
+  await db.query("UPDATE nestwise.bank_feed_rows SET cents=-21000 WHERE feed_id=$1",[feed]);assert.equal(reportTotals(await report()).expense,0n);assert.equal((await report()).data.receipt_pending,'1');
+  await db.query("UPDATE nestwise.bank_feed_rows SET cents=-21400 WHERE feed_id=$1",[feed]);
+  const login=await f.fetch(new Request('http://localhost:8083/api/auth/sign-in/email',{method:'POST',headers:{origin:'http://localhost:8081','Content-Type':'application/json'},body:JSON.stringify({email:f.email,password:f.password})}));
+  const cookie=login.headers.getSetCookie().map(s=>s.split(';')[0]).join('; '),path=`http://localhost:8083/v1/user/workspaces/${personal}/accounts/${account}/receipts/${hash}/classification`;
+  const request=(body)=>new Request(path,{method:body?'POST':'GET',headers:{cookie,origin:'http://localhost:8081','Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+  const read=await f.fetch(request());assert.equal(read.status,200,await read.clone().text());assert.equal((await read.json()).targets.length,1);
+  const post=await f.fetch(request({...command,id:randomUUID(),expected:2,categories}));assert.equal(post.status,200,await post.clone().text());
+  const reuse=await f.fetch(new Request(path.replace('/classification','/process'),{method:'POST',headers:{cookie,origin:'http://localhost:8081','Content-Type':'application/json'},body:JSON.stringify({consent:true})}));assert.equal(reuse.status,200,await reuse.clone().text());assert.equal((await reuse.json()).review.id,review);
+  // Cash payment has one real journal entry; categorization must not add another.
+  const cashHash='e'.repeat(64),cashReview=randomUUID();
+  await db.query("SELECT nestwise.prepare_receipt($1,$2,$3,$4,100,'image/jpeg')",[subject,personal,account,cashHash]);await db.query('SELECT nestwise.complete_receipt($1,$2,$3,$4)',[subject,personal,account,cashHash]);await db.query('SELECT nestwise.review_receipt($1,$2,$3,$4,$5,0,$6)',[subject,personal,account,cashHash,cashReview,JSON.stringify(receipt)]);
+  const cash={...payment,id:randomUUID(),review:cashReview,bank_id:null};await db.query("SELECT nestwise.personal_document($1,$2,$3,$4,'expense_save',$5)",[subject,personal,account,cashHash,JSON.stringify(cash)]);
+  const cashCommand={...command,id:randomUUID(),review:cashReview};await db.query('SELECT nestwise.classify_receipt($1,$2,$3,$4,$5)',[subject,personal,account,cashHash,JSON.stringify(cashCommand)]);
+  assert.equal(reportTotals(await report()).expense,21400n);assert.equal((await db.query('SELECT count(*)::int n FROM nestwise.journal_transactions')).rows[0].n,1);
+  const op=(await db.query('SELECT operation_id FROM nestwise.personal_receipt_expenses WHERE hash=$1',[cashHash])).rows[0].operation_id;
+  const transaction=(await db.query('SELECT id FROM nestwise.journal_transactions WHERE manual_id=$1',[op])).rows[0].id;
+  await assert.rejects(db.query('SELECT nestwise.link_owner_expense($1,$2,$3,$4)',[subject,f.workspace,f.account,JSON.stringify({id:randomUUID(),transaction,business_cents:'10700'})]),/receipt_business_already_linked/);
+  await db.query('SELECT nestwise.post_manual_operation($1,$2,$3,$4)',[subject,personal,account,JSON.stringify({id:randomUUID(),kind:'refund',paid_on:'2026-09-18',amount_cents:'100',note:'Synthetic return',destination_account:null,reference_operation:op,allocations:[]})]);
+  assert.equal(reportTotals(await report()).expense,10700n);assert.equal((await report()).data.receipt_pending,'1');
+  await db.query("UPDATE nestwise.memberships SET role='reviewer' WHERE workspace_id=$1",[f.workspace]);
+  await assert.rejects(classify({...command,id:randomUUID(),expected:3}),/forbidden/);
+  await db.query("UPDATE nestwise.memberships SET role='owner' WHERE workspace_id=$1",[f.workspace]);
+  await db.query("UPDATE nestwise.memberships SET role='reviewer' WHERE workspace_id=$1",[personal]);assert.equal((await f.fetch(request({...command,id:randomUUID(),expected:3}))).status,404);
+  await assert.rejects(db.query('UPDATE nestwise.receipt_classifications SET categories=$1 WHERE id=$2',[JSON.stringify(categories),command.id]),/immutable/);
+  mkdirSync('.local',{recursive:true});writeFileSync('.local/receipt-statement-preview.html',reportHTML(parseReport(saved)));
+ }finally{await db.close();}
+});

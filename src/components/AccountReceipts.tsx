@@ -1,3 +1,4 @@
+import {PersonalReceiptDetails} from './PersonalReceiptDetails';
 import {PersonalReceiptPosting} from './PersonalReceiptPosting';
 import React,{useEffect,useRef,useState} from 'react';
 import {useBackStep} from '../back-navigation';
@@ -26,6 +27,7 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState('');
   const [pending,setPending]=useState<{mode:'review'|'post';body:unknown;summary?:string}|null>(null);
   const [upload,setUpload]=useState<ReceiptFile|null>(null);
+  const [editDetails,setEditDetails]=useState(false);
   const [query,setQuery]=useState(''),[stage,setStage]=useState<ReceiptStage|'all'>('all'),[technical,setTechnical]=useState(false);
   useBackStep(!!selected,()=>{if(!busy&&!pending)setSelected(null);},20);
   const alive=useRef(true),sending=useRef(false),path=`/v1/user/workspaces/${workspace}/accounts/${account}/receipts`;
@@ -43,7 +45,7 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
     return()=>{active=false;controller.abort();};
   },[path,before,revision,onSessionExpired,ru,loadKey]);
   function fill(data:ReceiptData){setForm(data);setMoney(Object.fromEntries(moneyFields.map(k=>[k,decimal(data[k])])));setItems(data.items.map(i=>({key:randomUUID(),description:i.description,amount:decimal(i.cents)})));}
-  function open(row:Receipt){setPersonalChecked(false);setPersonalSaved(false);setSelected(row);fill(row.review?.data||empty());setPending(null);setError('');setPreview('');setTechnical(false);}
+  function open(row:Receipt){setEditDetails(false);setPersonalChecked(false);setPersonalSaved(false);setSelected(row);fill(row.review?.data||empty());setPending(null);setError('');setPreview('');setTechnical(false);}
   async function action(task:()=>Promise<void>){if(sending.current)return;sending.current=true;setBusy(true);setError('');try{await task();}catch{if(alive.current)setError(ru?'Действие не подтверждено. Повторите запрос с теми же данными.':'Action is not confirmed. Retry the same request.');}finally{sending.current=false;if(alive.current)setBusy(false);}}
   async function responseData(response:Response){if(response.status===401){onSessionExpired();throw new Error();}if(!response.ok){const v=await response.json();if(response.status>=400&&response.status<500&&alive.current)setPending(null);if(v.error==='ocr_not_configured')throw new Error('ocr_not_configured');throw new Error();}return response.json();}
   function currentData(){const amount=(s:string|undefined)=>s?.trim()?cents(s).toString():null;
@@ -58,20 +60,33 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
   async function save(){if(!selected||!pending)return;await action(async()=>{await responseData(await authenticatedPost(`${path}/${selected.hash}/${pending.mode}`,pending.body));if(!alive.current)return;
     const values=await responseData(await authenticatedFetch(`${path}/${selected.hash}`));if(!alive.current)return;open(values[0]);setRevision(v=>v+1);
   });}
+  async function processPersonal(row:Receipt){
+    const saved=await responseData(await authenticatedPost(`${path}/${row.hash}/process`,{consent:true},undefined,90_000));
+    if(alive.current){open(saved);setRevision(v=>v+1);}
+  }
+  async function acceptFile(file:ReceiptFile|null){
+    if(!file||!alive.current)return;setUpload(file);if(!personal)return;
+    await responseData(await authenticatedUpload(`${path}/${file.hash}/original`,file.bytes,'application/octet-stream'));
+    const values=await responseData(await authenticatedFetch(`${path}/${file.hash}`));
+    if(!alive.current)return;open(values[0]);setUpload(null);setBefore(null);setRevision(v=>v+1);
+    await processPersonal(values[0]);
+  }
   return <Card><Text accessibilityRole="header" style={styles.h2}>{ru?'Чеки и документы':'Receipts and documents'}</Text>
     <Notice text={ru?'Загрузка и сохранение проверенных данных не создают расход. Подтверждайте оплату только если она ещё не учтена в CRM или журнале.':'Uploading and saving reviewed details do not book an expense. Confirm payment only if it is not already recorded in CRM or the journal.'}/>
     {!!error&&<Notice error text={error}/>}
-    {canWrite&&<>{upload?<>
+    {personal&&busy&&<Notice text={ru?'Сохраняем и распознаём чек…':'Saving and recognizing your receipt…'}/>}
+    {canWrite&&(!personal||!selected)&&<>{upload?<>
       <Notice text={`${upload.name} · ${upload.bytes.length} bytes · ${ru?'Подтвердите загрузку оригинала.':'Confirm original upload.'}`}/>
       <Button primary label={ru?'Загрузить / повторить':'Upload / retry'} disabled={busy||!!pending} onPress={()=>void action(async()=>{
         await responseData(await authenticatedUpload(`${path}/${upload.hash}/original`,upload.bytes,'application/octet-stream'));
-        const values=await responseData(await authenticatedFetch(`${path}/${upload.hash}`));if(alive.current){open(values[0]);setUpload(null);setBefore(null);setRevision(v=>v+1);}
+        const values=await responseData(await authenticatedFetch(`${path}/${upload.hash}`));if(alive.current){open(values[0]);setUpload(null);setBefore(null);setRevision(v=>v+1);}if(personal)await processPersonal(values[0]);
       })}/>
       <Button label={ru?'Закрыть файл':'Dismiss file'} disabled={busy} onPress={()=>setUpload(null)}/>
     </>:<>
-      <Button label={ru?'Выбрать фото или PDF':'Choose image or PDF'} disabled={busy||!!pending} onPress={()=>void action(async()=>{const file=await readReceiptFile();if(alive.current)setUpload(file);})}/>
-      <Button label={ru?'Сфотографировать чек':'Photograph receipt'} disabled={busy||!!pending} onPress={()=>void action(async()=>{const file=await captureReceipt();if(alive.current)setUpload(file);})}/>
-      {Platform.OS==='android'&&<Button label={ru?'Восстановить фото после перезапуска':'Recover photo after restart'} disabled={busy||!!pending} onPress={()=>void action(async()=>{const file=await captureReceipt(true);if(alive.current)setUpload(file);})}/>}
+      {personal&&<Text style={styles.muted}>{ru?'Фото или PDF сохраняется и отправляется в OpenAI для платного распознавания. После обработки откроется электронный чек. Сверьте позиции и итог с оригиналом.':'The photo or PDF is saved and sent to OpenAI for paid recognition. Your digital receipt opens after processing. Check the items and total against the original.'}</Text>}
+      <Button label={ru?'Выбрать фото или PDF':'Choose image or PDF'} disabled={busy||!!pending} onPress={()=>void action(async()=>acceptFile(await readReceiptFile()))}/>
+      <Button primary={personal} label={ru?'Сфотографировать чек':'Photograph receipt'} disabled={busy||!!pending} onPress={()=>void action(async()=>acceptFile(await captureReceipt()))}/>
+      {Platform.OS==='android'&&<Button label={ru?'Восстановить фото после перезапуска':'Recover photo after restart'} disabled={busy||!!pending} onPress={()=>void action(async()=>acceptFile(await captureReceipt(true)))}/>}
     </>}</>}
     {!selected?<>
       <TextInput accessibilityLabel={ru?'Поиск чеков на странице':'Search receipts on this page'} placeholder={ru?'Продавец, дата, сумма или позиция':'Supplier, date, amount or item'} style={styles.input} value={query} onChangeText={setQuery}/>
@@ -100,7 +115,7 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
         const bytes=new Uint8Array(await r.arrayBuffer());if(bytes.length>5_000_000)throw new Error();let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.slice(i,i+8192));if(alive.current)setPreview(`data:${selected.mime};base64,${btoa(raw)}`);
       })}/>}
       {!!preview&&<Image accessibilityLabel={ru?'Оригинал чека':'Original receipt'} source={{uri:preview}} resizeMode="contain" style={{width:'100%',height:420}}/>}
-      {personalSaved?<Notice text={ru?'Расход сохранён с категориями. Посмотреть его можно в разделе «Мои расходы». Повторного списания нет.':'Expense saved with categories. View it in My expenses. No duplicate withdrawal.'}/>:selected.operation_id?<Notice text={ru?'Оплата уже внесена в журнал. Категории и итог доступны в отчётах. Повторно создавать расход не нужно.':'Payment is already in the journal. Categories and totals are available in reports. Do not record this expense again.'}/>:canWrite&&selected.archived&&(!personal||personalChecked)?<>
+      {personal&&!editDetails?(selected.review?<PersonalReceiptDetails key={selected.review.id} workspace={workspace} account={account} hash={selected.hash} review={selected.review.id} data={selected.review.data} canWrite={canWrite&&!busy} ru={ru} onSessionExpired={onSessionExpired} onEdit={()=>setEditDetails(true)}/>:canWrite?<><Notice text={ru?'Оригинал сохранён. Обработка отправит его в OpenAI и создаст электронный чек с позициями.':'Original saved. Processing sends it to OpenAI and creates a digital receipt with items.'}/><Button primary label={ru?'Обработать чек':'Process receipt'} disabled={busy} onPress={()=>void action(()=>processPersonal(selected))}/><Button label={ru?'Заполнить вручную':'Enter manually'} disabled={busy} onPress={()=>setEditDetails(true)}/></>:null):personalSaved?<Notice text={ru?'Расход сохранён с категориями. Посмотреть его можно в разделе «Мои расходы». Повторного списания нет.':'Expense saved with categories. View it in My expenses. No duplicate withdrawal.'}/>:selected.operation_id?<Notice text={ru?'Оплата уже внесена в журнал. Категории и итог доступны в отчётах. Повторно создавать расход не нужно.':'Payment is already in the journal. Categories and totals are available in reports. Do not record this expense again.'}/>:canWrite&&selected.archived&&(!personal||personalChecked)?<>
         {pending&&<>
           <Notice text={pending.mode==='post'?(ru?'Подтвердите: оплата действительно произведена в указанную дату и ещё не внесена в журнал.':'Confirm: payment was made on the stated date and is not already in the journal.'):(ru?'Сохранить новую версию проверенных данных? Расход пока не создаётся.':'Save a new review version? This does not book an expense.')}/>
           {pending.summary&&<Text selectable style={styles.text}>{pending.summary}</Text>}
