@@ -209,6 +209,32 @@ END $$;
 REVOKE ALL ON FUNCTION nestwise.personal_document(text,uuid,uuid,text,text,jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION nestwise.personal_document(text,uuid,uuid,text,text,jsonb) TO nestwise_api;
 
+-- The archive follows the payment account without copying or deleting the original.
+CREATE OR REPLACE FUNCTION nestwise.read_receipts(p_subject text,p_workspace uuid,p_account uuid,p_hash text DEFAULT NULL,p_before text DEFAULT NULL) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=nestwise,pg_temp AS $$
+DECLARE boundary timestamptz;who uuid;
+BEGIN
+ who:=reconciliation_actor(p_subject,p_workspace,p_account,false);
+ IF p_before IS NOT NULL THEN
+  IF p_hash IS NOT NULL THEN RAISE EXCEPTION 'invalid_receipt';END IF;
+  SELECT max(o.created_at) INTO boundary FROM receipt_originals o LEFT JOIN receipt_bank_intents i ON i.account_id=o.account_id AND i.hash=o.hash
+   WHERE o.workspace_id=p_workspace AND coalesce(i.bank_account,o.account_id)=p_account AND o.hash=p_before;
+  IF boundary IS NULL THEN RAISE EXCEPTION 'invalid_receipt';END IF;
+ END IF;
+ RETURN coalesce((SELECT jsonb_agg(to_jsonb(q) ORDER BY q.created_at DESC,q.hash) FROM (SELECT * FROM (
+  SELECT DISTINCT ON(o.hash) o.account_id source_account,o.hash,o.bytes,o.mime,o.created_at,
+   EXISTS(SELECT 1 FROM receipt_archived a WHERE a.account_id=o.account_id AND a.hash=o.hash) archived,
+   (SELECT jsonb_build_object('id',r.id,'revision',r.revision,'data',r.data,'recorded_at',r.recorded_at) FROM receipt_reviews r WHERE r.account_id=o.account_id AND r.hash=o.hash ORDER BY revision DESC LIMIT 1) review,
+   (SELECT p.operation_id FROM receipt_postings p WHERE p.account_id=o.account_id AND p.hash=o.hash) operation_id
+  FROM receipt_originals o LEFT JOIN receipt_bank_intents i ON i.account_id=o.account_id AND i.hash=o.hash
+  JOIN memberships m ON m.workspace_id=o.workspace_id AND m.user_id=who
+  WHERE o.workspace_id=p_workspace AND ((p_hash IS NOT NULL AND o.account_id=p_account AND o.hash=p_hash) OR (p_hash IS NULL AND coalesce(i.bank_account,o.account_id)=p_account))
+   AND (m.all_accounts OR EXISTS(SELECT 1 FROM account_grants g WHERE g.workspace_id=p_workspace AND g.user_id=who AND g.account_id=o.account_id))
+   AND (p_before IS NULL OR o.created_at<boundary OR (o.created_at=boundary AND o.hash>p_before))
+  ORDER BY o.hash,o.created_at DESC
+ ) dedup ORDER BY created_at DESC,hash LIMIT 100) q),'[]'::jsonb);
+END $$;
+
 CREATE OR REPLACE FUNCTION nestwise.report_input(p_subject text,p_workspace uuid,p_account uuid,p_from date,p_to date) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=nestwise,pg_temp AS $$
 DECLARE result jsonb; receipts jsonb; pending bigint;

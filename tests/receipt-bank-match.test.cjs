@@ -19,6 +19,9 @@ test('cross-bank receipt waits, auto-matches once, verifies PDF and bank changes
   const report=async()=>(await db.query("SELECT nestwise.report_input($1,$2,$3,'2026-10-01','2026-10-31') result",[subject,f.workspace,f.account])).rows[0].result.data;
   await db.query('SELECT nestwise.classify_receipt($1,$2,$3,$4,$5)',[subject,workspace,source,hash,JSON.stringify({id:randomUUID(),expected:0,review,categories:['tax_06'],business_workspace:f.workspace,business_account:f.account})]);
   assert.equal((await payment(body)).match.status,'waiting');assert.equal((await payment(body)).cards[0].mask,'8280');
+  const receipts=async(acc,h=null)=>(await db.query('SELECT nestwise.read_receipts($1,$2,$3,$4,NULL) result',[subject,workspace,acc,h])).rows[0].result;
+  assert.equal((await receipts(bank))[0].source_account,source);assert.equal((await receipts(source)).length,0);
+  assert.equal((await receipts(source,hash))[0].hash,hash);
   assert.equal((await report()).receipt_pending,'1');
   const sync=async(rows)=>{const lease=randomUUID();await db.query("UPDATE nestwise.bank_feeds SET checked_at=NULL WHERE id=$1",[feed]);const claim=(await db.query('SELECT nestwise.claim_bank_feed($1,$2) result',[feed,lease])).rows[0].result;
    await db.query('SELECT nestwise.apply_bank_feed($1,$2,$3,$4,$5,$6,NULL)',[feed,lease,claim.cursor,randomUUID(),JSON.stringify(rows),'[]']);};
