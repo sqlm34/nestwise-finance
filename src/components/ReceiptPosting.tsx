@@ -33,7 +33,7 @@ export function ReceiptPosting({data,review,business,ru,disabled,onPrepare}:{dat
           <TextInput accessibilityLabel={`${label(row.category)} USD`} style={styles.input} keyboardType="decimal-pad" value={row.amount} editable={!disabled} onChangeText={amount=>setSplits(v=>v.map(s=>s.category===row.category?{...s,amount}:s))}/>
           <Button label={`${ru?'Убрать':'Remove'}: ${label(row.category)}`} disabled={disabled} onPress={()=>setSplits(v=>v.filter(s=>s.category!==row.category))}/>
         </View>)}
-        {remaining!==null&&<Text accessibilityRole="status" style={styles.text}>{ru?'Осталось распределить':'Remaining to allocate'}: {format(remaining)} USD</Text>}
+        {remaining!==null&&<Text accessibilityLiveRegion="polite" style={styles.text}>{ru?'Осталось распределить':'Remaining to allocate'}: {format(remaining)} USD</Text>}
         <Button label={choosing?(ru?'Закрыть выбор категорий':'Close category picker'):(ru?'Добавить категорию':'Add category')} disabled={disabled||splits.length>=43} onPress={()=>setChoosing(v=>!v)}/>
         {choosing&&<>
           <TextInput accessibilityLabel={ru?'Поиск категории':'Search categories'} placeholder={ru?'Название категории':'Category name'} style={styles.input} value={query} onChangeText={setQuery} editable={!disabled}/>
