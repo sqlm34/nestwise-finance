@@ -87,9 +87,9 @@ export async function userApi(request: Request, env: UserEnv,
   const reportWrite=reportRoute&&request.method==='POST';
   const authPaths = new Map([['/api/auth/sign-in/email','POST'],['/api/auth/sign-out','POST'],['/api/auth/get-session','GET']]);
   const invitationRoute=url.pathname==='/v1/invitations/accept' && request.method==='POST';
-  const receiptMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/receipts(?:\/([0-9a-f]{64})(?:\/(original|review|post|ocr|classification|process))?)?$/i.exec(url.pathname);
+  const receiptMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/accounts\/([0-9a-f-]{36})\/receipts(?:\/([0-9a-f]{64})(?:\/(original|review|post|ocr|classification|process|payment))?)?$/i.exec(url.pathname);
   const receiptList=!!receiptMatch&&!receiptMatch[3]&&request.method==='GET';
-  const receiptRoute=receiptList||!!receiptMatch&&!url.search&&(request.method==='GET'&&(!receiptMatch[4]||receiptMatch[4]==='original'||receiptMatch[4]==='ocr'||receiptMatch[4]==='classification')||request.method==='POST'&&!!receiptMatch[4]);
+  const receiptRoute=receiptList||!!receiptMatch&&!url.search&&(request.method==='GET'&&(!receiptMatch[4]||receiptMatch[4]==='original'||receiptMatch[4]==='ocr'||receiptMatch[4]==='classification'||receiptMatch[4]==='payment')||request.method==='POST'&&!!receiptMatch[4]);
   const receiptWrite=receiptRoute&&request.method==='POST';
   const receiptUpload=receiptWrite&&receiptMatch?.[4]==='original';
   const adminMatch=/^\/v1\/user\/workspaces\/([0-9a-f-]{36})\/administration$/i.exec(url.pathname);

@@ -14,7 +14,7 @@ import {Button,Card,Notice,styles} from './ui';
 import {ReceiptAiReview} from './ReceiptAiReview';
 import {receiptReviewChecks,possibleReceiptDuplicates,sameReceiptData} from '../domain/receipt-review';
 import {receiptTitle,receiptStage,receiptStageLabel,receiptAmount,receiptMatches,type ReceiptStage} from '../domain/receipt-inbox';
-type Receipt={hash:string;bytes:number;mime:string;archived:boolean;operation_id:string|null;review:{id:string;revision:number;data:ReceiptData}|null};
+type Receipt={source_account?:string;hash:string;bytes:number;mime:string;archived:boolean;operation_id:string|null;review:{id:string;revision:number;data:ReceiptData}|null};
 const empty=():ReceiptData=>({supplier:'',date:'',currency:'USD',items:[],tax_cents:null,tip_cents:null,shipping_cents:null,discount_cents:null,total_cents:null});
 const moneyFields=['tax_cents','tip_cents','shipping_cents','discount_cents','total_cents'] as const;
 const moneyLabels={tax_cents:['Tax','Налог'],tip_cents:['Tip','Чаевые'],shipping_cents:['Shipping','Доставка'],discount_cents:['Discount','Скидка'],total_cents:['Total','Итого']} as const;
@@ -31,11 +31,12 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
   const [query,setQuery]=useState(''),[stage,setStage]=useState<ReceiptStage|'all'>('all'),[technical,setTechnical]=useState(false);
   useBackStep(!!selected,()=>{if(!busy&&!pending)setSelected(null);},20);
   const alive=useRef(true),sending=useRef(false),path=`/v1/user/workspaces/${workspace}/accounts/${account}/receipts`;
+  const detailAccount=selected?.source_account??account,detailPath=`/v1/user/workspaces/${workspace}/accounts/${detailAccount}/receipts`;
   const [personalSaved,setPersonalSaved]=useState(false),[personalChecked,setPersonalChecked]=useState(false);
   const stageLabel=(value:ReceiptStage)=>personal&&value==='payment'?(ru?'Проверен · категории и оплата внутри':'Reviewed · open for categories and payment'):receiptStageLabel(value,ru);
   useEffect(()=>{if(!personal||!selected)return;let active=true;const controller=new AbortController();
-    void authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${account}/personal-expenses/${selected.hash}`,controller.signal).then(async r=>{if(r.status===401){onSessionExpired();return;}if(!r.ok)throw Error();const v=await r.json();if(active){setPersonalSaved(!!v);setPersonalChecked(true);}}).catch(()=>{if(active)setError(ru?'Не удалось проверить, учтён ли чек. Откройте его ещё раз.':'Could not check receipt status. Open it again.');});return()=>{active=false;controller.abort();};
-  },[personal,selected,workspace,account,onSessionExpired,ru]);
+    void authenticatedFetch(`/v1/user/workspaces/${workspace}/accounts/${detailAccount}/personal-expenses/${selected.hash}`,controller.signal).then(async r=>{if(r.status===401){onSessionExpired();return;}if(!r.ok)throw Error();const v=await r.json();if(active){setPersonalSaved(!!v);setPersonalChecked(true);}}).catch(()=>{if(active)setError(ru?'Не удалось проверить, учтён ли чек. Откройте его ещё раз.':'Could not check receipt status. Open it again.');});return()=>{active=false;controller.abort();};
+  },[personal,selected,workspace,detailAccount,onSessionExpired,ru]);
   const loadKey=`${path}:${before}:${revision}:${ru}`,loading=loadedKey!==loadKey;
   useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
   useEffect(()=>{const controller=new AbortController();let active=true;
@@ -57,11 +58,11 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
     const data=currentData();
     setPending({mode:'review',body:{id:randomUUID(),expected:selected?.review?.revision||0,data}});setError('');
   }catch{setError(ru?'Проверьте поля. Пустая сумма означает «неизвестно», ноль вводится явно.':'Check the fields. An empty amount means unknown; enter zero explicitly.');}}
-  async function save(){if(!selected||!pending)return;await action(async()=>{await responseData(await authenticatedPost(`${path}/${selected.hash}/${pending.mode}`,pending.body));if(!alive.current)return;
-    const values=await responseData(await authenticatedFetch(`${path}/${selected.hash}`));if(!alive.current)return;open(values[0]);setRevision(v=>v+1);
+  async function save(){if(!selected||!pending)return;await action(async()=>{await responseData(await authenticatedPost(`${detailPath}/${selected.hash}/${pending.mode}`,pending.body));if(!alive.current)return;
+    const values=await responseData(await authenticatedFetch(`${detailPath}/${selected.hash}`));if(!alive.current)return;open(values[0]);setRevision(v=>v+1);
   });}
   async function processPersonal(row:Receipt){
-    const saved=await responseData(await authenticatedPost(`${path}/${row.hash}/process`,{consent:true},undefined,90_000));
+    const saved=await responseData(await authenticatedPost(`/v1/user/workspaces/${workspace}/accounts/${row.source_account??account}/receipts/${row.hash}/process`,{consent:true},undefined,90_000));
     if(alive.current){open(saved);setRevision(v=>v+1);}
   }
   async function acceptFile(file:ReceiptFile|null){
@@ -72,7 +73,7 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
     await processPersonal(values[0]);
   }
   return <Card><Text accessibilityRole="header" style={styles.h2}>{ru?'Чеки и документы':'Receipts and documents'}</Text>
-    <Notice text={ru?'Загрузка и сохранение проверенных данных не создают расход. Подтверждайте оплату только если она ещё не учтена в CRM или журнале.':'Uploading and saving reviewed details do not book an expense. Confirm payment only if it is not already recorded in CRM or the journal.'}/>
+    <Notice text={personal?(ru?'Для известных карт чек сверяется с банком автоматически. Повторное списание не создаётся. Наличные подтверждаются отдельно.':'Receipts from known cards are checked against the bank automatically, without another withdrawal. Cash payments are confirmed separately.'):(ru?'Подтверждайте оплату только если она ещё не учтена в CRM или журнале.':'Confirm payment only if it is not already recorded in CRM or the journal.')}/>
     {!!error&&<Notice error text={error}/>}
     {personal&&busy&&<Notice text={ru?'Сохраняем и распознаём чек…':'Saving and recognizing your receipt…'}/>}
     {canWrite&&(!personal||!selected)&&<>{upload?<>
@@ -106,16 +107,16 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
       <Button label={technical?(ru?'Скрыть технические сведения':'Hide technical details'):(ru?'Технические сведения':'Technical details')} onPress={()=>setTechnical(v=>!v)}/>
       {technical&&<Text selectable style={styles.muted}>{ru?'Идентификатор оригинала SHA-256 (не содержимое чека)':'Original SHA-256 identifier (not receipt contents)'}: {selected.hash}{'\n'}{selected.mime} · {selected.bytes} {ru?'байт':'bytes'}{selected.operation_id?`\n${ru?'Операция журнала':'Journal operation'}: ${selected.operation_id}`:''}</Text>}
       <Button label={ru?'Сохранить оригинал / открыть в приложении':'Save original / open in app'} disabled={busy||!selected.archived} onPress={()=>void action(async()=>{
-        const r=await authenticatedFetch(`${path}/${selected.hash}/original`);if(r.status===401){onSessionExpired();return;}if(!r.ok)throw new Error();
+        const r=await authenticatedFetch(`${detailPath}/${selected.hash}/original`);if(r.status===401){onSessionExpired();return;}if(!r.ok)throw new Error();
         await saveReceiptOriginal(new Uint8Array(await r.arrayBuffer()),selected.hash);
       })}/>
       {selected.review&&<Text style={styles.text}>{selected.review.data.supplier} · {selected.review.data.date} · {decimal(selected.review.data.total_cents)} USD · {ru?'Версия':'Version'} {selected.review.revision}</Text>}
       {selected.mime.startsWith('image/')&&<Button label={ru?'Показать оригинал':'Show original'} disabled={busy} onPress={()=>void action(async()=>{
-        const r=await authenticatedFetch(`${path}/${selected.hash}/original`);if(r.status===401){onSessionExpired();return;}if(!r.ok)throw new Error();
+        const r=await authenticatedFetch(`${detailPath}/${selected.hash}/original`);if(r.status===401){onSessionExpired();return;}if(!r.ok)throw new Error();
         const bytes=new Uint8Array(await r.arrayBuffer());if(bytes.length>5_000_000)throw new Error();let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.slice(i,i+8192));if(alive.current)setPreview(`data:${selected.mime};base64,${btoa(raw)}`);
       })}/>}
       {!!preview&&<Image accessibilityLabel={ru?'Оригинал чека':'Original receipt'} source={{uri:preview}} resizeMode="contain" style={{width:'100%',height:420}}/>}
-      {personal&&!editDetails?(selected.review?<PersonalReceiptDetails key={selected.review.id} workspace={workspace} account={account} hash={selected.hash} review={selected.review.id} data={selected.review.data} canWrite={canWrite&&!busy} ru={ru} onSessionExpired={onSessionExpired} onEdit={()=>setEditDetails(true)}/>:canWrite?<><Notice text={ru?'Оригинал сохранён. Обработка отправит его в OpenAI и создаст электронный чек с позициями.':'Original saved. Processing sends it to OpenAI and creates a digital receipt with items.'}/><Button primary label={ru?'Обработать чек':'Process receipt'} disabled={busy} onPress={()=>void action(()=>processPersonal(selected))}/><Button label={ru?'Заполнить вручную':'Enter manually'} disabled={busy} onPress={()=>setEditDetails(true)}/></>:null):personalSaved?<Notice text={ru?'Расход сохранён с категориями. Посмотреть его можно в разделе «Мои расходы». Повторного списания нет.':'Expense saved with categories. View it in My expenses. No duplicate withdrawal.'}/>:selected.operation_id?<Notice text={ru?'Оплата уже внесена в журнал. Категории и итог доступны в отчётах. Повторно создавать расход не нужно.':'Payment is already in the journal. Categories and totals are available in reports. Do not record this expense again.'}/>:canWrite&&selected.archived&&(!personal||personalChecked)?<>
+      {personal&&!editDetails?(selected.review?<PersonalReceiptDetails key={selected.review.id} workspace={workspace} account={detailAccount} hash={selected.hash} review={selected.review.id} data={selected.review.data} canWrite={canWrite&&!busy} ru={ru} onSessionExpired={onSessionExpired} onEdit={()=>setEditDetails(true)}/>:canWrite?<><Notice text={ru?'Оригинал сохранён. Обработка отправит его в OpenAI и создаст электронный чек с позициями.':'Original saved. Processing sends it to OpenAI and creates a digital receipt with items.'}/><Button primary label={ru?'Обработать чек':'Process receipt'} disabled={busy} onPress={()=>void action(()=>processPersonal(selected))}/><Button label={ru?'Заполнить вручную':'Enter manually'} disabled={busy} onPress={()=>setEditDetails(true)}/></>:null):personalSaved?<Notice text={ru?'Расход сохранён с категориями. Посмотреть его можно в разделе «Мои расходы». Повторного списания нет.':'Expense saved with categories. View it in My expenses. No duplicate withdrawal.'}/>:selected.operation_id?<Notice text={ru?'Оплата уже внесена в журнал. Категории и итог доступны в отчётах. Повторно создавать расход не нужно.':'Payment is already in the journal. Categories and totals are available in reports. Do not record this expense again.'}/>:canWrite&&selected.archived&&(!personal||personalChecked)?<>
         {pending&&<>
           <Notice text={pending.mode==='post'?(ru?'Подтвердите: оплата действительно произведена в указанную дату и ещё не внесена в журнал.':'Confirm: payment was made on the stated date and is not already in the journal.'):(ru?'Сохранить новую версию проверенных данных? Расход пока не создаётся.':'Save a new review version? This does not book an expense.')}/>
           {pending.summary&&<Text selectable style={styles.text}>{pending.summary}</Text>}
@@ -123,7 +124,7 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
           <Button label={ru?'Отмена':'Cancel'} disabled={busy||!!error} onPress={()=>setPending(null)}/>
         </>}
         <View style={{display:pending?'none':'flex',gap:8}}>
-          <ReceiptAiReview key={selected.hash} path={`${path}/${selected.hash}/ocr`} ru={ru} disabled={busy} onApply={fill} onBusy={setBusy} onSessionExpired={onSessionExpired}/>
+          <ReceiptAiReview key={selected.hash} path={`${detailPath}/${selected.hash}/ocr`} ru={ru} disabled={busy} onApply={fill} onBusy={setBusy} onSessionExpired={onSessionExpired}/>
           <Notice text={ru?'Сверьте данные с оригиналом и заполните поля вручную. Пустая сумма означает «неизвестно»; если сбора нет, укажите 0.':'Check the original and enter its details manually. An empty amount means unknown; enter 0 when a charge does not apply.'}/>
           <TextInput accessibilityLabel={ru?'Продавец':'Supplier'} placeholder={ru?'Продавец':'Supplier'} style={styles.input} value={form.supplier} onChangeText={supplier=>setForm(f=>({...f,supplier}))}/>
           <TextInput accessibilityLabel={ru?'Дата чека YYYY-MM-DD':'Receipt date YYYY-MM-DD'} placeholder="YYYY-MM-DD" style={styles.input} value={form.date} onChangeText={date=>setForm(f=>({...f,date}))}/>
@@ -136,7 +137,7 @@ export function AccountReceipts({workspace,account,business,personal=false,canWr
           {checks&&checks.missing.length>0&&<Notice text={ru?`Не заполнено полей: ${checks.missing.length}. Неизвестные суммы не заменяются нулём автоматически.`:`Missing fields: ${checks.missing.length}. Unknown amounts are not automatically replaced with zero.`}/>}
           {checks?.totalsMatch===false&&<Notice error text={ru?'Сумма позиций и сборов с учётом скидки не совпадает с итогом. Проверьте оригинал.':'Items and charges less discount do not match the total. Check the original.'}/>}
           {duplicates.length>0&&<Notice error text={ru?`В загруженном списке есть похожие чеки: ${duplicates.map(h=>h.slice(0,12)).join(', ')}. Проверьте, не учтена ли покупка раньше.`:`Similar receipts on the loaded page: ${duplicates.map(h=>h.slice(0,12)).join(', ')}. Check whether the purchase was already recorded.`}/>}
-          {!!selected.review&&personal?<PersonalReceiptPosting key={selected.review.id} workspace={workspace} account={account} hash={selected.hash} review={selected.review.id} data={selected.review.data} disabled={busy||dirty} ru={ru} onSessionExpired={onSessionExpired} onSaved={()=>{setPersonalSaved(true);setRevision(v=>v+1);}}/>:!!selected.review&&<ReceiptPosting key={selected.review.id} data={selected.review.data} review={selected.review.id} business={business} ru={ru} disabled={busy||dirty} onPrepare={(body,summary)=>{setPending({mode:'post',body,summary});setError('');}}/>}
+          {!!selected.review&&personal?<PersonalReceiptPosting key={selected.review.id} workspace={workspace} account={detailAccount} hash={selected.hash} review={selected.review.id} data={selected.review.data} disabled={busy||dirty} ru={ru} onSessionExpired={onSessionExpired} onSaved={()=>{setPersonalSaved(true);setRevision(v=>v+1);}}/>:!!selected.review&&<ReceiptPosting key={selected.review.id} data={selected.review.data} review={selected.review.id} business={business} ru={ru} disabled={busy||dirty} onPrepare={(body,summary)=>{setPending({mode:'post',body,summary});setError('');}}/>}
         </View>
       </>:null}
     </>}

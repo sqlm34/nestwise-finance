@@ -7,7 +7,7 @@ import {classifyReceipt,businessReceiptCategories,isBusinessCategory,type Receip
 import type {ReceiptData} from '../domain/receipt';
 import {exactUsd} from '../domain/exact-money';
 import {DigitalReceipt} from './DigitalReceipt';
-import {PersonalReceiptPosting} from './PersonalReceiptPosting';
+import {ReceiptBankMatch} from './ReceiptBankMatch';
 import {Button,Notice,styles} from './ui';
 type Target={workspace:string;account:string;name:string};
 type State={classification:ReceiptClassification|null;payment:{paid_on:string;item_categories:string[]}|null;targets:Target[]};
@@ -39,7 +39,7 @@ export function PersonalReceiptDetails({workspace,account,hash,review,data,canWr
   {!split&&<Notice text={ru?'Для назначения категорий проверьте дату, позиции и итог. Неизвестные суммы показаны знаком «—».':'Check the date, items and total before assigning categories. Unknown amounts are shown as —.'}/>}
   {canWrite&&!state?.payment&&<Button label={ru?'Исправить распознанные данные':'Edit recognized details'} disabled={busy||!!retry} onPress={onEdit}/>}
   {split&&<><Text style={styles.text}>{ru?'Личное':'Personal'}: {money(split.personal_cents)} · Aksenov LLC: {money(split.business_cents)}</Text><Text style={styles.muted}>{ru?'Налог, общие сборы и скидка распределяются между позициями пропорционально их стоимости, точно до цента. Названия и цены позиций сохранены как в чеке.':'Tax, shared charges and discount are allocated proportionally by item price to the cent. Item names and prices remain as printed.'}</Text></>}
-  {state?.payment?<Notice text={ru?`Оплата учтена: ${state.payment.paid_on.slice(0,10)}. Выбранные бизнес-позиции автоматически входят в Statement за этот период. Категории можно изменить через ⋯.`:`Payment recorded: ${state.payment.paid_on.slice(0,10)}. Selected business items automatically enter Statement for this period. Change categories with ⋯.`}/>:state&&canWrite&&split?<PersonalReceiptPosting workspace={workspace} account={account} hash={hash} review={review} data={data} disabled={busy||!!retry} ru={ru} hideCategories onSessionExpired={onSessionExpired} onSaved={()=>setReload(n=>n+1)}/>:null}
+  {state&&split&&<ReceiptBankMatch workspace={workspace} account={account} hash={hash} review={review} data={data} disabled={busy||!!retry} canWrite={canWrite} hasPayment={!!state.payment} ru={ru} onSessionExpired={onSessionExpired} onSaved={()=>setReload(n=>n+1)}/>}
   <Modal visible={choosing!==null} transparent animationType="fade" onRequestClose={()=>{if(!busy)setChoosing(null);}}>
    <View style={{flex:1,backgroundColor:'#0007',justifyContent:'center',alignItems:'center',padding:18}}>
     <View accessibilityViewIsModal style={{width:'100%',maxWidth:520,maxHeight:'85%',backgroundColor:'white',borderRadius:18,padding:18,gap:10}}>
