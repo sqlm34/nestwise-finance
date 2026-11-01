@@ -11,6 +11,14 @@ const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]
 export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subject:string,workspace:string,account:string,hash?:string,mode?:string){
   const write=request.method==='POST';
   await db.documentAccess(subject,workspace,account,write);
+  if(mode==='payment'){
+    if(!write)return Response.json(await db.receiptPayment(subject,workspace,account,hash!,null));
+    const body=await request.json();
+    if(!body||Object.keys(body).sort().join(',')!=='bank_account,card_mask,review'||!uuid.test(body.bank_account)||!uuid.test(body.review)||(body.card_mask!==null&&!/^\d{4}$/.test(body.card_mask)))throw Error('invalid_receipt');
+    const receipts=await db.readReceipts(subject,workspace,account,hash!) as {review:{id:string;data:unknown}|null}[];
+    const review=receipts.find(r=>r.review?.id===body.review)?.review;if(!review)throw Error('receipt_conflict');parseReceipt(review.data,true);
+    return Response.json(await db.receiptPayment(subject,workspace,account,hash!,body));
+  }
   if(mode==='classification'){
     if(!write){
       const state=await db.classifyReceipt(subject,workspace,account,hash!,null) as object;

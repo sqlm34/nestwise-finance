@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import type {JournalFilters} from '../src/domain/journal-filters';
 export type Database = {
+  receiptPayment(subject:string,workspace:string,account:string,hash:string,data:unknown):Promise<unknown>;
   classifyReceipt(subject:string,workspace:string,account:string,hash:string,data:unknown):Promise<unknown>;
   personalDocument(subject:string,workspace:string,account:string,hash:string|null,action:string,data:unknown):Promise<unknown>;
   readBankFeed(subject:string,workspace:string,account:string,from:string,to:string):Promise<unknown>;
@@ -52,6 +53,7 @@ export function database(url: string): Database {
   const sql = neon(url);
   return {
     async personalDocument(subject,workspace,account,hash,action,data){return (await sql`SELECT nestwise.personal_document(${subject},${workspace}::uuid,${account}::uuid,${hash},${action},${JSON.stringify(data)}::jsonb) result`)[0].result;},
+    async receiptPayment(subject,workspace,account,hash,data) { return (await sql`SELECT nestwise.receipt_payment(${subject},${workspace}::uuid,${account}::uuid,${hash},${data===null?null:JSON.stringify(data)}::jsonb) result`)[0].result; },
     async classifyReceipt(subject,workspace,account,hash,data){return (await sql`SELECT nestwise.classify_receipt(${subject},${workspace}::uuid,${account}::uuid,${hash},${data===null?null:JSON.stringify(data)}::jsonb) result`)[0].result;},
     async userCrmStatus(subject,workspace,account) { return (await sql`SELECT nestwise.user_crm_status(${subject},${workspace}::uuid,${account}::uuid) result`)[0].result; },
     async cancelOwnerExpense(subject,workspace,account,data){return (await sql`SELECT nestwise.cancel_owner_expense(${subject},${workspace}::uuid,${account}::uuid,${JSON.stringify(data)}::jsonb) result`)[0].result;},

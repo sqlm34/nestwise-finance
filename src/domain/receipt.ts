@@ -1,4 +1,4 @@
-export type ReceiptData={supplier:string;date:string;currency:'USD';items:{description:string;cents:string|null}[];
+export type ReceiptData={card_last4?:string|null;supplier:string;date:string;currency:'USD';items:{description:string;cents:string|null}[];
   tax_cents:string|null;tip_cents:string|null;shipping_cents:string|null;discount_cents:string|null;total_cents:string|null};
 const monetary=['tax_cents','tip_cents','shipping_cents','discount_cents','total_cents'] as const;
 const fail=():never=>{throw new Error('invalid_receipt');};
@@ -6,12 +6,13 @@ const object=(v:unknown):Record<string,unknown>=>!v||typeof v!=='object'||Array.
 function amount(v:unknown):string|null{if(v===null)return null;if(typeof v!=='string'||!/^(0|[1-9]\d{0,15})$/.test(v)||BigInt(v)>9007199254740991n)return fail();return v;}
 function text(v:unknown,max:number):string{if(typeof v!=='string'||v.length>max||/[\u0000-\u001f\u007f]/.test(v))return fail();return v.trim();}
 export function parseReceipt(value:unknown,confirmed=false):ReceiptData{
-  const r=object(value),keys=['supplier','date','currency','items',...monetary];
+  const r=object(value),keys=['supplier','date','currency','items',...monetary,...(Object.hasOwn(r,'card_last4')?['card_last4']:[])];
   if(Object.keys(r).length!==keys.length||keys.some(k=>!Object.hasOwn(r,k))||r.currency!=='USD'||!Array.isArray(r.items)||r.items.length>100)return fail();
   const supplier=text(r.supplier,200),date=text(r.date,10);
   if(date&&(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date||date<'1900-01-01'||date>'2199-12-31'))return fail();
   const items=r.items.map(v=>{const i=object(v);if(Object.keys(i).length!==2||!Object.hasOwn(i,'description')||!Object.hasOwn(i,'cents'))return fail();return {description:text(i.description,300),cents:amount(i.cents)};});
   const result:ReceiptData={supplier,date,currency:'USD',items,tax_cents:amount(r.tax_cents),tip_cents:amount(r.tip_cents),shipping_cents:amount(r.shipping_cents),discount_cents:amount(r.discount_cents),total_cents:amount(r.total_cents)};
+  if(Object.hasOwn(r,'card_last4')){if(r.card_last4!==null&&(typeof r.card_last4!=='string'||!/^\d{4}$/.test(r.card_last4)))return fail();result.card_last4=r.card_last4 as string|null;}
   if(confirmed){
     if(!supplier||!date||!items.length||items.some(i=>!i.description||i.cents===null)||monetary.some(k=>result[k]===null)||BigInt(result.total_cents!)<=0n)return fail();
     if(items.reduce((sum,i)=>sum+BigInt(i.cents!),0n)+BigInt(result.tax_cents!)+BigInt(result.tip_cents!)+BigInt(result.shipping_cents!)-BigInt(result.discount_cents!)!==BigInt(result.total_cents!))return fail();
