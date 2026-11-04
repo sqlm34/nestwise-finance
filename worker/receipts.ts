@@ -94,6 +94,13 @@ async function receiptApiCurrent(request:Request,env:ReceiptEnv,db:Database,subj
       if(Object.keys(body).length!==3||typeof body.id!=='string'||!uuid.test(body.id)||!Number.isInteger(body.expected)||Number(body.expected)<0||Number(body.expected)>999)throw new Error();
       data=parseReceipt(body.data);
     }catch{return Response.json({error:'invalid_receipt'},{status:400});}
+    // A legacy client cannot display the suffix, so its edits must not erase it.
+    // Current clients explicitly send null to clear an incorrectly read suffix.
+    if(!Object.hasOwn(data,'card_last4')){
+      const previous=await db.readReceipts(subject,workspace,account,hash!) as {review:{data:import('../src/domain/receipt').ReceiptData}|null}[];
+      const suffix=previous[0]?.review?.data.card_last4;
+      if(suffix!==undefined)data.card_last4=suffix;
+    }
     return Response.json({id:await db.reviewReceipt(subject,workspace,account,hash!,body.id as string,body.expected as number,data)});
   }
   if(mode==='post'){

@@ -26,6 +26,15 @@ test('wrong-account posting is refused before any ledger write',async()=>{
  const response=await receiptApi(new Request('https://synthetic.invalid/',{method:'POST',body:'{}'}),{NESTWISE_RECEIPT_CARD_ROUTES:raw},db,'synthetic',workspace,'33333333-3333-4333-8333-333333333333','a'.repeat(64),'post');
  assert.equal(response.status,409);assert.equal((await response.json()).error,'receipt_wrong_account');assert.equal(posts,0);
 });
+test('legacy edits preserve an existing suffix; explicit current-client null clears it',async()=>{
+ const data={supplier:'Synthetic',date:'',currency:'USD',items:[],tax_cents:null,tip_cents:null,shipping_cents:null,discount_cents:null,total_cents:null};let saved;
+ const db={documentAccess:async()=>{},readReceipts:async()=>[{review:{data:{...data,card_last4:'2222'}}}],reviewReceipt:async(...args)=>{saved=args.at(-1);return 'saved';}};
+ for(const supplied of [data,{...data,card_last4:null}]){
+  const request=new Request('https://synthetic.invalid/',{method:'POST',body:JSON.stringify({id:account,expected:1,data:supplied})});
+  assert.equal((await receiptApi(request,{},db,'synthetic',workspace,account,'a'.repeat(64),'review')).status,200);
+  assert.equal(saved.card_last4,Object.hasOwn(supplied,'card_last4')?null:'2222');
+ }
+});
 test('authenticated transfer retries preserve one original and review per account and never book money',async()=>{
  const {randomUUID,createHash}=require('node:crypto');
  const fixture=await require('../scripts/auth-fixture.cjs').createAuthFixture();
