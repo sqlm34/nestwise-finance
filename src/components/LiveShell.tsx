@@ -1,3 +1,5 @@
+import {AccountChoices} from './AccountChoices';
+import {accountChoices} from '../domain/account-choices';
 import {CrmConnectionStatus} from './CrmConnectionStatus';
 import React,{useState} from 'react';
 import {Modal,Pressable,ScrollView,Text,View,useWindowDimensions} from 'react-native';
@@ -19,7 +21,7 @@ export function LiveShell({children,access,selected,title,navigation,onSelect,on
   <ScrollView style={{flex:1}} contentContainerStyle={{paddingBottom:24}}>
   <Text style={[styles.label,{marginHorizontal:10,marginBottom:8,color:'#9aaca4'}]}>{locale==='ru'?'ПРОСТРАНСТВА':'SPACES'}</Text>
   {access?.workspaces.map(w=><NavigationItem key={w.id} label={w.name} disabled={busy} selected={selected?.workspace===w.id}
-   onPress={()=>{const a=w.accounts.find(a=>a.id===selected?.account)||w.accounts[0];if(a)onSelect({workspace:w.id,account:a.id,name:a.name,currency:a.currency});setMenu(false);}}/>)}
+   onPress={()=>{const a=w.accounts.find(a=>a.id===selected?.account)||accountChoices(w).primary[0]||w.accounts[0];if(a)onSelect({workspace:w.id,account:a.id,name:a.name,currency:a.currency});setMenu(false);}}/>)}
   {selected&&<View style={{gap:0,marginTop:14}}><Text style={[styles.label,{paddingHorizontal:12,marginBottom:8}]}>{locale==='ru'?'РАБОЧЕЕ ПРОСТРАНСТВО':'WORKSPACE'}</Text>{navigation(()=>setMenu(false))}</View>}
   </ScrollView>
   {access&&<View style={{paddingTop:18,borderTopWidth:1,borderTopColor:colors.line}}><Button label={t('authSignOut')} disabled={busy} onPress={onSignOut}/></View>}
@@ -50,7 +52,7 @@ export function LiveShell({children,access,selected,title,navigation,onSelect,on
   </View>
   <Modal visible={accounts} transparent animationType="fade" onRequestClose={()=>setAccounts(false)}>
    <View style={{flex:1,backgroundColor:'rgba(25,55,47,0.2)',justifyContent:'center',padding:20}}><View style={{backgroundColor:'#fff',padding:21,borderRadius:17,gap:8,maxWidth:420,width:'100%',alignSelf:'center'}}>
-    <Text style={styles.h2}>{space?.name}</Text>{space?.accounts.map(a=><NavigationItem key={a.id} label={`${a.name} · ${a.currency}`} selected={a.id===selected?.account} onPress={()=>{if(space)onSelect({workspace:space.id,account:a.id,name:a.name,currency:a.currency});setAccounts(false);}}/>)}
+    <Text style={styles.h2}>{space?.name}</Text>{space&&<AccountChoices key={space.id} space={space} selected={selected?.account} ru={locale==='ru'} onSelect={value=>{onSelect(value);setAccounts(false);}}/>}
     <Button label={t('close')} onPress={()=>setAccounts(false)}/>
    </View></View>
   </Modal>
