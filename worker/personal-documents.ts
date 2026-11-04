@@ -1,3 +1,4 @@
+import {receiptTarget} from './receipt-routing';
 import type {Database} from './database';
 import type {ReceiptEnv} from './receipts';
 import {boundedBody,sha256,verified} from './documents';
@@ -18,7 +19,9 @@ export async function personalDocumentApi(request:Request,env:ReceiptEnv,db:Data
   if(!body||Object.keys(body).sort().join(',')!=='bank_id,categories,extra,id,paid_on,review'||!uuid.test(body.id)||!uuid.test(body.review)||!documentDate(body.paid_on)||!Array.isArray(body.categories)||body.bank_id!==null&&(typeof body.bank_id!=='string'||body.bank_id.length>200))throw Error('invalid_personal_document');
   const receipts=await db.readReceipts(subject,workspace,account,hash!) as {review:{id:string;data:unknown}|null}[];
   const receipt=receipts.find(r=>r.review?.id===body.review);if(!receipt?.review)throw Error('receipt_conflict');
-  receiptCategoryTotals(parseReceipt(receipt.review.data,true),body.categories,body.extra);
+  const data=parseReceipt(receipt.review.data,true),target=await receiptTarget(env,db,subject,data);
+  if(target&&(target.account!==account||target.workspace!==workspace))return Response.json({error:'receipt_wrong_account'},{status:409});
+  receiptCategoryTotals(data,body.categories,body.extra);
   return Response.json(await call('expense_save',body));
  }
  if(!env.STATEMENTS||!env.STATEMENTS_BACKUP)return Response.json({error:'archive_unavailable'},{status:503});
