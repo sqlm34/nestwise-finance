@@ -23,13 +23,13 @@ export const authClient=createAuthClient({
   })],
 });
 function receiptHeaders(path:string):Record<string,string>{return /\/receipts(?:[/?]|$)/.test(path)?{Accept:'application/vnd.nestwise.receipt-v2+json'}:{};}
-export async function authenticatedFetch(path: string, signal?: AbortSignal) {
+export async function authenticatedFetch(path: string, signal?: AbortSignal, timeoutMs=30_000) {
   if(!apiURL) throw new Error('unconfigured');
   // Native cookies live in SecureStore; web cookies remain HttpOnly.
   const cookie=Platform.OS==='web'?'':await authClient.getCookie();
   return fetchWithDeadline(`${apiURL}${path}`,{
     credentials:'include',signal,headers:{...receiptHeaders(path),...(cookie?{Cookie:cookie}:{})},
-  });
+  },timeoutMs);
 }
 export async function authenticatedPost(path:string,body:unknown,signal?:AbortSignal,timeoutMs=30_000){
   if(!apiURL)throw new Error('unconfigured');

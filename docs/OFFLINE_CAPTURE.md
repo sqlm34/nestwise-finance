@@ -1,0 +1,11 @@
+# Offline receipt capture and bank choices
+
+Native installations can reopen local receipt capture after an unsuccessful network session check (8-second request deadline). A successful online session stores an origin-bound, writable-account snapshot in Expo SecureStore for up to 30 days. This is not a session token or permission to call APIs. HTTP 401 removes the snapshot; explicit sign-out and starting another sign-in remove it. Browser cold starts still require the hosted application.
+
+Local mode mounts only the local photo queue, account selector and purchase notes. It must not mount financial reports, server posting forms, OCR or upload effects. Original photos use the existing persistent, scoped outbox. Purchase notes are explicitly device-only, scoped by origin/user/workspace/account; they remain visible in the online receipt screen for manual entry. Notes never automatically create payments. Never erase outboxes on sign-out.
+
+Local mode checks session connectivity every 30 seconds while mounted. Successful reconnection revalidates permissions and opens the receipt screen. If the session expired, sign in again and select the original account to send its queued originals. Revoked-account originals remain local rather than being silently sent elsewhere. A failed local write must remain visible. After an update, open the application online once to establish the local snapshot.
+
+Personal account selection shows connected Chase/Old National accounts first. Exact duplicate legacy bank names are grouped under Previously saved documents, with all original IDs and evidence retained. This is a presentation change only: no balances, cards, statements, receipts or queues are merged or re-assigned. Legacy documents remain accessible; new purchases should select the connected account ending in four digits.
+
+Acceptance: existing editor/outbox regression suite; origin/expiry/role isolation tests; account grouping retention; staging selector screenshot. Native acceptance must include a cold launch in airplane mode after one successful online launch, capture or import, a saved note, app restart, reconnect and confirmed server original. Do not claim physical-device acceptance from unit tests. No database migration or native dependency change.

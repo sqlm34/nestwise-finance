@@ -1,3 +1,4 @@
+import {LocalReceiptNote} from './LocalReceiptCapture';
 import {ReceiptEditorDraft,clearReceiptEditorDraft} from './ReceiptEditorDraft';
 import {ReceiptRouting} from './ReceiptRouting';
 import type {Selection} from '../domain/live-navigation';
@@ -85,6 +86,7 @@ export function AccountReceipts({user,workspace,account,business,personal=false,
   return <Card><Text accessibilityRole="header" style={styles.h2}>{ru?'Чеки и документы':'Receipts and documents'}</Text>
     <Notice text={ru?'Загрузка и сохранение проверенных данных не создают расход. Подтверждайте оплату только если она ещё не учтена в CRM или журнале.':'Uploading and saving reviewed details do not book an expense. Confirm payment only if it is not already recorded in CRM or the journal.'}/>
     {!!error&&<Notice error text={error}/>}
+    {canWrite&&<LocalReceiptNote key={user+workspace+account} scope={queueScope} ru={ru}/>}
     {canWrite&&<ReceiptOutbox scope={queueScope} ru={ru} revision={revision} disabled={busy} onDelivered={refreshReceipts} onSessionExpired={onSessionExpired}/>}
     {personal&&busy&&<Notice text={ru?'Сохраняем и распознаём чек…':'Saving and recognizing your receipt…'}/>}
     {canWrite&&(!personal||!selected)&&<>{upload?<>

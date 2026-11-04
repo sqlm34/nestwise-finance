@@ -1,7 +1,10 @@
+import {AccountChoices} from '../components/AccountChoices';
+import {LocalReceiptCapture} from '../components/LocalReceiptCapture';
+import {readOfflineAccess,saveOfflineAccess} from '../storage/offline-access';
 import {PersonalStatements,type StatementResult} from '../components/PersonalStatements';
 import {PersonalExpenses} from '../components/PersonalExpenses';
 import {PersonalBankFeed} from '../components/PersonalBankFeed';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, ScrollView, Text, View } from 'react-native';
 import {LoginFields,type Credentials} from '../components/LoginFields';
 import {BackStepsContext} from '../back-navigation';
@@ -34,6 +37,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   const [access,setAccess]=useState<Access|null>(null),[busy,setBusy]=useState(!!apiURL),[error,setError]=useState('');
   const [selected,setSelected]=useState<Selection|null>(null);
   const [expired,setExpired]=useState(false);
+  const [localAccess,setLocalAccess]=useState<Access|null>(null),[localSelected,setLocalSelected]=useState<Selection|null>(null);
   const [statementResult,setStatementResult]=useState<StatementResult|null>(null);
   const [administration,setAdministration]=useState<string|null|undefined>(undefined);
   const section=initialSection;
@@ -58,7 +62,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
   const requestVersion=useRef(0);
   const accessRef=useRef<Access|null>(null);
   const installAccess=useCallback((value:Access|null)=>{accessRef.current=value;setAccess(value);},[]);
-  const sessionExpired=useCallback(()=>{requestVersion.current++;installAccess(null);setSelected(null);setExpired(true);setBusy(false);},[installAccess]);
+  const sessionExpired=useCallback(()=>{requestVersion.current++;void saveOfflineAccess(apiURL,null).catch(()=>setSelectionError(true));setLocalAccess(null);installAccess(null);setSelected(null);setExpired(true);setBusy(false);},[installAccess]);
   const selectAccount=(value:Selection)=>{
     setSelected(value);setAdministration(undefined);setChooseAccount(false);setSelectionError(false);
     const current=accessRef.current;if(!current)return;
@@ -71,16 +75,19 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
     if(!apiURL)return;
     void (async()=>{
       try{
-        const response=await authenticatedFetch('/v1/session',controller.signal);
+        const response=await authenticatedFetch('/v1/session',controller.signal,8_000);
         if(version!==requestVersion.current)return;
-        if(response.status===401){setBusy(false);return;}
+        if(response.status===401){setLocalAccess(null);setBusy(false);await saveOfflineAccess(apiURL,null).catch(()=>setSelectionError(true));return;}
         if(!response.ok)throw new Error();
         const value=workingAccess(parseAccess(await response.json()));
         let stored:null|string=null;
         try{stored=await AsyncStorage.getItem(selectionKey(value.user.id));}catch{if(version===requestVersion.current)setSelectionError(true);}
         if(version!==requestVersion.current)return;
-        installAccess(value);setSelected(resolveSelection(value,stored));setExpired(false);
-      }catch{if(version===requestVersion.current)setError('authUnavailable');}
+        installAccess(value);setSelected(resolveSelection(value,stored));setLocalAccess(null);setExpired(false);
+        void saveOfflineAccess(apiURL,value).catch(()=>setSelectionError(true));
+      }catch{if(version===requestVersion.current){
+        try{const cached=await readOfflineAccess(apiURL);if(version!==requestVersion.current)return;if(cached){const stored=await AsyncStorage.getItem(selectionKey(cached.user.id));if(version!==requestVersion.current)return;setLocalAccess(cached);setLocalSelected(resolveSelection(cached,stored));}else setError('authUnavailable');}catch{setError('authUnavailable');}
+      }}
       finally{if(version===requestVersion.current)setBusy(false);}
     })();
   },[installAccess]);
@@ -91,6 +98,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
     const version=++requestVersion.current;
     setBusy(true);setError('');setExpired(false);setSelected(null);
     try {
+      await saveOfflineAccess(apiURL,null);
       const result=await authClient.signIn.email({email:credentials.email.trim(),password:credentials.password});
       if(version!==requestVersion.current)return;
       setPassword('');setPasswordReset(value=>value+1);
@@ -103,6 +111,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
     const version=++requestVersion.current,current=accessRef.current;
     setBusy(true);setError('');setSelected(null);
     try {
+      await saveOfflineAccess(apiURL,null);setLocalAccess(null);
       const result=await authClient.signOut();
       if(version!==requestVersion.current)return;
       if(result.error)throw new Error();
@@ -111,6 +120,18 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
     } catch {if(version===requestVersion.current)setError(t('authLogoutFailed'));}
     finally {if(version===requestVersion.current)setBusy(false);}
   }
+  useEffect(()=>{if(!localAccess)return;let active=true,running=false;
+    const timer=setInterval(()=>{if(running)return;running=true;void authenticatedFetch('/v1/session',undefined,8_000).then(async r=>{if(!active)return;if(r.status===401){setLocalAccess(null);setExpired(true);await saveOfflineAccess(apiURL,null).catch(()=>setSelectionError(true));}else if(r.ok){refreshAccess();router.replace('/receipts');}}).catch(()=>{}).finally(()=>{running=false;});},30_000);
+    return()=>{active=false;clearInterval(timer);};
+  },[localAccess,refreshAccess]);
+  if(localAccess&&!busy)return <ScrollView contentContainerStyle={{padding:20,gap:16}}><Text style={styles.title}>{locale==='ru'?'Чеки без интернета':'Offline receipts'}</Text>
+    <Notice text={locale==='ru'?'Локальный режим: доступны только сохранение фото и заметок. Балансы и отчёты появятся после подключения.':'Local mode: photos and notes only. Balances and reports require a connection.'}/>
+    {localAccess.workspaces.map(w=><View key={w.id} style={{gap:8}}><Text style={styles.h2}>{w.name}</Text><AccountChoices space={w} selected={localSelected?.account} ru={locale==='ru'} onSelect={value=>{setLocalSelected(value);void AsyncStorage.setItem(selectionKey(localAccess.user.id),JSON.stringify(value)).catch(()=>setSelectionError(true));}}/></View>)}
+    {localSelected&&<LocalReceiptCapture key={localSelected.account} origin={apiURL} user={localAccess.user.id} workspace={localSelected.workspace} account={localSelected.account} ru={locale==='ru'}/>}
+    <Button label={locale==='ru'?'Проверить подключение':'Retry connection'} onPress={()=>{if(localSelected)void AsyncStorage.setItem(selectionKey(localAccess.user.id),JSON.stringify(localSelected)).then(refreshAccess);else refreshAccess();}}/>
+    <Button label={locale==='ru'?'Закрыть локальный режим':'Close local mode'} onPress={()=>void saveOfflineAccess(apiURL,null).then(()=>{setLocalAccess(null);setLocalSelected(null);setExpired(true);}).catch(()=>setSelectionError(true))}/>
+    {selectionError&&<Notice error text={t('settingsError')}/>}
+  </ScrollView>;
   const navigation=(close:()=>void)=>access&&selected?(        <View style={{gap:0}}>
           <NavigationItem label={t('overview')} selected={section==='insights'} onPress={() => {setSection('insights');close();}}/>
           <NavigationItem label={locale==='ru'?'Операции':'Transactions'} selected={section==='journal'} onPress={() => {setSection('journal');close();}}/>
@@ -153,7 +174,7 @@ export default function Workspace({initialSection='insights'}:{initialSection?:L
           <Text style={styles.h2}>{space.name}</Text>
           {space.role==='owner'&&<Button label={locale==='ru'?'Настроить пространство':'Manage workspace'} onPress={()=>setAdministration(space.id)}/>}
           {space.accounts.length===0&&<Notice text={t('journalNoAccounts')}/>}
-          {space.accounts.map(account=><Button key={account.id} label={`${account.name} · ${account.currency}`} selected={selected?.workspace===space.id&&selected.account===account.id} disabled={busy} onPress={()=>selectAccount({workspace:space.id,account:account.id,name:account.name,currency:account.currency})}/>)}
+          <AccountChoices space={space} selected={selected?.account} disabled={busy} ru={locale==='ru'} onSelect={selectAccount}/>
         </View>)}
       </Card>}
       {access&&administration!==undefined&&<WorkspaceAdministration key={administration||'new'} workspace={administration} onChanged={refreshAccess} onSessionExpired={sessionExpired}/>}
