@@ -1,3 +1,4 @@
+import {receiptRoutingApi,receiptTarget} from './receipt-routing';
 import {parseReceipt,receiptMime} from '../src/domain/receipt';
 import {parseReceiptAllocations} from '../src/domain/receipt-posting';
 import {parseManualOperation} from '../src/domain/manual-operation';
@@ -6,11 +7,19 @@ import type {Database} from './database';
 import {recognizeReceipt} from './receipt-ocr';
 import {classifyReceipt,completeAbsentCharges} from '../src/domain/receipt-classification';
 import type {Access} from '../src/domain/live-navigation';
-export type ReceiptEnv=DocumentEnv&{NESTWISE_OCR_ENABLED?:string;NESTWISE_OCR_API_KEY?:string;NESTWISE_OCR_MODEL?:string};
+export type ReceiptEnv=DocumentEnv&{NESTWISE_RECEIPT_CARD_ROUTES?:string;NESTWISE_OCR_ENABLED?:string;NESTWISE_OCR_API_KEY?:string;NESTWISE_OCR_MODEL?:string};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subject:string,workspace:string,account:string,hash?:string,mode?:string){
+  const response=await receiptApiCurrent(request,env,db,subject,workspace,account,hash,mode);
+  if(request.headers.get('accept')==='application/vnd.nestwise.receipt-v2+json'||!response.headers.get('content-type')?.includes('application/json'))return response;
+  // Old native clients validate exact receipt keys. Preserve their response contract.
+  const body=JSON.parse(await response.text());
+  return new Response(JSON.stringify(body,(key,value)=>key==='card_last4'?undefined:value),{status:response.status,headers:response.headers});
+}
+async function receiptApiCurrent(request:Request,env:ReceiptEnv,db:Database,subject:string,workspace:string,account:string,hash?:string,mode?:string){
   const write=request.method==='POST';
   await db.documentAccess(subject,workspace,account,write);
+  if(mode==='route')return receiptRoutingApi(request,env,db,subject,workspace,account,hash!);
   if(mode==='classification'){
     if(!write){
       const state=await db.classifyReceipt(subject,workspace,account,hash!,null) as object;
@@ -88,6 +97,9 @@ export async function receiptApi(request:Request,env:ReceiptEnv,db:Database,subj
     return Response.json({id:await db.reviewReceipt(subject,workspace,account,hash!,body.id as string,body.expected as number,data)});
   }
   if(mode==='post'){
+    const rows=await db.readReceipts(subject,workspace,account,hash!) as {review:{data:import('../src/domain/receipt').ReceiptData}|null}[];
+    const target=rows[0]?.review?await receiptTarget(env,db,subject,rows[0].review.data):null;
+    if(target&&(target.account!==account||target.workspace!==workspace))return Response.json({error:'receipt_wrong_account'},{status:409});
     let allocations;
     try{
       if(Object.keys(body).length!==(Object.hasOwn(body,'allocations')?4:3)||typeof body.review!=='string'||!uuid.test(body.review)||typeof body.operation!=='string'||!uuid.test(body.operation))throw new Error();
