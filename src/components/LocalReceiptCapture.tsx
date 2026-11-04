@@ -6,14 +6,14 @@ import {receiptQueueStore} from '../storage/receipt-queue';
 import {scopeKey,type DraftScope} from '../domain/operation-draft';
 import {Button,Card,Notice,styles} from './ui';
 let noteWrites:Promise<unknown>=Promise.resolve();
-export function LocalReceiptNote({scope,ru}:{scope:DraftScope;ru:boolean}){
- const key='nestwise.capture-note.v1:'+scopeKey(scope),[note,setNote]=useState(''),[ready,setReady]=useState(false),[saved,setSaved]=useState(false),[error,setError]=useState(false);const generation=useRef(0);const alive=useRef(true);
+export function LocalReceiptNote({scope,ru,compact=false}:{scope:DraftScope;ru:boolean;compact?:boolean}){
+ const key='nestwise.capture-note.v1:'+scopeKey(scope),[note,setNote]=useState(''),[ready,setReady]=useState(false),[saved,setSaved]=useState(false),[error,setError]=useState(false),[expanded,setExpanded]=useState(!compact);const generation=useRef(0);const alive=useRef(true);
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;};},[]);
- useEffect(()=>{let active=true;void noteWrites.then(()=>AsyncStorage.getItem(key)).then(v=>{if(active){setNote(v||'');setReady(true);setSaved(true);}}).catch(()=>{if(active)setError(true);});return()=>{active=false;};},[key]);
+ useEffect(()=>{let active=true;void noteWrites.then(()=>AsyncStorage.getItem(key)).then(v=>{if(active){setNote(v||'');if(v)setExpanded(true);setReady(true);setSaved(true);}}).catch(()=>{if(active)setError(true);});return()=>{active=false;};},[key]);
  function change(value:string){const revision=++generation.current;setNote(value);setSaved(false);const next=noteWrites.then(()=>AsyncStorage.setItem(key,value));noteWrites=next.catch(()=>{});void next.then(()=>{if(alive.current&&generation.current===revision){setSaved(true);setError(false);}}).catch(()=>{if(alive.current)setError(true);});}
- return <View style={{gap:8}}><Text style={styles.label}>{ru?'Заметка к покупкам на этом устройстве':'Purchase notes on this device'}</Text>
+ return <View style={{gap:8}}><Button label={ru?'Заметка к покупкам на этом устройстве':'Purchase notes on this device'} onPress={()=>setExpanded(v=>!v)}/>{expanded&&<>
  <TextInput accessibilityLabel={ru?'Продавец, дата, сумма и позиции':'Merchant, date, amount and items'} multiline maxLength={10000} editable={ready} value={note} onChangeText={change} placeholder={ru?'Продавец, дата, сумма, позиции. После подключения перенесите данные в чек.':'Merchant, date, amount, items. Enter these details in the receipt when connected.'} style={[styles.input,{minHeight:90}]}/>
- <Notice text={error?(ru?'Заметка не сохранена. Не закрывайте экран.':'Note not saved. Keep this screen open.'):saved?(ru?'Заметка сохранена только на устройстве. Расход не создан.':'Note saved on this device only. No expense created.'):(ru?'Сохраняем заметку…':'Saving note…')} error={error}/></View>;
+ <Notice text={error?(ru?'Заметка не сохранена. Не закрывайте экран.':'Note not saved. Keep this screen open.'):saved?(ru?'Заметка сохранена только на устройстве. Расход не создан.':'Note saved on this device only. No expense created.'):(ru?'Сохраняем заметку…':'Saving note…')} error={error}/></>}</View>;
 }
 export function LocalReceiptCapture({origin,user,workspace,account,ru}:{origin:string;user:string;workspace:string;account:string;ru:boolean}){
  const scope=useMemo(()=>({origin,user,workspace,account}),[origin,user,workspace,account]);
