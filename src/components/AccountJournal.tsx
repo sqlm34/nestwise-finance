@@ -12,6 +12,7 @@ import {JournalDetail} from './JournalDetail';
 import {transactionLabel,transactionPerson,transactionAmount} from '../domain/transaction-label';
 import {onForegroundRefresh} from '../foreground-refresh';
 import {recordJournalChange} from '../domain/journal-change';
+import {OrderPartsResult} from './OrderPartsResult';
 const labels:Record<JournalCode,MessageKey>={
   clearing:'journalClearing',receipts:'journalReceipts',refunds:'journalRefunds',
   parts_cost:'journalPartsCost',parts_payable:'journalPartsPayable',fees:'journalFees',expenses:'journalExpenses',transfers:'journalTransfers',
@@ -71,7 +72,9 @@ export function AccountJournal({name,currency,workspace,account,onSessionExpired
     {page?.entries.length===0&&<Text style={styles.muted}>{t('journalNoMatches')}</Text>}
     <View style={{flexDirection:'row',justifyContent:'space-between',padding:10,backgroundColor:'#f8faf9'}}><Text style={styles.label}>{locale==='ru'?'ОПЕРАЦИЯ / КЛИЕНТ':'TRANSACTION / CUSTOMER'}</Text><Text style={styles.label}>{locale==='ru'?'СУММА':'AMOUNT'}</Text></View>
     {page?.entries.slice(0,5).map(row=>{const cash=transactionAmount(row);return <Pressable key={row.id} accessibilityRole="button" accessibilityLabel={`${transactionLabel(row,locale)}. ${transactionPerson(row,locale)}. ${journalMoney(cash.toString(),locale,currency)}`} onPress={()=>setSelectedTransaction(row.id)} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:12,borderTopWidth:1,borderColor:colors.line}}>
-      <View style={{flex:1,gap:3}}><Text style={styles.text}>{transactionLabel(row,locale)}</Text><Text style={styles.text}>{transactionPerson(row,locale)}</Text><Text style={styles.muted}>{row.paid_at?.slice(0,10)??t('journalNotPaid')}</Text></View>
+      <View style={{flex:1,gap:3}}><Text style={styles.text}>{transactionLabel(row,locale)}</Text><Text style={styles.text}>{transactionPerson(row,locale)}</Text><Text style={styles.muted}>{row.paid_at?.slice(0,10)??t('journalNotPaid')}</Text>
+        {row.order_result&&row.entries.some(e=>e.code==='receipts'&&BigInt(e.cents)<0n)&&<OrderPartsResult value={row.order_result}/>}
+      </View>
       <Text style={[styles.text,{fontWeight:'600',color:cash<0n?colors.red:colors.green}]}>{cash>0n?'+':''}{journalMoney(cash.toString(),locale,currency).replace(/ USD$/,'')}</Text>
     </Pressable>;})}
     <Text style={[styles.muted,{fontSize:11}]}>{locale==='ru'?'Плюс — деньги пришли, минус — деньги ушли.':'Plus means money received; minus means money spent.'}</Text>

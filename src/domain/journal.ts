@@ -1,11 +1,13 @@
 import {exactUsd} from './exact-money';
 import {localDateTime} from './local-time';
+import {parseOrderResult,type OrderResult} from './order-result';
 export const journalCodes=['clearing','receipts','refunds','parts_cost','parts_payable','fees','expenses','transfers'] as const;
 export type JournalCode=typeof journalCodes[number];
 export type JournalTransaction={
   id:string;occurred_at:string;paid_at:string|null;posted_at:string;
   source_event_id:string;source_order_id:string;
   customer_name?:string;
+  order_result?:OrderResult;
   entries:{code:JournalCode;cents:string}[];
 };
 export type JournalPage={entries:JournalTransaction[];limit:number};
@@ -41,7 +43,8 @@ export function parseJournal(value:unknown):JournalPage {
       return {code:line.code as JournalCode,cents:line.cents};
     });
     if(lines.reduce((sum,line)=>sum+BigInt(line.cents),0n)!==0n)throw new Error('invalid_journal');
-    return {id,occurred_at:timestamp(row.occurred_at),paid_at:row.paid_at===null?null:timestamp(row.paid_at),
+    const orderResult=parseOrderResult(row.order_result);
+    return {id,...(orderResult?{order_result:orderResult}:{}),occurred_at:timestamp(row.occurred_at),paid_at:row.paid_at===null?null:timestamp(row.paid_at),
       posted_at:timestamp(row.posted_at),source_event_id:identifier(row.source_event_id),
       source_order_id:(()=>{
         if(typeof row.source_order_id!=='string'||!/^[A-Za-z0-9_.:-]{1,128}$/.test(row.source_order_id))throw new Error('invalid_journal');

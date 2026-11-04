@@ -25,3 +25,10 @@ test('simple operation labels preserve signs and distinguish income, refunds, pa
  const cases=[['receipts','-16500','Поступление от клиента'],['parts_cost','4309','Покупка запчасти'],['parts_cost','-4309','Возврат за запчасть'],['expenses','300','Расход'],['fees','300','Комиссия за оплату']];
  for(const [code,cents,label] of cases)assert.equal(transactionLabel({...row,entries:[{code,cents},{code:'clearing',cents:String(-BigInt(cents))}]},'ru'),label);
 });
+test('job result is optional enrichment and never changes financial journal entries',async()=>{
+ const page={entries:[row],limit:100},summary={received_cents:'35500',refunds_cents:'0',purchased_parts_cents:'0',stock_parts_cents:'1935'};
+ const enriched=await orderLabels(page,connections,env,async()=>Response.json({labels:[{order_id:row.source_order_id,customer_name:'Synthetic',order_result:summary}]}));
+ assert.deepEqual(enriched.entries[0].order_result,summary);assert.deepEqual(enriched.entries[0].entries,row.entries);
+ const invalid=await orderLabels(page,connections,env,async()=>Response.json({labels:[{order_id:row.source_order_id,customer_name:'Synthetic',order_result:{...summary,stock_parts_cents:'NaN'}}]}));
+ assert.equal(invalid.entries[0].order_result,undefined);assert.deepEqual(invalid.entries[0].entries,row.entries);
+});
