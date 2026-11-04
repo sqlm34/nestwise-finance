@@ -1,5 +1,6 @@
 import {sha256,type ServiceKey,limitedText} from './security';
 import type {UserEnv} from './user-api';
+import {parseOrderResult,type OrderResult} from '../src/domain/order-result';
 type Row={source_order_id:string;source_event_id:string;customer_name?:string};
 // Enrichment only: amounts, event bytes and the immutable ledger are unchanged.
 export async function orderLabels<T>(page:T,connections:unknown,env:UserEnv,fetcher:typeof fetch=(input,init)=>globalThis.fetch(input,init)):Promise<T> {
@@ -21,8 +22,9 @@ export async function orderLabels<T>(page:T,connections:unknown,env:UserEnv,fetc
     if(!result.ok){console.warn('CRM labels unavailable',result.status);return page;}
     const data=JSON.parse(await limitedText(result,100000));
     if(!Array.isArray(data.labels)||data.labels.length>100){console.warn('CRM labels unavailable','invalid response');return page;}
-    const names=new Map<string,string>();
-    for(const label of data.labels){if(typeof label?.order_id!=='string'||typeof label.customer_name!=='string'||label.customer_name.length>200)return page;names.set(label.order_id,label.customer_name.trim());}
-    return {...page,entries:rows.map(row=>({...row,...(names.get(row.source_order_id)?{customer_name:names.get(row.source_order_id)}:{})}))};
+    const names=new Map<string,string>(),results=new Map<string,OrderResult>();
+    const requestedOrders=new Set(requested.map(row=>row.order_id));
+    for(const label of data.labels){if(typeof label?.order_id!=='string'||typeof label.customer_name!=='string'||label.customer_name.length>200||!requestedOrders.has(label.order_id))return page;names.set(label.order_id,label.customer_name.trim());const result=parseOrderResult(label.order_result);if(result)results.set(label.order_id,result);}
+    return {...page,entries:rows.map(row=>({...row,...(names.get(row.source_order_id)?{customer_name:names.get(row.source_order_id)}:{}),...(results.has(row.source_order_id)?{order_result:results.get(row.source_order_id)}:{})}))};
   }catch(error){console.warn('CRM labels unavailable',error instanceof Error?error.name:'lookup error');return page;}
 }

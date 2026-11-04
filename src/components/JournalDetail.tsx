@@ -10,6 +10,7 @@ import {parseJournalDetail,parseEventDetail,type EventDetail,type JournalDetail 
 import type {MessageKey} from '../i18n';
 import {parseManualDetail,type ManualDetail} from '../domain/manual-operation';
 import {saveReceiptOriginal} from '../receipt-file';
+import {OrderPartsResult} from './OrderPartsResult';
 const kinds:Record<SourceEvent['kind'],MessageKey>={
   'job.payment_recorded':'eventPayment','job.part_cost_recorded':'eventPart','job.customer_refund_issued':'eventRefund',
   'job.supplier_credit_received':'eventCredit','job.cost_corrected':'eventCorrection',
@@ -96,6 +97,7 @@ export function JournalDetail({workspace,account,transaction,event,currency,name
         <Text style={styles.text}>{transactionPerson(data.transaction,locale)}</Text>
         <Text style={[styles.h2,{color:transactionAmount(data.transaction)<0n?colors.red:colors.green}]}>{transactionAmount(data.transaction)>0n?'+':''}{journalMoney(transactionAmount(data.transaction).toString(),locale,currency)}</Text>
         <Text style={styles.muted}>{data.transaction.paid_at?.slice(0,10)??t('journalNotPaid')}</Text>
+        {data.transaction.order_result&&<OrderPartsResult value={data.transaction.order_result}/>}
       </View>}
       <Button label={technical?(locale==='ru'?'Скрыть технические подробности':'Hide technical details'):(locale==='ru'?'Технические подробности':'Technical details')} onPress={()=>setTechnical(value=>!value)}/>
       {technical&&<>
