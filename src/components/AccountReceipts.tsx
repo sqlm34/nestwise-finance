@@ -28,12 +28,12 @@ export function AccountReceipts({user,workspace,account,business,personal=false,
   const {locale}=useApp(),ru=locale==='ru';
   const queueScope=useMemo(()=>({origin:apiURL,user,workspace,account}),[user,workspace,account]);
   const [rows,setRows]=useState<Receipt[]>([]),[revision,setRevision]=useState(0),[selected,setSelected]=useState<Receipt|null>(null);
-  const refreshReceipts=useCallback(()=>setRevision(v=>v+1),[]);
   const [before,setBefore]=useState<string|null>(null),[loadedKey,setLoadedKey]=useState('');
   const [form,setForm]=useState(empty),[money,setMoney]=useState<Record<string,string>>({}),[items,setItems]=useState<{description:string;amount:string;key:string}[]>([]);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[preview,setPreview]=useState('');
   const [pending,setPending]=useState<{mode:'review'|'post';body:unknown;summary?:string}|null>(null);
   const [upload,setUpload]=useState<ReceiptFile|null>(null);
+  const refreshReceipts=useCallback((hashes:string[])=>{setUpload(file=>file&&hashes.includes(file.hash)?null:file);setRevision(v=>v+1);},[]);
   const [editDetails,setEditDetails]=useState(false);
   const [routingBlocked,setRoutingBlocked]=useState(true);
   const [query,setQuery]=useState(''),[stage,setStage]=useState<ReceiptStage|'all'>('all'),[technical,setTechnical]=useState(false);

@@ -15,6 +15,6 @@ export function ReceiptRouting({path,review,account,ru,onRouted,onBlocked,onEdit
  return <View style={{gap:8}}>
   {!!error&&<><Notice error text={error}/><Button label={ru?'Повторить проверку карты':'Retry card check'} disabled={busy} onPress={()=>setRevision(v=>v+1)}/></>}
   {loaded&&(target?<Notice text={`${ru?'Счёт по карте':'Account identified by card'}: ${target.name}`}/>:<Notice text={ru?'Карта не определена однозначно. Проверьте выбранный счёт вручную. Личные покупки для бизнеса отмечаются по отдельным позициям.':'Card is not uniquely identified. Check the selected account manually. Mark personal-card business purchases by item.'}/>)}
-  {loaded&&target&&target.account!==account&&<><Notice text={ru?'Чек относится к другому счёту. Перенесите его перед учётом оплаты.':'This receipt belongs to another account. Transfer it before recording payment.'}/><Button primary label={`${ru?'Открыть чек в':'Open receipt in'} ${target.name}`} disabled={busy} onPress={()=>void route()}/><Button label={ru?'Исправить распознанную карту':'Correct recognized card'} disabled={busy} onPress={onEdit}/></>}
+  {loaded&&target&&target.account!==account&&<><Notice text={ru?'Чек относится к другому счёту. Перенесите его перед учётом оплаты.':'This receipt belongs to another account. Transfer it before recording payment.'}/><Button primary label={`${ru?'Перенести в':'Transfer to'} ${target.name}`} disabled={busy} onPress={()=>void route()}/><Button label={ru?'Исправить распознанную карту':'Correct recognized card'} disabled={busy} onPress={onEdit}/></>}
  </View>;
 }

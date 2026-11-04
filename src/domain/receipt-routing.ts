@@ -8,7 +8,7 @@ export function receiptCardTarget(raw:string|undefined,last4:string|null|undefin
  const matches=routes.filter(r=>r.last4===last4).flatMap(r=>{
   const space=spaces.find(s=>s.id===r.workspace&&['owner','accountant'].includes(s.role));
   const account=space?.accounts.find(a=>a.id===r.account&&a.currency==='USD');
-  return space&&account?[{workspace:space.id,account:account.id,name:space.name+' · '+account.name,currency:account.currency}]:[];
+  return space&&account?[{workspace:space.id,account:account.id,name:account.name,currency:account.currency}]:[];
  });
  return matches.length===1?matches[0]:null;
 }
