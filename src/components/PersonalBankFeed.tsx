@@ -8,10 +8,12 @@ import {periodPreset} from '../domain/period-insights';
 import {exactUsd} from '../domain/exact-money';
 import {Button,Card,Notice,colors,styles} from './ui';
 import {AutomaticUpdates} from './AutomaticUpdates';
+import {PersonalExpenseChart} from './PersonalExpenseChart';
 type Feed={connection:null|{institution:string;name:string;mask:string;enabled:boolean;checked_at:string|null;changed_at:string|null;error:string|null};
  rows:{id:string;paid_on:string;name:string;cents:string;pending:boolean;category:string;currency:string}[];count?:number};
 export function PersonalBankFeed({workspace,account,onSessionExpired,allowAppUpdate=false,fallback}:{workspace:string;account:string;onSessionExpired:()=>void;allowAppUpdate?:boolean;fallback?:React.ReactNode}){
  const {locale}=useApp(),ru=locale==='ru';const [period,setPeriod]=useState(()=>periodPreset('month'));
+ const [chart,setChart]=useState(false);
  const [feed,setFeed]=useState<Feed|null>(null),[error,setError]=useState(false),[revision,setRevision]=useState(0);
  useEffect(()=>{
   const controller=new AbortController();let active=true,inFlight=false;
@@ -30,10 +32,13 @@ export function PersonalBankFeed({workspace,account,onSessionExpired,allowAppUpd
  },[workspace,account,period.from,period.to,revision,onSessionExpired]);
  const shift=(amount:number)=>{setFeed(null);const date=new Date(period.from+'T12:00:00Z');date.setUTCMonth(date.getUTCMonth()+amount);setPeriod(periodPreset('month',date));};
  const connection=feed?.connection;
- if(feed&&!connection&&fallback)return <>{fallback}</>;
+ if(chart)return <PersonalExpenseChart workspace={workspace} account={account} onClose={()=>setChart(false)} onSessionExpired={onSessionExpired}/>;
+ const chartButton=<Button label={ru?'Диаграмма расходов':'Expense chart'} onPress={()=>setChart(true)}/>;
+ if(feed&&!connection&&fallback)return <>{chartButton}{fallback}</>;
  return <Card>
   <AutomaticUpdates canApply={allowAppUpdate}/>
   <Text style={styles.h2}>{ru?'Личные банковские операции':'Personal bank transactions'}</Text>
+  {chartButton}
   <View style={styles.between}><Button label={ru?'← Месяц':'← Month'} onPress={()=>shift(-1)}/><Text style={styles.text}>{period.from.slice(0,7)}</Text><Button label={ru?'Месяц →':'Month →'} onPress={()=>shift(1)}/></View>
   {error&&<Notice error text={ru?'Не удалось обновить операции. Сохранённые данные остаются на экране.':'Could not refresh transactions. Previously loaded data remains visible.'}/>}
   {!feed&&!error&&<ActivityIndicator color={colors.green}/>}
